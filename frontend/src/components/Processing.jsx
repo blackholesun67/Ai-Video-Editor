@@ -12,10 +12,10 @@ const STATUS_TRANSLATIONS = {
 };
 
 const STEPS = [
-  { id: 1, label: 'แยกเสียง',     icon: FileAudio,  progressMin: 0,  progressMax: 24 },
-  { id: 2, label: 'ตรวจเสียงพูด',  icon: Loader2,    progressMin: 25, progressMax: 44 },
-  { id: 3, label: 'AI วิเคราะห์',  icon: Brain,      progressMin: 45, progressMax: 79 },
-  { id: 4, label: 'ตัด & รวม',     icon: Film,       progressMin: 80, progressMax: 100 },
+  { id: 1, label: 'แยกเสียง',       icon: FileAudio,  progressMin: 0,  progressMax: 24 },
+  { id: 2, label: 'ฟังเสียงพูด',     icon: Loader2,    progressMin: 25, progressMax: 44 },
+  { id: 3, label: 'AI คิดวิเคราะห์', icon: Brain,      progressMin: 45, progressMax: 79 },
+  { id: 4, label: 'ตัดและรวมคลิป',   icon: Film,       progressMin: 80, progressMax: 100 },
 ];
 
 // เพดานเวลา polling — งานที่ค้างนานเกินนี้ (เช่น worker ตาย) จะเลิก poll แล้วโชว์ error
@@ -39,6 +39,26 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = null;
   };
+
+  // เก็บเวลาเริ่มไว้ใน localStorage → refresh แล้ว timer ไม่รีเซ็ตเป็น 0
+  useEffect(() => {
+    const key = `aive_start_${jobId}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      startTimeRef.current = parseInt(saved, 10);
+    } else {
+      startTimeRef.current = Date.now();
+      localStorage.setItem(key, String(startTimeRef.current));
+    }
+    setElapsedSec(Math.floor((Date.now() - startTimeRef.current) / 1000));
+  }, [jobId]);
+
+  // งานจบ (สำเร็จ/ล้มเหลว) → ล้างเวลาเริ่มที่เก็บไว้
+  useEffect(() => {
+    if (status === 'SUCCESS' || status === 'FAILURE') {
+      localStorage.removeItem(`aive_start_${jobId}`);
+    }
+  }, [status, jobId]);
 
   // Elapsed timer
   useEffect(() => {
@@ -135,6 +155,10 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
   const isFailure = status === 'FAILURE';
   const isSuccess = status === 'SUCCESS';
   const isPending = message.startsWith('🕐') || status === 'PENDING';
+  // ETA โดยประมาณจาก progress ปัจจุบัน (ประเมินคร่าว ๆ — บอกให้ user อุ่นใจว่ายังไม่ค้าง)
+  const eta = (status === 'PROGRESS' && progress > 8 && progress < 100)
+    ? Math.round((elapsedSec / progress) * (100 - progress))
+    : null;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -158,9 +182,9 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
 
           {/* Title */}
           <h2 className="text-xl sm:text-2xl font-semibold text-slate-900">
-            {isSuccess ? 'สำเร็จ' :
-              isFailure ? 'เกิดข้อผิดพลาด' :
-              isPending ? 'รอคิวประมวลผล' : 'กำลังประมวลผล'}
+            {isSuccess ? 'เสร็จแล้ว' :
+              isFailure ? 'มีบางอย่างผิดพลาด' :
+              isPending ? 'กำลังรอคิว' : 'กำลังตัดต่อให้อยู่'}
           </h2>
           <p className="text-sm text-slate-500 mt-1.5 max-w-md mx-auto">{message}</p>
 
@@ -178,10 +202,19 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
               />
             </div>
             <div className="flex items-center justify-between mt-2 text-xs">
-              <span className="text-slate-400 font-mono">ID: {jobId.substring(0, 8)}</span>
-              <span className="font-medium text-slate-600">{progress}% · {formatTime(elapsedSec)}</span>
+              <span className="font-medium text-slate-600">{progress}% · ผ่านไป {formatTime(elapsedSec)}</span>
+              {eta != null && (
+                <span className="text-slate-400">เหลืออีกประมาณ {formatTime(eta)}</span>
+              )}
             </div>
           </div>
+
+          {/* บอก user ว่าปิดหน้าได้ ระบบทำงานต่อ */}
+          {!isFailure && !isSuccess && (
+            <p className="text-xs text-slate-400 mt-4 max-w-sm mx-auto leading-relaxed">
+              💡 ปิดหน้านี้หรือปิดเครื่องได้ — ระบบประมวลผลต่อเบื้องหลัง กลับมาที่หน้านี้ (บนเบราว์เซอร์เดิม) เพื่อดูผลได้
+            </p>
+          )}
         </div>
 
         {/* Step indicator */}

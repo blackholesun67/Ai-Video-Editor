@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
-  Type, Check, Play, Loader2, AlertTriangle, RotateCcw, Sparkles,
+  Type, Check, Play, Loader2, AlertTriangle, RotateCcw, Sparkles, X,
 } from 'lucide-react';
 import { API_URL } from '../config';
 
@@ -19,10 +19,15 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [dirtyCount, setDirtyCount] = useState(0);
+  const [videoSrc, setVideoSrc] = useState(null);
+  const [activeIdx, setActiveIdx] = useState(null);
   const listRef = useRef(null);
+  const videoRef = useRef(null);
+  const playEndRef = useRef(null);
 
-  // Load subtitle phrases
+  // Load subtitle phrases + วิดีโอต้นฉบับ (จาก preview.json)
   useEffect(() => {
     let cancelled = false;
     axios.get(`${API_URL}/subtitle/${jobId}`)
@@ -35,11 +40,43 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err.response?.data?.detail || 'โหลด subtitle ไม่สำเร็จ');
+        setError(err.response?.data?.detail || 'โหลดคำบรรยายไม่สำเร็จ');
         setLoading(false);
       });
+    // ดึง URL วิดีโอต้นฉบับ (best-effort — ไม่มีก็แค่ไม่โชว์ player)
+    axios.get(`${API_URL}/preview/${jobId}`)
+      .then((res) => {
+        if (cancelled) return;
+        const p = res.data?.video_path;
+        if (p) {
+          const rel = p.replace(/\\/g, '/').replace(/^storage\//, '');
+          setVideoSrc(`${API_URL}/storage/${rel}`);
+        }
+      })
+      .catch(() => { /* ignore */ });
     return () => { cancelled = true; };
   }, [jobId]);
+
+  // เล่นพรีวิวเฉพาะช่วง phrase นั้น
+  const playPhrase = (idx, ph) => {
+    const v = videoRef.current;
+    if (!v) return;
+    playEndRef.current = ph.end;
+    setActiveIdx(idx);
+    try {
+      v.currentTime = ph.start;
+      v.play().catch(() => {});
+      v.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch { /* ignore */ }
+  };
+
+  const onTimeUpdate = () => {
+    const v = videoRef.current;
+    if (v && playEndRef.current != null && v.currentTime >= playEndRef.current) {
+      v.pause();
+      playEndRef.current = null;
+    }
+  };
 
   // Track dirty count
   useEffect(() => {
@@ -55,12 +92,13 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
   };
 
   const resetAll = () => {
-    if (!window.confirm('คืนค่า subtitle เป็นต้นฉบับ?')) return;
+    if (!window.confirm('คืนคำบรรยายกลับเป็นต้นฉบับ?')) return;
     setPhrases(originalPhrases.map((p) => ({ ...p })));
   };
 
   const handleRender = async () => {
     setSubmitting(true);
+    setSubmitError('');
     try {
       // ส่ง edited phrases + selected segments → render
       const res = await axios.post(`${API_URL}/render/${jobId}`, {
@@ -69,7 +107,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
       });
       onRendering(res.data.task_id);
     } catch (err) {
-      alert(err.response?.data?.detail || 'Render fail');
+      setSubmitError(err.response?.data?.detail || 'ส่งไปตัดต่อไม่สำเร็จ — กรุณาลองใหม่');
       setSubmitting(false);
     }
   };
@@ -78,7 +116,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
         <Loader2 className="h-12 w-12 text-indigo-500 animate-spin mx-auto mb-3" />
-        <p className="text-sm text-slate-500">กำลังโหลด subtitle...</p>
+        <p className="text-sm text-slate-500">กำลังโหลดคำบรรยาย...</p>
       </div>
     );
   }
@@ -103,10 +141,10 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center space-y-4">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
           <AlertTriangle className="h-3.5 w-3.5" />
-          ไม่มี subtitle
+          ไม่มีคำบรรยาย
         </div>
         <p className="text-sm text-slate-600">
-          ไม่สามารถสร้าง subtitle ได้ — ข้ามขั้นตอนนี้แล้ว render ต่อเลย?
+          สร้างคำบรรยายไม่ได้ — ข้ามไปตัดต่อเลยไหม?
         </p>
         <div className="flex gap-3">
           <button
@@ -119,7 +157,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
             onClick={handleRender}
             className="flex-1 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
           >
-            ข้าม → Render
+            ข้ามไปตัดต่อ
           </button>
         </div>
       </div>
@@ -132,15 +170,28 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
       <div className="text-center">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium mb-2">
           <Type className="h-3.5 w-3.5" />
-          แก้ Subtitle
+          แก้คำบรรยาย
         </div>
         <h2 className="text-2xl font-semibold text-slate-900">
-          ตรวจสอบ + แก้ <span className="text-indigo-600">subtitle</span> ก่อน render
+          ตรวจและแก้ <span className="text-indigo-600">คำบรรยาย</span> ก่อนตัดต่อ
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          แก้คำที่ฟังผิดได้ — เช่น ชื่อเฉพาะ, ศัพท์เทคนิค
+          แก้คำที่ฟังผิดได้ เช่น ชื่อเฉพาะ หรือศัพท์เฉพาะทาง
         </p>
       </div>
+
+      {/* Video player (ต้นฉบับ) — กด "ดู" ที่บรรทัดเพื่อฟังช่วงนั้น */}
+      {videoSrc && (
+        <div className="rounded-2xl overflow-hidden bg-slate-900 border border-slate-200">
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            controls
+            onTimeUpdate={onTimeUpdate}
+            className="w-full max-h-[40vh] object-contain bg-black"
+          />
+        </div>
+      )}
 
       {/* Stats */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between gap-3 flex-wrap">
@@ -150,7 +201,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
               <Sparkles className="h-4 w-4 text-indigo-600" />
             </div>
             <div>
-              <p className="text-[10px] text-slate-500 uppercase font-medium">รวม phrases</p>
+              <p className="text-[10px] text-slate-500 uppercase font-medium">จำนวนบรรทัด</p>
               <p className="text-lg font-bold text-slate-800">{phrases.length}</p>
             </div>
           </div>
@@ -186,11 +237,14 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
       <div ref={listRef} className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
         {phrases.map((ph, idx) => {
           const isEdited = (ph.text || '') !== (originalPhrases[idx]?.text || '');
+          const isActive = activeIdx === idx;
           return (
             <div
               key={idx}
               className={`p-3 rounded-xl border-2 transition-colors ${
-                isEdited
+                isActive
+                  ? 'border-indigo-400 bg-indigo-50/50 ring-2 ring-indigo-200'
+                  : isEdited
                   ? 'border-amber-300 bg-amber-50/40'
                   : 'border-slate-200 bg-white'
               }`}
@@ -199,11 +253,26 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
                 <span className="font-mono text-[11px] text-slate-500">
                   {formatTime(ph.start)} → {formatTime(ph.end)}
                 </span>
-                {isEdited && (
-                  <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
-                    แก้แล้ว
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {isEdited && (
+                    <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                      แก้แล้ว
+                    </span>
+                  )}
+                  {videoSrc && (
+                    <button
+                      type="button"
+                      onClick={() => playPhrase(idx, ph)}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors ${
+                        isActive
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                      }`}
+                    >
+                      <Play className="h-2.5 w-2.5" /> ดู
+                    </button>
+                  )}
+                </div>
               </div>
               <input
                 type="text"
@@ -215,12 +284,23 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
                     ? 'border-amber-300 bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
                     : 'border-slate-200 bg-slate-50/60 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-200'
                 }`}
-                placeholder="พิมพ์ subtitle..."
+                placeholder="พิมพ์คำบรรยาย..."
               />
             </div>
           );
         })}
       </div>
+
+      {/* inline error (แทน alert) */}
+      {submitError && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <span>⚠️</span>
+          <span className="flex-1">{submitError}</span>
+          <button onClick={() => setSubmitError('')} className="text-red-400 hover:text-red-600" aria-label="ปิด">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="space-y-2 pt-2">
@@ -235,12 +315,12 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
         >
           {submitting ? (
             <>
-              <Loader2 className="h-5 w-5 animate-spin" /> กำลังส่ง render...
+              <Loader2 className="h-5 w-5 animate-spin" /> กำลังส่งไปตัดต่อ...
             </>
           ) : (
             <>
               <Play className="h-5 w-5" />
-              บันทึก + Render ({dirtyCount > 0 ? `แก้ ${dirtyCount} บรรทัด` : 'ใช้ subtitle เดิม'})
+              บันทึก + ตัดต่อ ({dirtyCount > 0 ? `แก้ ${dirtyCount} บรรทัด` : 'ใช้ subtitle เดิม'})
             </>
           )}
         </button>
@@ -249,7 +329,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
           disabled={submitting}
           className="w-full py-3 rounded-xl font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50"
         >
-          ← กลับไปเลือก segments
+          ← กลับไปเลือกช่วง
         </button>
       </div>
     </div>

@@ -1,83 +1,86 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Upload, MessageSquare, X, MicOff, BookOpen, Scissors, GraduationCap,
-  Mic, Briefcase, Gamepad2, Smartphone, Edit, FileVideo, Zap, Sparkles,
-  Star, Video, ShoppingBag, Utensils, Presentation, HelpCircle, Smile,
+  Upload, X, FileVideo, Scissors, ListChecks, Monitor, Smartphone, Loader2,
+  GraduationCap, Mic, Star, Video, Briefcase, Gamepad2, Sparkles,
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 
-// preset เขียนแบบ "เก็บอะไร / ตัดอะไร" ให้ชัด → AI ตัดสินใจแม่นขึ้น
-const PROMPT_PRESETS = [
-  { id: 'silence',  icon: MicOff,          label: 'ตัดความเงียบ',  desc: 'ลบ filler + ช่วงเงียบ',
-    text: 'ตัดเฉพาะช่วงเงียบ ช่วงหยุดคิดนาน คำ filler (อืม เอ่อ อ่อ เอิ่ม) และช่วงพูดซ้ำคำเดิมโดยไม่เพิ่มข้อมูล — เก็บเนื้อหาที่พูดจริงไว้ครบ ไม่ตัดใจความ' },
-  { id: 'essence',  icon: BookOpen,        label: 'เก็บสาระสำคัญ', desc: 'concept + ตัวอย่าง',
-    text: 'เก็บแนวคิด หลักการ คำอธิบาย และตัวอย่างที่ช่วยให้เข้าใจประเด็นหลัก — ตัดการเกริ่นยาว เรื่องเล่านอกประเด็น มุกที่ไม่เกี่ยวข้อง และช่วงพูดวกวน' },
-  { id: 'shortest', icon: Scissors,        label: 'สรุปสั้นที่สุด', desc: 'key points เท่านั้น',
-    text: 'ตัดให้สั้นกระชับที่สุด เก็บเฉพาะประเด็นสำคัญที่สุด (key points) และข้อสรุป — ตัด background การเกริ่น ตัวอย่างเสริม และรายละเอียดปลีกย่อยทั้งหมด' },
-  { id: 'tutorial', icon: GraduationCap,   label: 'วิดีโอสอน',     desc: 'step-by-step',
-    text: 'วิดีโอสอน — เก็บการอธิบายแนวคิด ขั้นตอนทำจริง (step-by-step) และตัวอย่างที่ลงมือทำ — ตัดการเกริ่นยาว พูดนอกเรื่อง ช่วงผู้สอนสับสน/แก้ที่ผิด และช่วงรอโหลด/เตรียมของ' },
-  { id: 'seminar',  icon: Presentation,    label: 'สัมมนา/บรรยาย', desc: 'ประเด็นหลัก + Q&A',
-    text: 'สัมมนา/บรรยาย — เก็บประเด็นหลัก สาระที่บรรยาย ข้อมูล/สถิติสำคัญ และช่วงถาม-ตอบที่มีสาระ — ตัดการแนะนำวิทยากรยาว การรอเริ่มงาน ปัญหาเทคนิค และช่วงพักเบรก' },
-  { id: 'review',   icon: Star,            label: 'รีวิวสินค้า',   desc: 'ข้อดี-ข้อเสีย + สรุป',
-    text: 'รีวิวสินค้า/บริการ — เก็บข้อดี ข้อเสีย ฟีเจอร์เด่น ราคา ประสบการณ์ใช้จริง และบทสรุป/คำแนะนำ — ตัดการเกริ่นนำยาว unboxing ที่ยืดเยื้อ และการพูดนอกเรื่อง' },
-  { id: 'cooking',  icon: Utensils,        label: 'ทำอาหาร',       desc: 'สูตร + ขั้นตอน',
-    text: 'ทำอาหาร — เก็บส่วนผสม ขั้นตอนการทำ เทคนิค/เคล็ดลับ และช่วงชิม/ผลลัพธ์ — ตัดการเกริ่นนำยาว ช่วงรอต้ม/รออบ/รอทอดที่ไม่มีคำอธิบาย และการพูดนอกเรื่อง' },
-  { id: 'podcast',  icon: Mic,             label: 'Podcast/สัมภาษณ์', desc: 'แก่นการสนทนา',
-    text: 'Podcast/สัมภาษณ์ — เก็บแก่นการสนทนา คำตอบสำคัญของแขก ประเด็นน่าสนใจและข้อคิด — ตัด small talk ทักทายช่วงต้น การทวนคำถามซ้ำ ช่วงคุยหลุดประเด็นยาว และการโปรโมท/ขอบคุณตอนท้ายที่ยืดเยื้อ' },
-  { id: 'qa',       icon: HelpCircle,      label: 'ถาม-ตอบ/Q&A',   desc: 'คำถาม + คำตอบ',
-    text: 'ไลฟ์ถาม-ตอบ — เก็บคำถามและคำตอบที่มีสาระ ประเด็นที่น่าสนใจ — ตัดช่วงรอคำถาม การทักทาย พูดคุยเล่น และช่วงที่ตอบวกวนไม่ตรงคำถาม' },
-  { id: 'vlog',     icon: Video,           label: 'Vlog/เล่าเรื่อง', desc: 'ไฮไลต์ + เล่าเรื่อง',
-    text: 'Vlog/เล่าเรื่อง — เก็บช่วงเล่าเรื่องสำคัญ ไฮไลต์ของวัน และช่วงที่มีอารมณ์ร่วม/น่าสนใจ — ตัดช่วงเดินทางเงียบ ๆ ช่วงเตรียมตัว และช่วงที่ไม่มีอะไรเกิดขึ้น' },
-  { id: 'reaction', icon: Smile,           label: 'Reaction',      desc: 'ช่วงรีแอคเด่น',
-    text: 'Reaction/ดูคลิป — เก็บช่วงที่มีปฏิกิริยาชัด (ตกใจ/ตลก/ประทับใจ) และช่วงคอมเมนต์/วิเคราะห์ที่น่าสนใจ — ตัดช่วงดูเงียบ ๆ ไม่พูด และการเกริ่นยาว' },
-  { id: 'sales',    icon: ShoppingBag,     label: 'ไลฟ์ขายของ',    desc: 'สินค้า + ราคา + โปร',
-    text: 'ไลฟ์ขายของ — เก็บช่วงพรีเซนต์สินค้า จุดขาย ราคา โปรโมชั่น และวิธีสั่งซื้อ — ตัดช่วงทักทาย รอลูกค้า พูดคุยเล่น และช่วงพูดซ้ำที่ไม่มีข้อมูลใหม่' },
-  { id: 'meeting',  icon: Briefcase,       label: 'ประชุม', desc: 'ตัดสินใจ + action',
-    text: 'สรุปประชุม — เก็บการตัดสินใจ ข้อสรุป action item ผู้รับผิดชอบ deadline และประเด็นสำคัญที่ถกกัน — ตัด chitchat ก่อนเริ่ม ช่วงรอคนเข้า การพูดนอกวาระ และปัญหาเทคนิค (เสียงหาย รอแชร์จอ)' },
-  { id: 'gaming',   icon: Gamepad2,        label: 'Live/Gaming',  desc: 'ไฮไลต์เท่านั้น',
-    text: 'Live/เกม — เก็บช่วงไฮไลต์ (kill, ชนะ, จังหวะพลิก, react ตลก, ช่วงลุ้น) และ milestone สำคัญ — ตัดช่วงเดินทาง รอ respawn/loading, AFK, เมนู และช่วงเงียบที่ไม่มีอะไรเกิดขึ้น' },
-  { id: 'tiktok',   icon: Smartphone,      label: 'TikTok/Reels', desc: '9:16 · hook + พีค',
-    text: 'คลิปสั้นแนวตั้ง — เลือกช่วงที่ปังที่สุด เริ่มด้วย hook ดึงความสนใจใน 3 วินาทีแรก ตามด้วยช่วงพีค (ตลก/น่าทึ่ง/น่าจดจำ) — ตัดทุกอย่างที่ยืดเยื้อ เน้นกระชับและ engaging' },
-  { id: 'custom',   icon: Edit,            label: 'Custom', desc: 'พิมพ์เอง',
-    text: '' },
+// โหมดการตัด — base prompt ที่ส่งให้ AI
+const CUT_MODES = {
+  prepare: {
+    label: 'เก็บเนื้อหาครบ',
+    desc: 'ตัดแค่ช่วงเงียบ คำติดปาก เสียงรบกวน',
+    icon: Scissors,
+    text: 'ตัดเฉพาะช่วงเงียบ ช่วงหยุดคิดนาน คำติดปาก (อืม เอ่อ อ่อ) เสียงรบกวน และช่วงพูดซ้ำโดยไม่มีข้อมูลใหม่ — เก็บเนื้อหาที่พูดไว้ให้ครบ ไม่ตัดใจความ',
+  },
+  summary: {
+    label: 'สรุปสั้น',
+    desc: 'เก็บเฉพาะใจความสำคัญ ตัดที่เหลือทิ้ง',
+    icon: ListChecks,
+    text: 'ตัดให้สั้นกระชับที่สุด เก็บเฉพาะใจความสำคัญและข้อสรุป — ตัดช่วงเกริ่นนำ ตัวอย่างเสริม และรายละเอียดปลีกย่อยออกทั้งหมด',
+  },
+};
+
+// chips หัวข้อ — กดแล้วเติมข้อความลงช่อง textarea (แก้ต่อได้) เพื่อช่วย AI แม่นขึ้น
+const TOPICS = [
+  { id: 'tutorial', label: 'วิดีโอสอน', icon: GraduationCap, text: 'คลิปนี้เป็นวิดีโอสอน เน้นเก็บขั้นตอนการทำและคำอธิบาย ตัดช่วงเตรียมของหรือรอ' },
+  { id: 'podcast',  label: 'พอดแคสต์', icon: Mic, text: 'คลิปนี้เป็นพอดแคสต์/สัมภาษณ์ เน้นเนื้อหาการพูดคุยที่สำคัญ ตัดช่วงทักทายและคุยนอกเรื่อง' },
+  { id: 'review',   label: 'รีวิวสินค้า', icon: Star, text: 'คลิปนี้เป็นรีวิวสินค้า เน้นข้อดี ข้อเสีย และบทสรุป ตัดช่วงเกริ่นนำที่ยืดยาว' },
+  { id: 'vlog',     label: 'Vlog', icon: Video, text: 'คลิปนี้เป็น Vlog เน้นช่วงไฮไลต์และเล่าเรื่องน่าสนใจ ตัดช่วงเดินทางหรือเตรียมตัว' },
+  { id: 'meeting',  label: 'ประชุม', icon: Briefcase, text: 'คลิปนี้เป็นการประชุม เน้นข้อสรุปและสิ่งที่ต้องทำต่อ ตัดช่วงคุยเล่นก่อนเริ่ม' },
+  { id: 'gaming',   label: 'เกม', icon: Gamepad2, text: 'คลิปนี้เป็นคลิปเล่นเกม เน้นช่วงมันส์ ๆ และไฮไลต์ ตัดช่วงรอหรือไม่มีอะไรเกิดขึ้น' },
 ];
 
-// จำกัดขนาดไฟล์ฝั่ง client — ตรงกับ MAX_FILE_SIZE_MB ของ backend (กันเริ่มอัปโหลดแล้วโดน 413)
+// จำกัดขนาดไฟล์ฝั่ง client — ตรงกับ MAX_FILE_SIZE_MB ของ backend
 const MAX_FILE_MB = 2048;
 
 const UploadScreen = ({ onUploadSuccess }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [prompt, setPrompt] = useState('');
-  const [activePresetId, setActivePresetId] = useState(null);
+  const [cutMode, setCutMode] = useState('prepare');
+  const [videoFormat, setVideoFormat] = useState('standard');
+  const [topicId, setTopicId] = useState(null);
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [targetLength, setTargetLength] = useState(60);
   const [burnSubtitle, setBurnSubtitle] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);   // % อัปโหลดจริง
-  const [error, setError] = useState('');                    // error inline (แทน alert)
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState('');
 
-  const isTiktokMode = activePresetId === 'tiktok';
+  const isTiktok = videoFormat === 'tiktok';
 
-  const handlePresetClick = (preset) => {
-    setPrompt(preset.text);
-    setActivePresetId(preset.id);
+  const buildPrompt = () => {
+    // ไม่เลือกโหมด → default เป็น 'prepare' เพื่อให้ AI มีทิศทางเสมอ
+    const base = CUT_MODES[cutMode]?.text || CUT_MODES.prepare.text;
+    const parts = [base];
+    if (description.trim()) parts.push(description.trim());
+    if (isTiktok) parts.push('ทำเป็นคลิปสั้นแนวตั้ง 9:16 — เริ่มด้วย hook ดึงความสนใจใน 3 วินาทีแรก เน้นช่วงที่ปังที่สุด กระชับและ engaging');
+    return parts.join('\n');
   };
 
-  const handlePromptChange = (e) => {
-    const value = e.target.value;
-    setPrompt(value);
-    if (activePresetId === 'tiktok') return;
-    const matched = PROMPT_PRESETS.find(p => p.text === value && p.id !== 'custom');
-    setActivePresetId(matched ? matched.id : (value === '' ? null : 'custom'));
+  // กด chip → เติมข้อความลงช่อง (กดซ้ำ = เอาออก)
+  const handleTopicClick = (t) => {
+    if (topicId === t.id) {
+      setTopicId(null);
+      setDescription('');
+    } else {
+      setTopicId(t.id);
+      setDescription(t.text);
+    }
   };
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    pickFile(selectedFile);
+  // พิมพ์แก้เอง → ถ้าไม่ตรง chip ไหนแล้ว ยกเลิกไฮไลต์ chip
+  const handleDescChange = (e) => {
+    const v = e.target.value;
+    setDescription(v);
+    const matched = TOPICS.find((t) => t.text === v);
+    setTopicId(matched ? matched.id : null);
   };
+
+  const handleFileChange = (e) => pickFile(e.target.files[0]);
 
   const pickFile = (selectedFile) => {
     if (!selectedFile) return;
@@ -86,14 +89,13 @@ const UploadScreen = ({ onUploadSuccess }) => {
       return;
     }
     if (selectedFile.size > MAX_FILE_MB * 1024 * 1024) {
-      const sizeMB = (selectedFile.size / 1024 / 1024).toFixed(0);
-      setError(`ไฟล์ใหญ่เกิน ${MAX_FILE_MB} MB (ไฟล์นี้ ${sizeMB} MB) — กรุณาเลือกไฟล์เล็กลง`);
+      const mb = (selectedFile.size / 1024 / 1024).toFixed(0);
+      setError(`ไฟล์ใหญ่เกิน ${MAX_FILE_MB} MB (ไฟล์นี้ ${mb} MB) — กรุณาเลือกไฟล์เล็กลง`);
       return;
     }
     setError('');
     setFile(selectedFile);
-    const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
+    setPreviewUrl(URL.createObjectURL(selectedFile));
   };
 
   const onDrop = (e) => {
@@ -108,29 +110,25 @@ const UploadScreen = ({ onUploadSuccess }) => {
     setPreviewUrl(null);
   };
 
-  useEffect(() => {
-    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
-  }, [previewUrl]);
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   const handleUpload = async () => {
     if (!file) return setError('กรุณาเลือกไฟล์วิดีโอก่อน');
-    if (!prompt.trim()) return setError('กรุณาเลือก preset หรือพิมพ์คำสั่งให้ AI');
 
     setError('');
     setUploadProgress(0);
     setLoading(true);
     const formData = new FormData();
     formData.append('video', file);
-    formData.append('prompt', prompt);
-    formData.append('output_mode', isTiktokMode ? 'tiktok' : 'standard');
+    formData.append('prompt', buildPrompt());
+    formData.append('output_mode', isTiktok ? 'tiktok' : 'standard');
     formData.append('target_length', String(targetLength));
     formData.append('burn_subtitle', String(burnSubtitle));
     formData.append('preview_mode', String(previewMode));
-    formData.append('preset_id', activePresetId || '');
+    formData.append('preset_id', topicId || cutMode);
 
-    const uploadUrl = `${API_URL}/upload`;
     try {
-      const response = await axios.post(uploadUrl, formData, {
+      const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 30 * 60 * 1000,
         onUploadProgress: (e) => {
@@ -141,11 +139,8 @@ const UploadScreen = ({ onUploadSuccess }) => {
       onUploadSuccess(response.data.job_id, previewMode ? 'preview' : 'final');
     } catch (err) {
       let msg = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
-      if (err.response) {
-        msg = err.response.data?.detail || `Server Error ${err.response.status}`;
-      } else if (err.code === 'ECONNABORTED') {
-        msg = 'ใช้เวลานานเกินไป (Timeout)';
-      }
+      if (err.response) msg = err.response.data?.detail || `Server Error ${err.response.status}`;
+      else if (err.code === 'ECONNABORTED') msg = 'ใช้เวลานานเกินไป (Timeout)';
       setError(msg);
       setLoading(false);
     }
@@ -153,131 +148,141 @@ const UploadScreen = ({ onUploadSuccess }) => {
 
   const sizeMB = file ? (file.size / 1024 / 1024).toFixed(1) : 0;
 
+  // การ์ดเลือก 2 ทาง (ธีมสว่าง)
+  const Choice = ({ active, onClick, icon: Icon, title, desc }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-start gap-3 p-4 rounded-2xl border text-left transition-colors ${
+        active
+          ? 'border-indigo-500 bg-indigo-50/70'
+          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+      }`}
+    >
+      <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400'}`} />
+      <div className="min-w-0">
+        <p className={`text-sm font-medium ${active ? 'text-indigo-900' : 'text-slate-800'}`}>{title}</p>
+        {desc && <p className="text-xs text-slate-500 mt-0.5 leading-snug">{desc}</p>}
+      </div>
+    </button>
+  );
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-7 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Hero */}
-      <div className="text-center mb-2">
-        <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
-          ตัดวิดีโออัตโนมัติด้วย AI
-        </h2>
+      <div className="text-center">
+        <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">ตัดวิดีโออัตโนมัติด้วย AI</h2>
         <p className="text-sm text-slate-500 mt-2">อัปโหลด → เลือกสไตล์ → ได้วิดีโอที่ตัดเสร็จ</p>
       </div>
 
       {/* Upload area */}
-      <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div
-          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={onDrop}
-          className="relative p-6 sm:p-8"
-        >
-          {!previewUrl ? (
-            <label
-              htmlFor="video-input"
-              className={`flex flex-col items-center justify-center border border-dashed rounded-xl py-12 cursor-pointer transition-colors ${
-                isDragOver
-                  ? 'border-indigo-400 bg-indigo-50/50'
-                  : 'border-slate-300 hover:border-indigo-300 hover:bg-slate-50'
-              }`}
-            >
-              <input
-                id="video-input"
-                type="file"
-                accept="video/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors ${
-                isDragOver ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'
-              }`}>
-                <Upload className="h-5 w-5" />
-              </div>
-              <p className="text-sm font-medium text-slate-700 mt-3">
-                {isDragOver ? 'ปล่อยไฟล์ที่นี่' : 'คลิกหรือลากไฟล์มาวาง'}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                MP4, MOV, MKV, AVI, WebM · สูงสุด 2GB
-              </p>
-            </label>
-          ) : (
-            <div className="space-y-3">
-              <div className="relative rounded-xl overflow-hidden bg-slate-900 aspect-video">
-                <button
-                  onClick={clearFile}
-                  className="absolute top-2 right-2 z-10 bg-black/50 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/70 transition-colors"
-                  title="ลบไฟล์"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-                <video src={previewUrl} controls className="w-full h-full object-contain" />
-              </div>
-              <div className="flex items-center gap-2.5 text-xs text-slate-600">
-                <FileVideo className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                <span className="font-medium truncate flex-1">{file.name}</span>
-                <span className="text-slate-400 flex-shrink-0">{sizeMB} MB</span>
-              </div>
+      <div
+        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={onDrop}
+      >
+        {!previewUrl ? (
+          <label
+            htmlFor="video-input"
+            className={`flex flex-col items-center justify-center border border-dashed rounded-2xl py-12 cursor-pointer transition-colors ${
+              isDragOver ? 'border-indigo-400 bg-indigo-50/50' : 'border-slate-300 hover:border-indigo-300 hover:bg-slate-50'
+            }`}
+          >
+            <input id="video-input" type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
+            <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors ${
+              isDragOver ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'
+            }`}>
+              <Upload className="h-5 w-5" />
             </div>
-          )}
+            <p className="text-sm font-medium text-slate-700 mt-3">
+              {isDragOver ? 'ปล่อยไฟล์ที่นี่' : 'คลิกหรือลากไฟล์วิดีโอมาวาง'}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">MP4, MOV, MKV, AVI, WebM · สูงสุด 2GB</p>
+          </label>
+        ) : (
+          <div className="space-y-3">
+            <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-video">
+              <button
+                onClick={clearFile}
+                className="absolute top-2 right-2 z-10 bg-black/50 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/70 transition-colors"
+                title="ลบไฟล์"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <video src={previewUrl} controls className="w-full h-full object-contain" />
+            </div>
+            <div className="flex items-center gap-2.5 text-xs text-slate-600">
+              <FileVideo className="h-4 w-4 text-slate-400 flex-shrink-0" />
+              <span className="font-medium truncate flex-1">{file.name}</span>
+              <span className="text-slate-400 flex-shrink-0">{sizeMB} MB</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* โหมดการตัด */}
+      <section>
+        <h3 className="text-sm font-medium text-slate-700 mb-2.5">โหมดการตัด</h3>
+        <div className="grid grid-cols-2 gap-3">
+          {Object.entries(CUT_MODES).map(([id, m]) => (
+            <Choice key={id} active={cutMode === id} onClick={() => setCutMode(cutMode === id ? null : id)} icon={m.icon} title={m.label} desc={m.desc} />
+          ))}
         </div>
       </section>
 
-      {/* Preset chips */}
-      <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
-        <div className="flex items-baseline justify-between mb-3">
-          <h3 className="text-sm font-medium text-slate-900">เลือกสไตล์การตัดต่อ</h3>
-          <span className="text-xs text-slate-400">เลือก 1 แบบ หรือพิมพ์เอง</span>
+      {/* รูปแบบวิดีโอ */}
+      <section>
+        <h3 className="text-sm font-medium text-slate-700 mb-2.5">รูปแบบวิดีโอ</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <Choice active={videoFormat === 'standard'} onClick={() => setVideoFormat(videoFormat === 'standard' ? null : 'standard')} icon={Monitor} title="มาตรฐาน 16:9" />
+          <Choice active={isTiktok} onClick={() => setVideoFormat(isTiktok ? null : 'tiktok')} icon={Smartphone} title="TikTok/Reels 9:16" />
         </div>
+      </section>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-          {PROMPT_PRESETS.map((preset) => {
-            const Icon = preset.icon;
-            const isActive = activePresetId === preset.id;
+      {/* บอก AI เกี่ยวกับคลิปนี้ */}
+      <section>
+        <h3 className="text-sm font-medium text-slate-700 mb-2.5">
+          เล่าให้ AI ฟังว่าคลิปนี้เกี่ยวกับอะไร <span className="text-slate-400 font-normal">(ไม่บังคับ — ช่วยให้ตัดแม่นขึ้น)</span>
+        </h3>
+        <textarea
+          className="w-full p-3.5 text-sm bg-white border border-slate-200 rounded-2xl text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all resize-none"
+          rows="3"
+          placeholder="เช่น คลิปสอนทำอาหาร ต้มยำกุ้ง เน้นขั้นตอนการปรุงรส · หรือกดหัวข้อด้านล่างเพื่อเติมให้"
+          value={description}
+          onChange={handleDescChange}
+        />
+
+        {/* chips หัวข้อ — ใหญ่ขึ้น มีไอคอน แต่โทนนวล */}
+        <div className="flex flex-wrap gap-2.5 mt-3">
+          {TOPICS.map((t) => {
+            const Icon = t.icon;
+            const active = topicId === t.id;
             return (
               <button
-                key={preset.id}
+                key={t.id}
                 type="button"
-                onClick={() => handlePresetClick(preset)}
-                className={`group flex items-start gap-2 p-2.5 rounded-xl border text-left transition-colors ${
-                  isActive
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                onClick={() => handleTopicClick(t)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm border transition-colors ${
+                  active
+                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                <div className={`h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-                  isActive ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
-                }`}>
-                  <Icon className="h-3.5 w-3.5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-xs font-medium leading-tight truncate ${
-                    isActive ? 'text-indigo-700' : 'text-slate-800'
-                  }`}>
-                    {preset.label}
-                  </p>
-                  <p className="text-[10px] text-slate-400 leading-tight truncate mt-0.5">{preset.desc}</p>
-                </div>
+                <Icon className={`h-4 w-4 ${active ? 'text-indigo-600' : 'text-slate-400'}`} />
+                {t.label}
               </button>
             );
           })}
         </div>
+      </section>
 
-        <textarea
-          className="w-full p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all resize-none placeholder:text-slate-400"
-          rows="3"
-          placeholder="คำสั่งจะปรากฏที่นี่เมื่อเลือกสไตล์ · หรือพิมพ์เอง"
-          value={prompt}
-          onChange={handlePromptChange}
-        />
-
-        {/* TikTok options */}
-        {isTiktokMode && (
-          <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4 text-slate-500" />
-              <p className="text-xs font-medium text-slate-700">ตัวเลือก TikTok/Reels</p>
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 block mb-1.5">ความยาวสูงสุด</label>
+      {/* ตั้งค่าเพิ่มเติม — โชว์ตรง ๆ ไม่ซ่อน */}
+      <section>
+        <h3 className="text-sm font-medium text-slate-700 mb-2.5">ตั้งค่าเพิ่มเติม</h3>
+        <div className="space-y-3">
+          {isTiktok && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <label className="text-xs text-slate-500 block mb-1.5">ความยาวสูงสุด (คลิปสั้น)</label>
               <div className="grid grid-cols-3 gap-2">
                 {[30, 60, 90].map((sec) => (
                   <button
@@ -295,51 +300,31 @@ const UploadScreen = ({ onUploadSuccess }) => {
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Subtitle */}
-        <label className={`flex items-start gap-3 mt-3 p-3.5 rounded-xl border cursor-pointer transition-colors ${
-          burnSubtitle
-            ? 'border-indigo-300 bg-indigo-50/40'
-            : 'border-slate-200 hover:bg-slate-50'
-        }`}>
-          <input
-            type="checkbox"
-            checked={burnSubtitle}
-            onChange={(e) => setBurnSubtitle(e.target.checked)}
-            className="mt-0.5 rounded accent-indigo-600"
-          />
-          <div className="flex-1 text-sm">
-            <p className="font-semibold text-slate-800">📝Subtitle อัตโนมัติ</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              สร้างคำบรรยายจากเสียงพูด ลงในวิดีโอ
-            </p>
-          </div>
-        </label>
+          <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-colors ${
+            burnSubtitle ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
+          }`}>
+            <input type="checkbox" checked={burnSubtitle} onChange={(e) => setBurnSubtitle(e.target.checked)} className="mt-0.5 rounded accent-indigo-600" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium text-slate-800">📝 ใส่คำบรรยาย (ซับ) ให้อัตโนมัติ</p>
+              <p className="text-xs text-slate-500 mt-0.5">สร้างคำบรรยายจากเสียงพูด แล้วฝังลงในวิดีโอ</p>
+            </div>
+          </label>
 
-        {/* Preview Mode */}
-        <label className={`flex items-start gap-3 mt-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-          previewMode ? 'border-indigo-300 bg-indigo-50/40' : 'border-slate-200 hover:bg-slate-50'
-        }`}>
-          <input
-            type="checkbox"
-            checked={previewMode}
-            onChange={(e) => setPreviewMode(e.target.checked)}
-            className="mt-0.5 rounded accent-indigo-600"
-          />
-          <div className="flex-1 text-sm">
-            <p className="font-medium text-slate-800">
-              👁️ Preview ก่อนตัดต่อจริง
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              ดูช่วงที่ AI เลือกก่อน แล้วยืนยัน/ยกเลิกได้รายช่วง (แม่นยำขึ้น)
-            </p>
-          </div>
-        </label>
+          <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-colors ${
+            previewMode ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
+          }`}>
+            <input type="checkbox" checked={previewMode} onChange={(e) => setPreviewMode(e.target.checked)} className="mt-0.5 rounded accent-indigo-600" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium text-slate-800">👁️ ดูตัวอย่างก่อนตัดจริง</p>
+              <p className="text-xs text-slate-500 mt-0.5">ดูช่วงที่ AI เลือก แล้วเลือกเก็บหรือตัดเองได้ก่อนตัดจริง</p>
+            </div>
+          </label>
+        </div>
       </section>
 
-      {/* Inline error (แทน alert) */}
+      {/* Inline error */}
       {error && (
         <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           <span>⚠️</span>
@@ -350,7 +335,7 @@ const UploadScreen = ({ onUploadSuccess }) => {
         </div>
       )}
 
-      {/* Upload progress bar (โชว์ % จริงตอนอัปโหลดไฟล์ใหญ่) */}
+      {/* Upload progress */}
       {loading && (
         <div>
           <div className="flex justify-between text-xs text-slate-500 mb-1">
@@ -358,36 +343,28 @@ const UploadScreen = ({ onUploadSuccess }) => {
             <span className="font-semibold text-slate-700">{uploadProgress}%</span>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="h-2 rounded-full bg-indigo-600 transition-all duration-200"
-              style={{ width: `${uploadProgress}%` }}
-            />
+            <div className="h-2 rounded-full bg-indigo-600 transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
           </div>
         </div>
       )}
 
-      {/* Submit */}
+      {/* เริ่มตัดต่อ */}
       <button
         onClick={handleUpload}
         disabled={loading}
         className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-semibold text-white transition-colors ${
-          loading
-            ? 'bg-slate-300 cursor-not-allowed'
-            : 'bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98]'
+          loading ? 'bg-slate-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99]'
         }`}
       >
         {loading ? (
           <>
-            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3" />
-              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            </svg>
+            <Loader2 className="h-5 w-5 animate-spin" />
             {uploadProgress < 100 ? `กำลังส่งวิดีโอ... ${uploadProgress}%` : 'กำลังเริ่มประมวลผล...'}
           </>
         ) : (
           <>
             <Sparkles className="h-5 w-5" />
-            เริ่มประมวลผลด้วย AI
+            เริ่มตัดต่อ
           </>
         )}
       </button>

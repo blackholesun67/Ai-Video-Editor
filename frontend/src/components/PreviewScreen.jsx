@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import {
   Sparkles, Check, X, Eye, Clock, Sigma, Play, Loader2, AlertTriangle,
@@ -18,6 +18,11 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');   // inline (แทน alert)
+  const [activeIdx, setActiveIdx] = useState(null);      // segment ที่กำลังเล่นพรีวิว
+
+  const videoRef = useRef(null);
+  const playEndRef = useRef(null);   // เวลา end ที่จะให้หยุดเล่น
 
   // Load preview data
   useEffect(() => {
@@ -26,7 +31,6 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
       .then((res) => {
         if (cancelled) return;
         setPreview(res.data);
-        // Default: ทุก segment ถูกเลือก
         const init = {};
         res.data.segments.forEach((_, i) => { init[i] = true; });
         setSelected(init);
@@ -34,7 +38,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err.response?.data?.detail || 'โหลด preview ไม่สำเร็จ');
+        setError(err.response?.data?.detail || 'โหลดตัวอย่างไม่สำเร็จ');
         setLoading(false);
       });
     return () => { cancelled = true; };
@@ -42,6 +46,14 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
 
   const segments = preview?.segments || [];
   const isTiktok = preview?.output_mode === 'tiktok';
+
+  // URL วิดีโอต้นฉบับ (preview.video_path = "storage/{job_id}/{file}") — /storage เสิร์ฟแบบ seek ได้
+  const videoSrc = useMemo(() => {
+    const p = preview?.video_path;
+    if (!p) return null;
+    const rel = p.replace(/\\/g, '/').replace(/^storage\//, '');
+    return `${API_URL}/storage/${rel}`;
+  }, [preview]);
 
   const toggle = (idx) => setSelected((s) => ({ ...s, [idx]: !s[idx] }));
   const selectAll = () => {
@@ -55,6 +67,27 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
     setSelected(none);
   };
 
+  // เล่นพรีวิวเฉพาะช่วงนั้น — seek ไป start แล้วหยุดที่ end
+  const previewSegment = (idx, seg) => {
+    const v = videoRef.current;
+    if (!v) return;
+    playEndRef.current = seg.end;
+    setActiveIdx(idx);
+    try {
+      v.currentTime = seg.start;
+      v.play().catch(() => {});
+      v.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch { /* ignore */ }
+  };
+
+  const onTimeUpdate = () => {
+    const v = videoRef.current;
+    if (v && playEndRef.current != null && v.currentTime >= playEndRef.current) {
+      v.pause();
+      playEndRef.current = null;
+    }
+  };
+
   const stats = useMemo(() => {
     let count = 0, dur = 0;
     segments.forEach((s, i) => {
@@ -65,24 +98,23 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
 
   const handleConfirm = async () => {
     if (stats.count === 0) {
-      alert('กรุณาเลือกอย่างน้อย 1 ช่วง');
+      setSubmitError('กรุณาเลือกอย่างน้อย 1 ช่วง');
       return;
     }
+    setSubmitError('');
     const chosen = segments.filter((_, i) => selected[i]);
 
-    // ถ้า burn_subtitle = true → ไปหน้าแก้ subtitle ก่อน render
     if (preview?.burn_subtitle && onEditSubtitle) {
       onEditSubtitle(chosen);
       return;
     }
 
-    // ไม่มี subtitle → render ทันที
     setSubmitting(true);
     try {
       const res = await axios.post(`${API_URL}/render/${jobId}`, { segments: chosen });
       onRendering(res.data.task_id);
     } catch (err) {
-      alert(err.response?.data?.detail || 'Render fail');
+      setSubmitError(err.response?.data?.detail || 'ส่งไปตัดต่อไม่สำเร็จ — กรุณาลองใหม่');
       setSubmitting(false);
     }
   };
@@ -91,7 +123,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
         <Loader2 className="h-12 w-12 text-indigo-500 animate-spin mx-auto mb-3" />
-        <p className="text-sm text-slate-500">กำลังโหลด preview...</p>
+        <p className="text-sm text-slate-500">กำลังโหลดตัวอย่าง...</p>
       </div>
     );
   }
@@ -117,15 +149,28 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
       <div className="text-center">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium mb-2">
           <Eye className="h-3.5 w-3.5" />
-          Preview
+          ดูตัวอย่าง
         </div>
         <h2 className="text-2xl font-semibold text-slate-900">
-          ตรวจสอบช่วงที่ AI <span className="text-indigo-600">เลือกไว้</span>
+          ดูช่วงที่ AI <span className="text-indigo-600">เลือกให้</span>
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          เลือก / ยกเลิก ช่วงที่ต้องการ — แล้วกด "ตัดต่อ" เพื่อ render
+          กด ▶ เพื่อดูแต่ละช่วงก่อน — ติ๊กเก็บหรือตัดออกได้ แล้วกด "ตัดต่อ"
         </p>
       </div>
+
+      {/* Video player (ต้นฉบับ) — seek ดูแต่ละช่วงได้ */}
+      {videoSrc && (
+        <div className="rounded-2xl overflow-hidden bg-slate-900 border border-slate-200">
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            controls
+            onTimeUpdate={onTimeUpdate}
+            className="w-full max-h-[45vh] object-contain bg-black"
+          />
+        </div>
+      )}
 
       {/* Stats card */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -167,14 +212,16 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
       <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
         {segments.map((seg, idx) => {
           const isOn = !!selected[idx];
+          const isActive = activeIdx === idx;
           const duration = seg.end - seg.start;
           return (
-            <button
+            <div
               key={idx}
-              type="button"
               onClick={() => toggle(idx)}
-              className={`w-full text-left p-3.5 rounded-xl border-2 transition-all ${
-                isOn
+              className={`w-full text-left p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
+                isActive
+                  ? 'border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-200'
+                  : isOn
                   ? 'border-indigo-400 bg-indigo-50/40 shadow-sm'
                   : 'border-slate-200 bg-slate-50/50 opacity-60 hover:opacity-80'
               }`}
@@ -186,7 +233,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
                   {isOn ? <Check className="h-4 w-4" /> : <X className="h-3.5 w-3.5" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5 flex-wrap">
                     <span className="font-mono">
                       {formatTime(seg.start)} – {formatTime(seg.end)}
                     </span>
@@ -200,6 +247,20 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
                         {seg.priority === 1 ? '🔥 Hook' : `P${seg.priority}`}
                       </span>
                     )}
+                    {/* ปุ่มดูช่วงนี้ */}
+                    {videoSrc && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); previewSegment(idx, seg); }}
+                        className={`ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                          isActive
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <Play className="h-3 w-3" /> ดูช่วงนี้
+                      </button>
+                    )}
                   </div>
                   {seg.text && (
                     <p className={`text-sm leading-relaxed ${isOn ? 'text-slate-800' : 'text-slate-500'}`}>
@@ -211,10 +272,21 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
                   )}
                 </div>
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
+
+      {/* inline error (แทน alert) */}
+      {submitError && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <span>⚠️</span>
+          <span className="flex-1">{submitError}</span>
+          <button onClick={() => setSubmitError('')} className="text-red-400 hover:text-red-600" aria-label="ปิด">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Submit */}
       <div className="space-y-2 pt-2">
@@ -229,7 +301,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         >
           {submitting ? (
             <>
-              <Loader2 className="h-5 w-5 animate-spin" /> กำลังส่ง render...
+              <Loader2 className="h-5 w-5 animate-spin" /> กำลังส่งไปตัดต่อ...
             </>
           ) : preview?.burn_subtitle ? (
             <>

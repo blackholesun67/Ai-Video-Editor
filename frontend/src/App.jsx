@@ -118,9 +118,11 @@ function App() {
           {(jobId || videoUrl) && (
             <button
               onClick={handleReset}
-              className="text-xs font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              title="เริ่มใหม่"
+              className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
             >
-              ← เริ่มใหม่
+              <RotateCcw className="h-4 w-4" />
+              <span className="hidden sm:inline">เริ่มใหม่</span>
             </button>
           )}
         </div>
@@ -163,7 +165,7 @@ function App() {
             <div className="text-center">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-xs font-medium">
                 <Sparkles className="h-3.5 w-3.5" />
-                ตัดต่อเสร็จสมบูรณ์
+                ตัดต่อเสร็จแล้ว
               </div>
               <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 mt-3">วิดีโอของคุณพร้อมแล้ว</h2>
             </div>
