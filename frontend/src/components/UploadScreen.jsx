@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Upload, X, FileVideo, Scissors, ListChecks, Monitor, Smartphone, Loader2,
-  GraduationCap, Mic, Star, Video, Briefcase, Gamepad2, Sparkles,
+  GraduationCap, Mic, Star, Video, Briefcase, Gamepad2, Sparkles, Captions, Eye,
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
@@ -242,7 +242,7 @@ const UploadScreen = ({ onUploadSuccess }) => {
       {/* บอก AI เกี่ยวกับคลิปนี้ */}
       <section>
         <h3 className="text-sm font-medium text-slate-700 mb-2.5">
-          เล่าให้ AI ฟังว่าคลิปนี้เกี่ยวกับอะไร <span className="text-slate-400 font-normal">(ไม่บังคับ — ช่วยให้ตัดแม่นขึ้น)</span>
+          อยากได้คลิปแบบไหน บอก AI ได้เลย <span className="text-slate-400 font-normal">(ไม่บังคับ — ช่วยให้ตัดแม่นขึ้น)</span>
         </h3>
         <textarea
           className="w-full p-3.5 text-sm bg-white border border-slate-200 rounded-2xl text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all resize-none"
@@ -307,8 +307,10 @@ const UploadScreen = ({ onUploadSuccess }) => {
           }`}>
             <input type="checkbox" checked={burnSubtitle} onChange={(e) => setBurnSubtitle(e.target.checked)} className="mt-0.5 rounded accent-indigo-600" />
             <div className="flex-1 text-sm">
-              <p className="font-medium text-slate-800">📝 ใส่คำบรรยาย (ซับ) ให้อัตโนมัติ</p>
-              <p className="text-xs text-slate-500 mt-0.5">สร้างคำบรรยายจากเสียงพูด แล้วฝังลงในวิดีโอ</p>
+              <p className="font-medium text-slate-800 flex items-center gap-1.5">
+                <Captions className="h-4 w-4 text-indigo-600" /> ใส่คำบรรยาย (ซับ) ให้อัตโนมัติ
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">สร้างคำบรรยายจากเสียงพูด ในวิดีโอ</p>
             </div>
           </label>
 
@@ -317,8 +319,10 @@ const UploadScreen = ({ onUploadSuccess }) => {
           }`}>
             <input type="checkbox" checked={previewMode} onChange={(e) => setPreviewMode(e.target.checked)} className="mt-0.5 rounded accent-indigo-600" />
             <div className="flex-1 text-sm">
-              <p className="font-medium text-slate-800">👁️ ดูตัวอย่างก่อนตัดจริง</p>
-              <p className="text-xs text-slate-500 mt-0.5">ดูช่วงที่ AI เลือก แล้วเลือกเก็บหรือตัดเองได้ก่อนตัดจริง</p>
+              <p className="font-medium text-slate-800 flex items-center gap-1.5">
+                <Eye className="h-4 w-4 text-indigo-600" /> ดูตัวอย่างก่อนตัดจริง
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">ดูช่วงที่ AI เลือกเก็บหรือตัดเองได้ก่อนตัดจริง</p>
             </div>
           </label>
         </div>

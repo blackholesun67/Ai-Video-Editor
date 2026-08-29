@@ -119,10 +119,10 @@ function App() {
             <button
               onClick={handleReset}
               title="เริ่มใหม่"
-              className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 px-3.5 py-1.5 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
             >
               <RotateCcw className="h-4 w-4" />
-              <span className="hidden sm:inline">เริ่มใหม่</span>
+              เริ่มใหม่
             </button>
           )}
         </div>
@@ -187,7 +187,7 @@ function App() {
               <a
                 href={`${API_URL}/download/${jobIdShort}`}
                 download="ai_edited_video.mp4"
-                className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors active:scale-[0.98]"
+                className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors active:scale-[0.98]"
               >
                 <Download className="h-5 w-5" />
                 ดาวน์โหลดวิดีโอ

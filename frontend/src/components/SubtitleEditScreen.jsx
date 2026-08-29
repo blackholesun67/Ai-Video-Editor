@@ -176,7 +176,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
           ตรวจและแก้ <span className="text-indigo-600">คำบรรยาย</span> ก่อนตัดต่อ
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          แก้คำที่ฟังผิดได้ เช่น ชื่อเฉพาะ หรือศัพท์เฉพาะทาง
+          แก้คำที่ผิดได้ เช่น ชื่อเฉพาะ หรือศัพท์เฉพาะทาง
         </p>
       </div>
 
@@ -229,7 +229,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
 
       {/* Tips */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-600 leading-relaxed">
-        💡 <strong>เคล็ดลับ:</strong> ตรวจชื่อเฉพาะ (Andrew Huberman, FastAPI, React) และศัพท์เทคนิค —
+        💡 <strong>เคล็ดลับ:</strong> ตรวจชื่อเฉพาะ (Andrew Huberman, Elon Musk) และศัพท์เทคนิค —
         ไม่ต้องแก้ทุกบรรทัด แค่บรรทัดที่ผิด
       </div>
 
@@ -320,7 +320,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
           ) : (
             <>
               <Play className="h-5 w-5" />
-              บันทึก + ตัดต่อ ({dirtyCount > 0 ? `แก้ ${dirtyCount} บรรทัด` : 'ใช้ subtitle เดิม'})
+              บันทึก ({dirtyCount > 0 ? `แก้ ${dirtyCount} บรรทัด` : 'ใช้ subtitle เดิม'})
             </>
           )}
         </button>
