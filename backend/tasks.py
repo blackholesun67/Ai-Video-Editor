@@ -389,8 +389,16 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
         final_phrases = None
         if burn_subtitle:
             if edited_phrases is not None:
-                final_phrases = remap_edited_phrases(edited_phrases, clean_segs)
-                print(f"📝 Remapped {len(edited_phrases)} edited phrases → "
+                # เติมวรรคที่ user ไม่เคยเห็น ก่อน remap
+                #   generate_phrases_from_transcript ทิ้งวรรคที่ไม่ทับ keep segment
+                #   (srt_utils.py) → วรรคของ "ช่วงที่ AI ตัด" ไม่เคยถูกสร้าง ไม่อยู่ใน preview.json
+                #   และ remap_edited_phrases filter/shift ได้อย่างเดียว สร้างใหม่ไม่ได้
+                #   ⇒ ถ้า user เอาช่วงที่ถูกตัดกลับมา หรือยืดขอบออก ช่วงนั้นจะไม่มีซับแบบเงียบ ๆ
+                filled = _fill_missing_phrases(edited_phrases, transcript, clean_segs)
+                final_phrases = remap_edited_phrases(filled, clean_segs)
+                added = len(filled) - len(edited_phrases)
+                print(f"📝 Remapped {len(edited_phrases)} edited phrases"
+                      f"{f' (+{added} วรรคที่เติมให้ช่วงที่เพิ่มเข้ามา)' if added else ''} → "
                       f"{len(final_phrases)} (ตรงกับ {len(clean_segs)} segment ที่เลือก)")
             else:
                 # ไม่มี edit → regenerate จาก transcript + clean_segs
@@ -437,6 +445,40 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper: Render branch (standard vs tiktok)
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _phrase_overlaps(a: dict, b: dict, tol: float = 0.05) -> bool:
+    """วรรคสองอันนี้เป็นวรรคเดียวกันไหม — เทียบบนไทม์ไลน์ต้นฉบับ (orig_start/orig_end)"""
+    a0, a1 = a.get("orig_start"), a.get("orig_end")
+    b0, b1 = b.get("orig_start"), b.get("orig_end")
+    if a0 is None or a1 is None or b0 is None or b1 is None:
+        return False
+    return min(float(a1), float(b1)) - max(float(a0), float(b0)) > tol
+
+
+def _fill_missing_phrases(edited_phrases: list[dict], transcript: list[dict],
+                          keep_segments: list[dict]) -> list[dict]:
+    """
+    เติมวรรคซับที่ขาดหายให้ครบทุกช่วงที่จะ render
+
+    ที่มา: หน้าแก้ซับได้วรรคมาจาก preview.json ซึ่งสร้างตอนที่ AI ยังเลือกช่วงชุดเดิม
+    วรรคของ "ช่วงที่ AI ตัดทิ้ง" จึงไม่เคยถูกสร้าง (ถูก filter ทิ้งใน
+    generate_phrases_from_transcript) พอผู้ใช้เอาช่วงนั้นกลับมา หรือยืดขอบออก
+    remap_edited_phrases สร้างวรรคใหม่ให้ไม่ได้ → ช่วงนั้นจะไม่มีซับโดยไม่มี error
+
+    วิธี: gen วรรคใหม่จาก transcript ตามช่วงที่เลือกจริง แล้วเอาเฉพาะอันที่ไม่ทับ
+    วรรคที่ผู้ใช้มีอยู่แล้วมาเติม (เทียบบนไทม์ไลน์ต้นฉบับ) — ข้อความที่ผู้ใช้แก้ไว้ไม่ถูกทับ
+    """
+    if not transcript or not keep_segments:
+        return edited_phrases
+    try:
+        auto = generate_phrases_from_transcript(transcript, keep_segments)
+    except Exception as e:                       # ซับพังไม่ควรทำให้ render ล้ม
+        print(f"⚠️ เติมวรรคซับที่ขาดไม่สำเร็จ: {e} — ใช้วรรคที่ผู้ใช้แก้อย่างเดียว")
+        return edited_phrases
+    missing = [a for a in auto
+               if not any(_phrase_overlaps(a, e) for e in edited_phrases)]
+    return edited_phrases + missing if missing else edited_phrases
+
 
 def _render(video_path, segments, transcript, final_output, job_dir,
             output_mode, target_length, burn_subtitle, edited_phrases=None,
