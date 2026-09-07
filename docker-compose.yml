@@ -25,6 +25,9 @@ services:
       - transcript-cache:/app/transcript_cache
     env_file:
       - ./backend/.env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     depends_on:
       redis:
         condition: service_healthy      # รอ Redis พร้อมจริงก่อน start (ไม่ใช่แค่ลำดับ)
@@ -57,19 +60,15 @@ services:
       - ./backend/.env
     environment:
       - WHISPER_BATCH_SIZE=4
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     depends_on:
       redis:
         condition: service_healthy
     networks:
       - app-network
-    # ── GPU passthrough (NVIDIA) ────────────────────────────
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # GPU passthrough ปิดไว้ — เครื่องนี้ไม่มีการ์ดจอ NVIDIA (จะรัน Whisper บน CPU แทน)
 
   frontend:
     build:

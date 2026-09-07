@@ -26,6 +26,11 @@ RUN pip install --no-cache-dir --retries 10 --timeout 600 \
 
 RUN pip install --no-cache-dir --retries 10 --timeout 300 -r requirements.txt
 
+# Pre-download Silero VAD model ตอน build (มีเน็ตแน่นอนตอน build)
+# กัน crash ตอน runtime ถ้า container เข้าเน็ตไม่ได้ (DNS/network issue)
+ENV TORCH_HOME=/tmp/torch_hub
+RUN python3 -c "import torch; torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad', trust_repo=True, force_reload=False)"
+
 COPY . .
 
 RUN mkdir -p storage

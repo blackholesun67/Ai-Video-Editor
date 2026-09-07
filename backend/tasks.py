@@ -9,7 +9,7 @@ from celery.exceptions import Ignore
 from core.ffmpeg_utils import extract_clean_audio, edit_and_merge_video, render_tiktok_video
 from core.ai_logic import analyze_video_content
 from core.vad_logic import get_voice_activity
-from core.srt_utils import generate_phrases_from_transcript
+from core.srt_utils import generate_phrases_from_transcript, remap_edited_phrases
 from observability import init_sentry
 from celery.signals import worker_init
 from dotenv import load_dotenv
@@ -188,10 +188,17 @@ def _load_preview(job_dir: str) -> dict:
 @celery_app.task(bind=True, max_retries=3)
 def process_video_task(self, job_id, video_path, user_prompt,
                        output_mode="standard", target_length=60, burn_subtitle=False,
-                       preview_mode=False, preset_id=""):
+                       preview_mode=False, preset_id="", edit_mode=None, denoise=False):
     job_dir = os.path.dirname(video_path)
     audio_path = os.path.join(job_dir, "full_audio.wav")
     final_output = os.path.join(job_dir, FINAL_VIDEO_NAME)
+
+    # full = เก็บเนื้อหาครบ | summary = สรุปให้เข้าใจครบ | hook = ไฮไลต์ดึงคนดู
+    # backward compat: "short" เดิม → "summary" ; task ที่ค้างคิวก่อน deploy → เดาจาก output_mode
+    if edit_mode == "short":
+        edit_mode = "summary"
+    if edit_mode not in ("full", "summary", "hook"):
+        edit_mode = "summary" if output_mode == "tiktok" else "full"
 
     _mark_processing(job_dir)       # กัน cleanup ลบ dir กลางคัน
     clear_cancel_flag(job_id)       # เริ่มงานใหม่ = ล้าง flag เก่า (เผื่อ job_id ถูก reuse ตอน render)
@@ -222,13 +229,25 @@ def process_video_task(self, job_id, video_path, user_prompt,
         self.update_state(state='PROGRESS', meta={
             'status': 'Step 3/4: Transcribing & AI analyzing...', 'progress': 45
         })
+
+        def _progress(pct, msg):
+            # ให้หน้าเว็บเห็นว่ายังทำงานอยู่ระหว่างถอดเสียง/AI (กันคิดว่างานค้าง)
+            try:
+                self.update_state(state='PROGRESS', meta={
+                    'status': str(msg), 'progress': max(45, min(79, int(pct))),
+                })
+            except Exception:
+                pass
+
         ai_result, transcript = analyze_video_content(
             audio_path=audio_path,
             user_prompt=user_prompt,
             voice_segments=voice_segments,
             output_mode=output_mode,
+            edit_mode=edit_mode,
             target_length=target_length,
             preset_id=preset_id,
+            progress_cb=_progress,
         )
         if not ai_result:
             raise Exception("AI ไม่สามารถระบุช่วงที่ควรเก็บได้ — กรุณาลองใหม่")
@@ -236,29 +255,31 @@ def process_video_task(self, job_id, video_path, user_prompt,
         total_keep = sum(s["end"] - s["start"] for s in ai_result)
         print(f"\n📊 Edit Summary ({output_mode}): {len(ai_result)} segments, {total_keep:.1f}s")
 
-        # ── PREVIEW MODE: save แล้ว return ────────────────────────────────────
-        if preview_mode:
-            # Pre-generate subtitle phrases (สำหรับให้ user แก้ก่อน render ถ้าต้องการ)
-            try:
-                phrases = generate_phrases_from_transcript(transcript or [], ai_result)
-                print(f"📝 Pre-generated {len(phrases)} subtitle phrases for editing")
-            except Exception as ph_err:
-                print(f"⚠️ Phrase generation failed: {ph_err}")
-                phrases = []
+        # ── บันทึก preview.json ทุกงาน — ให้ย้อนกลับมา "แก้คำบรรยาย" ได้ภายหลัง ──
+        try:
+            phrases = generate_phrases_from_transcript(transcript or [], ai_result)
+            print(f"📝 Pre-generated {len(phrases)} subtitle phrases")
+        except Exception as ph_err:
+            print(f"⚠️ Phrase generation failed: {ph_err}")
+            phrases = []
 
-            preview_data = {
-                "job_id": job_id,
-                "video_path": video_path,
-                "user_prompt": user_prompt,
-                "output_mode": output_mode,
-                "target_length": target_length,
-                "burn_subtitle": burn_subtitle,
-                "segments": ai_result,
-                "transcript": transcript,    # ← เก็บ transcript reuse ใน render
-                "subtitle_phrases": phrases, # ← phrases ที่ user จะแก้ได้
-                "total_keep_seconds": round(total_keep, 1),
-            }
-            _save_preview(job_dir, preview_data)
+        _save_preview(job_dir, {
+            "job_id": job_id,
+            "video_path": video_path,
+            "user_prompt": user_prompt,
+            "output_mode": output_mode,
+            "edit_mode": edit_mode,
+            "target_length": target_length,
+            "burn_subtitle": burn_subtitle,
+            "denoise": denoise,
+            "segments": ai_result,
+            "transcript": transcript,           # ← reuse ตอน render / re-edit (ไม่ถอดเสียงซ้ำ)
+            "subtitle_phrases": phrases,        # ← phrases ที่ user แก้ได้
+            "selected_segments": ai_result,     # ← selection เริ่มต้น = ช่วงที่ AI เลือก
+            "total_keep_seconds": round(total_keep, 1),
+        })
+
+        if preview_mode:
             return {
                 "status": "SUCCESS",
                 "progress": 100,
@@ -277,7 +298,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
             'status': f'Step 4/4: Rendering ({output_mode})...', 'progress': 80
         })
         _render(video_path, ai_result, transcript, final_output, job_dir,
-                output_mode, target_length, burn_subtitle)
+                output_mode, target_length, burn_subtitle, denoise=denoise)
 
         return {
             "status": "SUCCESS",
@@ -288,6 +309,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
             "edit_summary": {
                 "segments_kept": len(ai_result),
                 "duration_kept_seconds": round(total_keep, 1),
+                "burn_subtitle": bool(burn_subtitle),
             }
         }
 
@@ -331,6 +353,7 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
     _mark_processing(job_dir)   # กัน cleanup ลบ dir กลางคัน
     clear_cancel_flag(job_id)
     try:
+        self.update_state(state='PROGRESS', meta={'status': 'กำลังเตรียม render...', 'progress': 20})
         _ckpt(job_id)
         preview = _load_preview(job_dir)
 
@@ -338,6 +361,7 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
         output_mode = preview["output_mode"]
         target_length = preview["target_length"]
         burn_subtitle = preview["burn_subtitle"]
+        denoise = preview.get("denoise", False)
         final_output = os.path.join(job_dir, FINAL_VIDEO_NAME)
 
         if not selected_segments:
@@ -354,20 +378,28 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
         # Clean segments (start/end only ที่ FFmpeg ต้องการ)
         clean_segs = [{"start": s["start"], "end": s["end"]} for s in selected_segments]
 
-        # ถ้า user แก้ subtitle → ใช้ edited phrases, ไม่งั้น regenerate
+        # ── จำสถานะไว้ให้ย้อนกลับมาแก้ซับได้อีก ──
+        preview["selected_segments"] = selected_segments
+        if edited_phrases is not None:
+            preview["edited_subtitle_phrases"] = edited_phrases   # raw (มี orig_start/orig_end)
+        _save_preview(job_dir, preview)
+
+        # ถ้า user แก้ subtitle → ใช้ edited phrases (remap ให้ตรง segment ที่เลือกจริง),
+        # ไม่งั้น regenerate ใหม่จาก transcript + clean_segs
         final_phrases = None
         if burn_subtitle:
             if edited_phrases is not None:
-                final_phrases = edited_phrases
-                print(f"📝 Using {len(edited_phrases)} user-edited subtitle phrases")
+                final_phrases = remap_edited_phrases(edited_phrases, clean_segs)
+                print(f"📝 Remapped {len(edited_phrases)} edited phrases → "
+                      f"{len(final_phrases)} (ตรงกับ {len(clean_segs)} segment ที่เลือก)")
             else:
                 # ไม่มี edit → regenerate จาก transcript + clean_segs
-                # (เผื่อ user แก้ segments selection แต่ไม่แก้ subtitle text)
                 final_phrases = generate_phrases_from_transcript(transcript, clean_segs)
                 print(f"📝 Auto-generated {len(final_phrases)} subtitle phrases")
 
         _render(video_path, clean_segs, transcript or [], final_output, job_dir,
-                output_mode, target_length, burn_subtitle, edited_phrases=final_phrases)
+                output_mode, target_length, burn_subtitle, edited_phrases=final_phrases,
+                denoise=denoise)
 
         total_keep = sum(s["end"] - s["start"] for s in clean_segs)
         return {
@@ -379,6 +411,7 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
             "edit_summary": {
                 "segments_kept": len(clean_segs),
                 "duration_kept_seconds": round(total_keep, 1),
+                "burn_subtitle": bool(burn_subtitle),
             }
         }
 
@@ -406,16 +439,17 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _render(video_path, segments, transcript, final_output, job_dir,
-            output_mode, target_length, burn_subtitle, edited_phrases=None):
+            output_mode, target_length, burn_subtitle, edited_phrases=None,
+            denoise=False):
     if output_mode == "tiktok":
         render_tiktok_video(
             video_path, segments, transcript, final_output, job_dir,
             target_length=target_length, burn_subtitle=burn_subtitle,
-            edited_phrases=edited_phrases,
+            edited_phrases=edited_phrases, denoise=denoise,
         )
     else:
         edit_and_merge_video(
             video_path, segments, final_output, job_dir,
             transcript=transcript, burn_subtitle=burn_subtitle,
-            edited_phrases=edited_phrases,
+            edited_phrases=edited_phrases, denoise=denoise,
         )

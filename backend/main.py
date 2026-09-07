@@ -27,7 +27,10 @@ init_sentry("backend")   # เปิดเฉพาะเมื่อมี SENT
 MAX_FILE_SIZE_MB = 2048               # 2GB upload limit
 MAX_PROMPT_LENGTH = 2000               # 2000 chars prompt
 ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v"}
-ALLOWED_OUTPUT_MODES = {"standard", "tiktok"}
+ALLOWED_OUTPUT_MODES = {"standard", "tiktok"}   # รูปแบบ render (aspect): 16:9 / 9:16
+# วิธีตัด: full=เก็บเนื้อหาครบ / summary=สรุปให้เข้าใจครบ / hook=ไฮไลต์ดึงคนดู
+ALLOWED_EDIT_MODES = {"full", "summary", "hook"}
+_EDIT_MODE_ALIASES = {"short": "summary"}       # back-compat กับ client เก่า
 MIN_TARGET_LENGTH = 10
 MAX_TARGET_LENGTH = 600
 # NOTE: cleanup logic (JOB_RETENTION_DAYS, marker guard) ย้ายไป tasks.py แล้ว
@@ -55,7 +58,8 @@ API_KEYS = {k.strip() for k in os.getenv("API_KEYS", "").split(",") if k.strip()
 # CORS: ตั้ง ALLOWED_ORIGINS (คั่นด้วย ,) สำหรับ deploy โดเมนจริง — ไม่ตั้ง = localhost
 _DEFAULT_ORIGINS = ("http://localhost,http://127.0.0.1,http://localhost:80,"
                     "http://127.0.0.1:80,http://localhost:5173")
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()]
+# .env ที่มีบรรทัด ALLOWED_ORIGINS= (ค่าว่าง) ต้อง fallback เป็น default ไม่ใช่ list ว่าง
+ALLOWED_ORIGINS = [o.strip() for o in (os.getenv("ALLOWED_ORIGINS") or _DEFAULT_ORIGINS).split(",") if o.strip()]
 # Rate limit ต่อ IP (ปรับผ่าน env) — กันยิงถล่ม /upload,/render (ที่กิน GPU+โควต้า AI)
 UPLOAD_RATE_LIMIT = os.getenv("UPLOAD_RATE_LIMIT", "20/hour")
 RENDER_RATE_LIMIT = os.getenv("RENDER_RATE_LIMIT", "60/hour")
@@ -117,10 +121,12 @@ async def upload_video(
     video: UploadFile = File(...),
     prompt: str = Form(...),
     output_mode: str = Form("standard"),
+    edit_mode: str = Form("full"),
     target_length: int = Form(60),
     burn_subtitle: bool = Form(False),
     preview_mode: bool = Form(False),
     preset_id: str = Form(""),
+    denoise: bool = Form(False),
 ):
     # ── Input validation ────────────────────────────────────────────────────
     prompt = (prompt or "").strip()
@@ -131,6 +137,9 @@ async def upload_video(
 
     if output_mode not in ALLOWED_OUTPUT_MODES:
         raise HTTPException(status_code=400, detail=f"output_mode ต้องเป็น {ALLOWED_OUTPUT_MODES}")
+    edit_mode = _EDIT_MODE_ALIASES.get(edit_mode, edit_mode)
+    if edit_mode not in ALLOWED_EDIT_MODES:
+        raise HTTPException(status_code=400, detail=f"edit_mode ต้องเป็น {ALLOWED_EDIT_MODES}")
     if not (MIN_TARGET_LENGTH <= target_length <= MAX_TARGET_LENGTH):
         raise HTTPException(
             status_code=400,
@@ -145,8 +154,8 @@ async def upload_video(
             detail=f"ไฟล์ {ext} ไม่รองรับ (ต้องเป็น {ALLOWED_VIDEO_EXTS})",
         )
 
-    print(f"DEBUG: Upload received: file={fname}, mode={output_mode}, "
-          f"target_length={target_length}s, burn_subtitle={burn_subtitle}")
+    print(f"DEBUG: Upload received: file={fname}, edit_mode={edit_mode}, aspect={output_mode}, "
+          f"target_length={target_length}s, burn_subtitle={burn_subtitle}, denoise={denoise}")
 
     try:
         job_id = str(uuid.uuid4())
@@ -176,7 +185,8 @@ async def upload_video(
         print(f"✅ File saved: {video_path} ({written / 1024 / 1024:.1f} MB)")
 
         process_video_task.apply_async(
-            args=[job_id, video_path, prompt, output_mode, target_length, burn_subtitle, preview_mode, preset_id],
+            args=[job_id, video_path, prompt, output_mode, target_length, burn_subtitle,
+                  preview_mode, preset_id, edit_mode, denoise],
             task_id=job_id,
         )
 
@@ -249,7 +259,11 @@ async def download_output(job_id: str):
     target_file = "final_summary.mp4"
     file_path = os.path.join(STORAGE_DIR, job_id, target_file)
     if os.path.exists(file_path):
-        return FileResponse(path=file_path, filename=target_file, media_type="video/mp4")
+        # no-store — ไฟล์ถูกเขียนทับได้เมื่อ user ย้อนกลับไปแก้ซับแล้ว render ใหม่
+        return FileResponse(
+            path=file_path, filename=target_file, media_type="video/mp4",
+            headers={"Cache-Control": "no-store"},
+        )
     raise HTTPException(status_code=404, detail="ไม่พบไฟล์วิดีโอผลลัพธ์")
 
 
@@ -278,11 +292,19 @@ def _validate_phrases(phrases: list[dict]) -> list[dict]:
             continue
         if len(text) > MAX_PHRASE_TEXT_LEN:
             text = text[:MAX_PHRASE_TEXT_LEN]
-        out.append({
+        entry = {
             "start": round(start, 3),
             "end": round(end, 3),
             "text": text,
-        })
+        }
+        # เก็บเวลาในคลิปต้นฉบับต่อ (ถ้ามี) → render ใช้ remap ให้ตรง segment ที่เลือก
+        for key in ("orig_start", "orig_end"):
+            try:
+                if p.get(key) is not None:
+                    entry[key] = round(float(p[key]), 3)
+            except (TypeError, ValueError):
+                pass
+        out.append(entry)
     return out
 
 
@@ -320,8 +342,13 @@ async def render_preview(request: Request, job_id: str, body: RenderRequest):
     if body.edited_phrases is not None:
         edited_phrases = _validate_phrases(body.edited_phrases)
 
-    # ใช้ job_id เดิมเป็น task_id ใหม่ → frontend poll endpoint เดิมได้
+    # ใช้ job_id เดิมเป็น task_id → frontend poll endpoint เดิมได้
+    # ล้างผลลัพธ์ render รอบก่อน (กันหน้าเว็บอ่านเจอ SUCCESS เก่าตอนกด "แก้คำบรรยาย" ซ้ำ)
     new_task_id = f"{job_id}-render"
+    try:
+        AsyncResult(new_task_id).forget()
+    except Exception as e:
+        print(f"⚠️ could not forget previous render result: {e}")
     render_only_task.apply_async(
         args=[job_id, cleaned, edited_phrases],
         task_id=new_task_id,
@@ -339,7 +366,9 @@ async def get_subtitle(job_id: str):
         raise HTTPException(status_code=404, detail="ไม่พบ preview")
     with open(preview_file, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return {"phrases": data.get("subtitle_phrases", [])}
+    # ถ้าเคยแก้ซับไว้แล้ว → คืน edit ล่าสุด, ไม่งั้นคืน phrases ที่ auto-generate
+    phrases = data.get("edited_subtitle_phrases") or data.get("subtitle_phrases", [])
+    return {"phrases": phrases}
 
 
 # NOTE: subtitle ที่ user แก้ถูกส่งตรงเข้า POST /render (edited_phrases) ไม่ต้อง persist

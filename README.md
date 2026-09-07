@@ -194,8 +194,27 @@ docker compose up -d --build
 | Variable | Default | Description |
 |---|---|---|
 | `GEMINI_API_KEYS` | required | Gemini key(s), comma-separated |
+| `GEMINI_MODELS` | `gemini-2.5-flash,gemini-3.6-flash` | fallback chain — แก้ได้ถ้า Google ปิด model เก่า (404) |
 | `REDIS_URL` | `redis://redis:6379/0` | Redis broker URL |
 | `WHISPER_BATCH_SIZE` | `4` | Batched inference batch size (↑ = faster, ↑ VRAM) |
+| `WHISPER_MODEL` | `medium` (GPU) / `small` (CPU) | Whisper model size. `WHISPER_MODEL_CPU` / `WHISPER_MODEL_CUDA` override per-device. ↑ = แม่นขึ้น, ช้าลง (CPU ~2-3x) |
+| `SUBTITLE_LEAD_TIME` | `0.18` | วินาทีที่ subtitle ขึ้นก่อนเสียง (`0.05` = ตามเสียงเป๊ะ, `0.25` = ขึ้นก่อนเยอะ) |
+| `SUBTITLE_MAX_CHARS` | `28` | ความยาวสูงสุดต่อบรรทัดซับ (↑ = บรรทัดยาวขึ้น, เบรกกลางประโยคน้อยลง) |
+| `SUBTITLE_MAX_DURATION` | `2.2` | เวลาสูงสุดต่อบรรทัดซับ (วินาที) |
+| `FILTERGRAPH_MAX_SEGMENTS` | `80` | ถ้าจำนวนช่วงตัด ≤ ค่านี้ → render แบบ 1-pass (frame-accurate); เกินกว่านี้ fallback ไป per-part |
+| `SILENCE_HINT_MIN_GAP` | `3.0` | ช่องว่างในทรานสคริปต์ที่ยาว ≥ ค่านี้ (วินาที) → ส่งเป็น hint ให้ Gemini พิจารณาตัดออก (AI ตัดเอง ไม่ตัดแบบกลไก) |
+| `HOOK_LEAD_FIRST` | `0` | โหมด `hook`: `1` = เอาช่วง role=hook ขึ้นก่อน (ที่เหลือเรียงตามเวลา) ; `0` = เรียงตามเวลาล้วน |
+| `SUMMARY_OUTLINE` | `1` | โหมด `summary`: `1` = ให้ AI ร่าง outline ประเด็นหลักก่อนตัด แล้วตรวจว่าประเด็น core ครบ ; `0` = ปิด (พฤติกรรมเดิม, ประหยัด Gemini 1 call) |
+| `SUMMARY_OUTLINE_MIN_COVERAGE` | `0.35` | เนื้อหาแนวอธิบาย/สอน: ประเด็น core ที่เหลืออยู่น้อยกว่าสัดส่วนนี้ → คืนช่วงนั้นกลับอัตโนมัติ (↑ = คืนบ่อยขึ้น/ผลลัพธ์ยาวขึ้น) |
+| `SUMMARY_OUTLINE_MIN_COVERAGE_NARRATIVE` | `0.6` | เนื้อหาแนวเล่าเรื่อง (ประวัติศาสตร์/สารคดี): เกณฑ์เดียวกันแต่สูงกว่า — เรื่องเล่าเหลือครึ่งเดียวก็ตามไม่ทันแล้ว |
+| `NARRATIVE_MERGE_GAP` | `8.0` | เนื้อหาแนวเล่าเรื่อง: รอยตัดที่สั้นกว่าค่านี้ (วินาที) จะถูกคืนกลับ — กันอาการ "ดูกระโดด ไม่ได้ใจความ" (↑ = ต่อเนื่องขึ้นแต่ตัดได้น้อยลง) |
+| `OUTRO_SEARCH_WINDOW` | `180.0` | ค้นคำพูดปิดคลิป ("แล้วพบกันใหม่", "ขอบคุณที่รับชม") ย้อนหลังจากคำพูดสุดท้ายกี่วินาที — ถ้าถูกตัดทิ้งจะคืนกลับอัตโนมัติ กันคลิปจบห้วน |
+| `OUTRO_LEAD` | `20.0` | เก็บเนื้อหา "เกริ่นก่อนจบ" (สรุปส่งท้าย) ก่อนถึงคำลากี่วินาที |
+| `OUTRO_MIN_TAIL` | `25.0` | ตัวกันขั้นต่ำ: เสียงพูดกี่วินาทีสุดท้ายที่ต้องเก็บเสมอ แม้ Whisper ถอดคำลาเพี้ยนจนไม่แมตช์ (`0` = ปิด พึ่งการแมตช์คำลาอย่างเดียว) |
+| `OUTRO_END_TOLERANCE` | `1.5` | คลิปจบก่อนคำพูดสุดท้ายได้ไม่เกินกี่วินาที ถึงยังถือว่าจบสมบูรณ์ — เกินกว่านี้จะคืนช่วงท้ายกลับ |
+| `OUTRO_MAX_RESTORE` | `90.0` | เพดานความยาวที่ยอมคืนกลับตอนท้าย (วินาที) |
+| `SENTENCE_PAUSE` | `0.45` | ช่องว่างระหว่างท่อนถอดเสียงที่ยังถือว่า "พูดต่อเนื่อง" — ใช้ยืดขอบตัดให้จบประโยคจริง (↑ = ยืดไกลขึ้น, เสี่ยงเก็บเกิน) |
+| `SNAP_MAX_EXTEND` | `6.0` | เพดานการยืดขอบตัดต่อด้าน (วินาที) กันกรณีพูดรัวไม่หยุด |
 | `TRANSCRIPT_CACHE_DIR` | `/app/transcript_cache` | Audio hash → transcript cache |
 
 ### Tuning Performance
@@ -209,15 +228,23 @@ docker compose up -d --build
 | RTX 4070+ | `16` |
 | A100/H100 | `32+` |
 
-### Subtitle Lead Time
+### โหมดการตัด (`edit_mode`)
 
-ใน `backend/core/srt_utils.py` (line ~31):
+| โหมด | ทำอะไร | ความยาวผลลัพธ์ |
+|---|---|---|
+| `full` เก็บเนื้อหาครบ | Deletion — ตัดแค่ช่วงเงียบ/filler/นอกเรื่อง/ปัญหาเทคนิค เก็บเนื้อหาครบ | ≈ ต้นฉบับ − ส่วนน้ำ |
+| `summary` สรุปให้เข้าใจครบ | Deletion แบบตัดหนัก — เก็บทุกประเด็นหลัก + context ให้ดูแทนคลิปเต็มได้ **AI ประเมินความยาวเอง** | ปกติ 10–40% ของต้นฉบับ ตามความแน่นของเนื้อหา |
+| `hook` ไฮไลต์ดึงคนดู | Selection — เลือก 2–5 ช่วงเด็ด (hook / insight / ปม / teaser) ไม่เฉลยจบ กระตุ้นให้ไปดูฉบับเต็ม | `target_length` วินาที (soft, ±30%) |
 
-```python
-SUBTITLE_LEAD_TIME = 0.18   # 180ms — subtitle เริ่มก่อนเสียง
-# 0.10 = ตามเสียงเป๊ะ ๆ
-# 0.20 = subtitle ก่อนเสียงเยอะ (ดูสบายตา)
-```
+`aspect` (16:9 / 9:16) แยกจาก `edit_mode` — ใช้กับโหมดไหนก็ได้ · client เก่าที่ส่ง `edit_mode=short` → map เป็น `summary`
+
+### Subtitle Sync
+
+- Subtitle timing ใช้ **word-level timestamps** จาก Whisper โดยตรง (ตัดวรรคที่จังหวะหยุดพูดจริง)
+  ถ้า transcript ถูก AI แปล/เขียนใหม่จน word ไม่ตรง จะ fallback ไปเฉลี่ยเวลาตามตัวอักษร
+- การตัด+รวมคลิปทำใน `filter_complex` pass เดียว → **frame/sample-accurate** ไม่มี A/V drift สะสม
+  → subtitle อยู่บน timeline เดียวกับวิดีโอ output เป๊ะ
+- ปรับ lead time (subtitle ขึ้นก่อนเสียง) ผ่าน env `SUBTITLE_LEAD_TIME` — เช่น `SUBTITLE_LEAD_TIME=0.05`
 
 ---
 

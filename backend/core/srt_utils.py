@@ -6,7 +6,9 @@
 4. รับประกัน phrase ไม่ซ้อนกัน + มี gap เล็กน้อยให้แต่ละ phrase หายไปก่อนตัวถัดไป
 """
 
+import os
 import unicodedata
+from collections import Counter
 
 try:
     from pythainlp.tokenize import word_tokenize as _thai_word_tokenize
@@ -16,10 +18,20 @@ except ImportError:
 
 # Soft limit: พยายามไม่เกินค่านี้ ถ้าเจอ pause/punctuation
 SOFT_MAX_CHARS = 14
-# Hard limit: ถึงไม่มี pause ก็ต้องตัด (กันยาวเกิน)
-HARD_MAX_CHARS = 28
-# Max duration ของ 1 phrase (วินาที) — กันค้างเกินเวลา
-MAX_PHRASE_DURATION = 1.8
+
+
+def _env_num(name: str, default, cast):
+    try:
+        return cast(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+# Hard limit: ถึงไม่มี pause ก็ต้องตัด (กันยาวเกิน) — ปรับผ่าน env SUBTITLE_MAX_CHARS
+HARD_MAX_CHARS = _env_num("SUBTITLE_MAX_CHARS", 28, int)
+# Max duration ของ 1 phrase (วินาที) — กันค้างเกินเวลา — ปรับผ่าน env SUBTITLE_MAX_DURATION
+# (Thai พูดเร็ว: 1.8s เบรกกลางประโยคบ่อย → default 2.2s)
+MAX_PHRASE_DURATION = _env_num("SUBTITLE_MAX_DURATION", 2.2, float)
 # pause threshold (วินาที) — gap เล็กน้อยก็ถือว่าตัดได้
 PAUSE_THRESHOLD = 0.05
 # punctuation ที่จบประโยค → cut ทันที
@@ -36,7 +48,11 @@ MIN_PHRASE_DURATION = 0.05
 MIN_PHRASE_CHARS = 9
 # Subtitle Lead Time (วินาที) — subtitle ปรากฏก่อนเสียงพูดเล็กน้อย ให้ผู้ดูทันอ่าน
 # Whisper มัก return start ช้ากว่าเสียงจริง ~100-300ms → ชดเชยด้วยค่านี้
-SUBTITLE_LEAD_TIME = 0.18
+# ปรับผ่าน env SUBTITLE_LEAD_TIME ได้ (0.05 = ตามเสียงเป๊ะ, 0.25 = ขึ้นก่อนเสียงเยอะ)
+try:
+    SUBTITLE_LEAD_TIME = max(0.0, float(os.getenv("SUBTITLE_LEAD_TIME", "0.18")))
+except ValueError:
+    SUBTITLE_LEAD_TIME = 0.18
 
 
 def _format_srt_timestamp(seconds: float) -> str:
@@ -79,6 +95,30 @@ def _is_dependent_mark(ch: str) -> bool:
 _THAI_TRAILING_VOWELS = set("ะาำๅ")
 # Thai leading vowels (เขียนก่อนพยัญชนะ) — ปลอดภัยที่จะเริ่ม syllable ใหม่
 _THAI_LEADING_VOWELS = set("เแโใไ")
+# อักขระที่ "ห้ามนำหน้าวรรค" — ต้องเกาะกับคำก่อนหน้าเสมอ
+#   ๆ = ไม้ยมก (ซ้ำคำ), ฯ = ไปยาลน้อย, + สระตาม (ะ า ำ ๅ)
+_MUST_NOT_LEAD = _THAI_TRAILING_VOWELS | {"ๆ", "ฯ"}
+
+
+def _starts_unbreakable(token: str) -> bool:
+    """True ถ้า token ขึ้นต้นด้วยอักขระที่ต้องเกาะคำก่อนหน้า (มาร์ก / ๆ / ฯ / สระตาม)"""
+    c = token[:1]
+    return bool(c) and (_is_dependent_mark(c) or c in _MUST_NOT_LEAD)
+
+
+def _merge_orphan_marks(tokens: list[str]) -> list[str]:
+    """
+    รวม token ที่ขึ้นต้นด้วยอักขระ 'ห้ามนำหน้าวรรค' เข้ากับ token ก่อนหน้า
+    เช่น PyThaiNLP แยก 'ต่างๆ' → ['ต่าง','ๆ'] → รวมกลับเป็น ['ต่างๆ']
+    กัน 'ๆ' / สระ ลอยไปนำหน้าวรรคถัดไป (เช่น 'ๆนะครับ')
+    """
+    out: list[str] = []
+    for t in tokens:
+        if out and _starts_unbreakable(t):
+            out[-1] += t
+        else:
+            out.append(t)
+    return out
 
 
 def _is_safe_break_before(text: str, pos: int) -> bool:
@@ -115,13 +155,15 @@ def _tokenize_thai_aware(text: str) -> list[str]:
     """
     แบ่งข้อความเป็น "words" โดย:
     - ถ้ามี PyThaiNLP → ใช้ word_tokenize (newmm) สำหรับ Thai → ได้ word ที่ถูกต้อง
-    - ถ้าไม่มี → fallback ใช้ safe-break split (character level)
+    - ถ้าไม่มี → fallback ใช้ split ด้วย whitespace
+    แล้วรวม token ที่ห้ามนำหน้าวรรค (ๆ / มาร์ก / สระตาม) กลับเข้าคำก่อนหน้า
     """
     if _HAS_PYTHAINLP:
         # newmm = Maximum Matching + TCC algorithm — Thai word tokenizer มาตรฐาน
-        return [w for w in _thai_word_tokenize(text, engine="newmm", keep_whitespace=False) if w.strip()]
-    # Fallback: split by whitespace แบบง่าย
-    return [w for w in text.split() if w.strip()]
+        toks = [w for w in _thai_word_tokenize(text, engine="newmm", keep_whitespace=False) if w.strip()]
+    else:
+        toks = [w for w in text.split() if w.strip()]
+    return _merge_orphan_marks(toks)
 
 
 def _break_priority(word: str, next_word: str | None, bucket_after: str) -> int:
@@ -311,26 +353,6 @@ def _split_segment_text(text: str, seg_start: float, seg_end: float,
     return chunks
 
 
-def _merge_dependent_marks(words: list[dict]) -> list[dict]:
-    """
-    รวม token ที่เริ่มด้วย dependent mark เข้ากับ token ก่อนหน้า
-    เช่น Whisper อาจส่ง: [{text:"ค"}, {text:"ิด"}] → รวมเป็น [{text:"คิด"}]
-    เพื่อกัน vowel/tone mark ลอยหลังการตัด phrase
-    """
-    if not words:
-        return []
-    merged: list[dict] = [dict(words[0])]
-    for w in words[1:]:
-        token = (w.get("text") or "")
-        if token and _is_dependent_mark(token[:1]) and merged:
-            prev = merged[-1]
-            prev["text"] = prev["text"] + token
-            prev["end"] = w["end"]
-        else:
-            merged.append(dict(w))
-    return merged
-
-
 def _join_token(existing: str, token: str) -> str:
     """รวม token เข้ากับ string เดิม โดย:
     - Thai → ไม่ใส่ space
@@ -345,72 +367,209 @@ def _join_token(existing: str, token: str) -> str:
     return existing + " " + token
 
 
-def _split_words_into_phrases(words: list[dict]) -> list[dict]:
-    """
-    Group consecutive words เป็น phrases สั้น ๆ โดย "ตัดที่ pause/punctuation"
-    เพื่อรักษาคำให้ครบ (ไม่ตัดกลางคำ) — ไม่ใช่ตัดที่ char limit แบบดื้อ ๆ
+def _norm_for_compare(s: str) -> str:
+    """normalize ข้อความสำหรับเทียบ (ตัด whitespace + dependent marks, lowercase)"""
+    return "".join(
+        ch.lower() for ch in s
+        if not ch.isspace() and not _is_dependent_mark(ch)
+    )
 
-    หลักการ:
-    - hard cut เมื่อ candidate > HARD_MAX_CHARS  (กันยาวเกิน)
-    - soft cut เมื่อ text_buf >= SOFT_MAX_CHARS และ มี pause > PAUSE_THRESHOLD
-    - soft cut เมื่อ ตัวท้าย text_buf เป็น punctuation (จบประโยค)
 
-    คืนค่า: [{"start": ..., "end": ..., "text": ...}]
+def _words_match_text(words: list[dict], text: str) -> bool:
     """
-    if not words:
+    True ถ้า word tokens จาก Whisper ยัง "ตรง" กับ segment text
+      → ใช้ word-level timestamps ได้ (แม่นกว่าเฉลี่ยเวลาตามจำนวนตัวอักษร)
+    False ถ้า text ถูก AI แก้/แปลจนไม่ตรงกับเสียงเดิม (เช่น แปลอังกฤษ → ไทย)
+      → ต้อง fallback ไปใช้ proportional split ของเดิม
+    """
+    if not words or not text:
+        return False
+    joined = _norm_for_compare("".join((w.get("text") or "") for w in words))
+    target = _norm_for_compare(text)
+    if not joined or not target:
+        return False
+    lo, hi = sorted((len(joined), len(target)))
+    if lo / hi < 0.72:                     # ความยาวต่างกันมาก → น่าจะโดนแปล/เขียนใหม่
+        return False
+    overlap = sum((Counter(joined) & Counter(target)).values())
+    return overlap / hi >= 0.78            # อักขระซ้อนกันเยอะพอ → ถือว่าตรง
+
+
+def _thai_words_with_times(seg_text: str, whisper_words: list[dict]) -> list[dict]:
+    """
+    แบ่ง seg_text เป็น "คำไทยจริง" (PyThaiNLP) แล้วให้เวลาแต่ละคำจาก Whisper word
+    ที่ประกอบเป็นคำนั้น — ไม่เฉลี่ยเวลาทั้ง segment
+
+    วิธี: Whisper คืน word เป็นเศษพยางค์พร้อม timestamp จริง — จับคู่ช่วงตัวอักษร
+    ของแต่ละคำ PyThaiNLP กับ fragment ที่ครอบตำแหน่งนั้น แล้วอ่านเวลาจาก fragment
+    (interpolate ภายใน fragment; ช่วง pause ระหว่าง fragment ไม่มีตัวอักษร จึงไม่ถูกกิน)
+
+    คืน [{"start", "end", "text"}] — text = คำไทยจริง, เวลา = เวลาพูดจริง
+    """
+    frags = [
+        (float(w["start"]), float(w["end"]), len((w.get("text") or "").strip()))
+        for w in whisper_words
+        if (w.get("text") or "").strip()
+        and w.get("start") is not None and w.get("end") is not None
+    ]
+    if not frags:
         return []
 
-    # Preprocess: รวม dependent marks เข้ากับพยัญชนะนำหน้า กัน split กลาง syllable
-    words = _merge_dependent_marks(words)
+    total_w = float(sum(L for _, _, L in frags)) or 1.0
+    seg_norm = "".join(seg_text.split())
+    total_s = float(len(seg_norm)) or 1.0
+    scale = total_w / total_s   # เผื่อ text ถูกแก้จนยาวไม่เท่ากันเป๊ะ
 
+    def time_at(seg_char: float, is_end: bool) -> float:
+        x = max(0.0, min(seg_char * scale, total_w))
+        cum = 0.0
+        for fs, fe, L in frags:
+            if L <= 0:
+                continue
+            lo, hi = cum, cum + L
+            inside = (x <= hi) if is_end else (x < hi)
+            if inside:
+                if x <= lo:
+                    return fs
+                return fs + (fe - fs) * (x - lo) / L
+            cum = hi
+        return frags[-1][1]
+
+    tokens = _tokenize_thai_aware(seg_text)
+    out: list[dict] = []
+    pos = 0
+    for tk in tokens:
+        n = len(tk)
+        s = time_at(pos, is_end=False)
+        e = time_at(pos + n, is_end=True)
+        pos += n
+        if e - s < 0.02:
+            e = s + 0.02
+        out.append({"start": s, "end": e, "text": tk})
+    return out
+
+
+# คำไทยสั้น ๆ ที่ห้ามอยู่ต้นวรรค (ควรเกาะกับประโยคก่อนหน้า)
+_NO_BREAK_BEFORE = THAI_END_PARTICLES | {"นะ", "ก็", "ที่", "ว่า", "คะ", "จ้ะ"}
+
+
+def _bucket_thai_words(words: list[dict]) -> list[dict]:
+    """
+    รวม "คำไทยจริง" (จาก _thai_words_with_times) เป็นวรรค subtitle
+    ตัดที่: จบประโยค / หลัง Thai end particle / ก่อน Thai conjunction (เมื่อถึง soft) /
+            pause ≥ 0.25s (เมื่อถึง soft) / เกิน HARD_MAX_CHARS / เกิน MAX_PHRASE_DURATION
+    ไม่ตัดก่อนคำลงท้าย/คำสั้น (ครับ ค่ะ นะ ก็ ที่ ว่า) — ปล่อยให้เกาะประโยค
+    เวลาแต่ละวรรค = เวลาคำแรก/คำสุดท้ายจริง (ไม่ตัดกลางคำ เพราะทำงานบนคำเต็ม)
+    """
+    ws = [w for w in words if (w.get("text") or "").strip()]
+    if not ws:
+        return []
+
+    PAUSE = 0.25
     phrases: list[dict] = []
     bucket: list[dict] = []
-    text_buf = ""
+
+    def _txt(items):
+        s = ""
+        for it in items:
+            s = _join_token(s, it["text"])
+        return s
 
     def flush():
         if bucket:
             phrases.append({
                 "start": bucket[0]["start"],
-                "end":   bucket[-1]["end"],
-                "text":  text_buf.strip(),
+                "end": bucket[-1]["end"],
+                "text": _txt(bucket).strip(),
             })
+        bucket.clear()
 
-    for w in words:
-        token = (w.get("text") or "").strip()
-        if not token:
-            continue
-
-        candidate = _join_token(text_buf, token)
-        should_cut = False
-
+    for i, w in enumerate(ws):
+        tok = w["text"].strip()
         if bucket:
-            prev_end = bucket[-1]["end"]
-            pause = w["start"] - prev_end
-            phrase_dur = bucket[-1]["end"] - bucket[0]["start"]
-
-            if len(candidate) > HARD_MAX_CHARS:
-                # ยาวเกิน — ต้องตัดแม้ไม่เจอ pause
-                should_cut = True
-            elif phrase_dur >= MAX_PHRASE_DURATION:
-                # phrase ยาวเกินเวลา → ตัดเพื่อไม่ให้ subtitle ค้าง
-                should_cut = True
-            elif len(text_buf) >= SOFT_MAX_CHARS and pause >= PAUSE_THRESHOLD:
-                # ถึง soft limit + มี pause = จุดตัดที่ดี
-                should_cut = True
-            elif text_buf and text_buf[-1] in SENTENCE_END_CHARS:
-                # จบประโยคด้วย punctuation
-                should_cut = True
-
-        if should_cut:
-            flush()
-            bucket = [w]
-            text_buf = token
-        else:
-            bucket.append(w)
-            text_buf = candidate
-
+            buf = _txt(bucket)
+            prev_tok = bucket[-1]["text"].strip()
+            pause = w["start"] - bucket[-1]["end"]
+            dur = bucket[-1]["end"] - bucket[0]["start"]
+            at_soft = len(buf) >= SOFT_MAX_CHARS
+            # เหตุ "แข็ง" — เบรกได้เสมอ (จบประโยค / หลังคำลงท้าย)
+            hard_reason = (
+                buf[-1:] in SENTENCE_END_CHARS
+                or prev_tok in THAI_END_PARTICLES
+            )
+            # เหตุ "อ่อน" — เบรกเฉพาะถ้าไม่ทำให้คำลงท้าย/คำสั้นไปนำหน้าวรรคถัดไป
+            soft_reason = (
+                len(_join_token(buf, tok)) > HARD_MAX_CHARS
+                or dur >= MAX_PHRASE_DURATION
+                or (at_soft and pause >= PAUSE)
+                or (at_soft and tok in THAI_CONJUNCTIONS)
+            )
+            if hard_reason or (soft_reason and tok not in _NO_BREAK_BEFORE):
+                flush()
+        bucket.append(w)
     flush()
-    return phrases
+
+    # รวมวรรคสั้นเกิน (< MIN_PHRASE_CHARS) เข้ากับเพื่อนบ้าน — คงเวลาปลายทั้งสองข้าง
+    out: list[dict] = []
+    for ph in phrases:
+        if out and len(ph["text"]) < MIN_PHRASE_CHARS:
+            prev = out[-1]
+            combined = _join_token(prev["text"], ph["text"])
+            if (len(combined) <= HARD_MAX_CHARS + 6
+                    and ph["end"] - prev["start"] <= MAX_PHRASE_DURATION * 2):
+                prev["text"] = combined
+                prev["end"] = ph["end"]
+                continue
+        out.append(dict(ph))
+    return out
+
+
+def remap_edited_phrases(phrases: list[dict],
+                         keep_segments: list[dict]) -> list[dict]:
+    """
+    รับ phrase ที่ผู้ใช้แก้แล้ว (ควรมี orig_start/orig_end = เวลาในคลิปต้นฉบับ)
+    → คำนวณ start/end ใน output timeline ใหม่ ตาม keep_segments ที่เลือกจริงตอน render
+      - phrase ที่ midpoint อยู่นอก keep segment ที่เลือก (โดนตัดออก) → ทิ้ง
+      - phrase ที่ไม่มี orig_* (preview เก่า) → ปล่อยผ่านตามเดิม (best-effort)
+    """
+    keep_sorted = sorted(keep_segments, key=lambda x: x["start"])
+    offsets: dict[int, float] = {}
+    cumulative = 0.0
+    for k in keep_sorted:
+        offsets[id(k)] = cumulative
+        cumulative += (k["end"] - k["start"])
+
+    out: list[dict] = []
+    for ph in phrases:
+        text = (ph.get("text") or "").strip()
+        if not text:
+            continue
+        os_ = ph.get("orig_start")
+        oe = ph.get("orig_end")
+        if os_ is None or oe is None:
+            out.append({"start": round(float(ph.get("start", 0)), 3),
+                        "end": round(float(ph.get("end", 0)), 3), "text": text})
+            continue
+        os_, oe = float(os_), float(oe)
+        mid = (os_ + oe) / 2
+        for k in keep_sorted:
+            if k["start"] <= mid <= k["end"]:
+                ps = max(os_, k["start"])
+                pe = min(oe, k["end"])
+                if pe - ps > MIN_PHRASE_DURATION:
+                    off = offsets[id(k)]
+                    out.append({
+                        "start": round(ps - k["start"] + off, 3),
+                        "end": round(pe - k["start"] + off, 3),
+                        "text": text,
+                    })
+                break
+    out.sort(key=lambda x: x["start"])
+    # กัน overlap หลัง sort
+    for i in range(1, len(out)):
+        if out[i]["start"] < out[i - 1]["end"] + PHRASE_GAP:
+            out[i]["start"] = round(out[i - 1]["end"] + PHRASE_GAP, 3)
+    return [p for p in out if p["end"] - p["start"] > MIN_PHRASE_DURATION]
 
 
 def generate_phrases_from_transcript(
@@ -418,49 +577,76 @@ def generate_phrases_from_transcript(
     keep_segments: list[dict],
 ) -> list[dict]:
     """
-    สร้าง list ของ phrases (ยังไม่เขียนไฟล์) สำหรับให้ user แก้ก่อน burn เป็น SRT
+    สร้าง list ของ phrases (ยังไม่เขียนไฟล์) สำหรับ burn เป็น SRT / ให้ user แก้
+
+    การแบ่งวรรค: ใช้ PyThaiNLP แบ่งคำไทยจริง — ไม่ตัดกลางคำ
+    เวลาแต่ละวรรค: เอาจาก Whisper word ที่ประกอบเป็นคำนั้นจริง ๆ (_thai_words_with_times)
+    ถ้า text ถูกแปล/เขียนใหม่จน word ไม่ตรง → fallback ไปเฉลี่ยเวลาตามตัวอักษร (_split_segment_text)
 
     Args:
-        transcript:    [{"start": 1.2, "end": 4.5, "text": "...", "words": [...]}]
-        keep_segments: [{"start": 10.0, "end": 25.0}]
+        transcript:    [{"start", "end", "text", "words": [{"start","end","text"}]}]
+        keep_segments: [{"start", "end"}]  (ช่วงที่จะเก็บไว้ในวิดีโอ output)
 
     Returns:
-        [{"start": float, "end": float, "text": str}]  timestamps อยู่ใน output timeline
+        [{"start", "end", "orig_start", "orig_end", "text"}]
+          start/end  = เวลาใน output timeline (หลัง cut+concat) — ใช้เขียน SRT
+          orig_*     = เวลาในคลิปต้นฉบับ — ใช้ให้หน้าแก้ซับ seek/preview ได้ตรง
     """
     keep_sorted = sorted(keep_segments, key=lambda x: x["start"])
-    offsets = {}
+    offsets: dict[int, float] = {}
     cumulative = 0.0
     for k in keep_sorted:
         offsets[id(k)] = cumulative
         cumulative += (k["end"] - k["start"])
 
-    raw_entries: list[tuple[float, float, str]] = []
+    raw_entries: list[tuple[float, float, float, float, str]] = []
     for seg in transcript:
-        k = _segment_midpoint_in_keep(seg["start"], seg["end"], keep_sorted)
-        if k is None:
-            continue
-        offset = offsets[id(k)]
-
+        seg_start = float(seg.get("start", 0) or 0)
+        seg_end = float(seg.get("end", 0) or 0)
         seg_text = (seg.get("text") or "").strip()
-        if not seg_text:
+        if not seg_text or seg_end <= seg_start:
             continue
-        phrases = _split_segment_text(seg_text, seg["start"], seg["end"])
 
-        for ph in phrases:
+        words = seg.get("words") or []
+        if words and _words_match_text(words, seg_text):
+            # เวลาจริงจาก Whisper word + แบ่งคำด้วย PyThaiNLP
+            parts = _bucket_thai_words(_thai_words_with_times(seg_text, words))
+        else:
+            # fallback (text ถูกแปล/เขียนใหม่): เฉลี่ยเวลาตามตัวอักษร
+            a_start = float(words[0]["start"]) if words else seg_start
+            a_end = float(words[-1]["end"]) if words else seg_end
+            a_start = min(max(a_start, 0.0), seg_end)
+            a_end = max(a_end, a_start + 0.05)
+            parts = _split_segment_text(seg_text, a_start, a_end)
+
+        for ph in parts:
             text = (ph.get("text") or "").strip()
             if not text:
                 continue
-            ps = max(ph["start"], k["start"])
-            pe = min(ph["end"],   k["end"])
-            if pe <= ps:
+            p0, p1 = float(ph["start"]), float(ph["end"])
+            # ผูกวรรคกับ keep segment ที่ทับกันมากที่สุด แล้ว clip ให้อยู่ในขอบ
+            # (วรรคที่อยู่ในช่วงตัดทั้งหมด → ไม่ทับ keep ไหนเลย → หายไป)
+            best_k, best_ov = None, 0.0
+            for kk in keep_sorted:
+                ov = min(p1, kk["end"]) - max(p0, kk["start"])
+                if ov > best_ov:
+                    best_ov, best_k = ov, kk
+            if best_k is None or best_ov <= 0.01:
                 continue
-            new_start = ps - k["start"] + offset
-            new_end   = pe - k["start"] + offset
-            raw_entries.append((new_start, new_end, text))
+            k = best_k
+            offset = offsets[id(k)]
+            ps = max(p0, k["start"])
+            pe = min(p1, k["end"])
+            raw_entries.append((
+                ps - k["start"] + offset,   # output start
+                pe - k["start"] + offset,   # output end
+                ps, pe,                      # original start/end
+                text,
+            ))
 
     raw_entries.sort(key=lambda x: x[0])
     final_phrases: list[dict] = []
-    for start, end, text in raw_entries:
+    for start, end, o_start, o_end, text in raw_entries:
         if final_phrases and start < final_phrases[-1]["end"] + PHRASE_GAP:
             start = final_phrases[-1]["end"] + PHRASE_GAP
         if end <= start + MIN_PHRASE_DURATION:
@@ -468,6 +654,8 @@ def generate_phrases_from_transcript(
         final_phrases.append({
             "start": round(start, 3),
             "end": round(end, 3),
+            "orig_start": round(o_start, 3),
+            "orig_end": round(o_end, 3),
             "text": text,
         })
 

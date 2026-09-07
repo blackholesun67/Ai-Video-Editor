@@ -45,7 +45,8 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   }, [jobId]);
 
   const segments = preview?.segments || [];
-  const isTiktok = preview?.output_mode === 'tiktok';
+  // โหมดไฮไลต์ → segment มี role/score สำหรับโชว์ badge
+  const isHighlight = preview?.edit_mode === 'hook';
 
   // URL วิดีโอต้นฉบับ (preview.video_path = "storage/{job_id}/{file}") — /storage เสิร์ฟแบบ seek ได้
   const videoSrc = useMemo(() => {
@@ -238,13 +239,11 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
                       {formatTime(seg.start)} – {formatTime(seg.end)}
                     </span>
                     <span className="font-semibold text-slate-700">({duration.toFixed(1)}s)</span>
-                    {isTiktok && seg.priority && (
+                    {isHighlight && seg.role && (
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        seg.priority === 1 ? 'bg-indigo-100 text-indigo-700' :
-                        seg.priority === 2 ? 'bg-indigo-50 text-indigo-600' :
-                        'bg-slate-100 text-slate-600'
+                        seg.role === 'hook' ? 'bg-indigo-100 text-indigo-700' : 'bg-indigo-50 text-indigo-600'
                       }`}>
-                        {seg.priority === 1 ? '🔥 Hook' : `P${seg.priority}`}
+                        {{ hook: '🔥 Hook', insight: '💡 Insight', tension: '⚡ ปม', tease: '👀 ชวนดูต่อ' }[seg.role] || seg.role}
                       </span>
                     )}
                     {/* ปุ่มดูช่วงนี้ */}

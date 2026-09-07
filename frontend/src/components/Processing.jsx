@@ -18,8 +18,12 @@ const STEPS = [
   { id: 4, label: 'ตัดและรวมคลิป',   icon: Film,       progressMin: 80, progressMax: 100 },
 ];
 
-// เพดานเวลา polling — งานที่ค้างนานเกินนี้ (เช่น worker ตาย) จะเลิก poll แล้วโชว์ error
-const MAX_POLL_MS = 60 * 60 * 1000;   // 60 นาที
+// งานที่ยังไม่เริ่มประมวลผลเลย (ค้างในคิว) นานเกินนี้ → ถือว่าค้างจริง เลิก poll
+const STUCK_IN_QUEUE_MS = 15 * 60 * 1000;   // 15 นาที
+// เพดานสูงสุด — ต่อให้กำลังทำงานอยู่ ถ้าเกินนี้ก็เลิก poll (worker อาจค้างเงียบ ๆ)
+const MAX_POLL_MS = 90 * 60 * 1000;         // 90 นาที
+// วิดีโอยาว + CPU ช้า ใช้เวลานานได้ — เกินนี้แค่ "เตือน" ยัง poll ต่อ
+const SLOW_WARN_MS = 12 * 60 * 1000;        // 12 นาที
 // ยอมแพ้ถ้าเชื่อมต่อ backend ไม่ได้ติดต่อกันเกินจำนวนนี้ (≈ 20 × 3s = 60s)
 const MAX_CONSECUTIVE_ERRORS = 20;
 
@@ -29,8 +33,10 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
   const [progress, setProgress] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [canceling, setCanceling] = useState(false);
+  const [slowWarn, setSlowWarn] = useState(false);
   const intervalRef = useRef(null);
   const startTimeRef = useRef(Date.now());
+  const sawProgressRef = useRef(false);   // เคยเห็น task เริ่มประมวลผลจริงไหม
   const onCompleteRef = useRef(onComplete);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
@@ -74,13 +80,23 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
     const checkStatus = async () => {
       if (cancelled) return;
 
-      // เพดานเวลา — งานค้างนานผิดปกติ (worker ตาย/task ค้าง PENDING) → เลิก poll
-      if (Date.now() - startTimeRef.current > MAX_POLL_MS) {
+      const elapsed = Date.now() - startTimeRef.current;
+      // ยังไม่เริ่มประมวลผลเลย (ค้างในคิว) นานเกินไป → worker น่าจะไม่ทำงาน
+      if (!sawProgressRef.current && elapsed > STUCK_IN_QUEUE_MS) {
         stopPolling();
         setStatus('FAILURE');
-        setMessage('ใช้เวลานานผิดปกติ — งานอาจค้าง กรุณาลองใหม่');
+        setMessage('งานค้างในคิว — worker อาจไม่ทำงาน ลองรีสตาร์ท backend/worker แล้วลองใหม่');
         return;
       }
+      // เพดานสูงสุดจริง ๆ — ต่อให้กำลังทำงานอยู่ ก็เลิก poll (แต่งานอาจเสร็จเบื้องหลัง)
+      if (elapsed > MAX_POLL_MS) {
+        stopPolling();
+        setStatus('FAILURE');
+        setMessage('ใช้เวลานานผิดปกติ — งานอาจค้าง ลองกลับมาเปิดหน้านี้ใหม่ หรือเริ่มใหม่');
+        return;
+      }
+      // นานกว่าปกติแต่ยังทำงานอยู่ → แค่เตือน ยัง poll ต่อ
+      if (elapsed > SLOW_WARN_MS && sawProgressRef.current) setSlowWarn(true);
 
       try {
         const { data } = await axios.get(`${API_URL}/status/${jobId}`);
@@ -113,6 +129,10 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
           const raw = data.status || 'กำลังประมวลผล...';
           setMessage(STATUS_TRANSLATIONS[raw] || raw);
           setProgress(data.progress || 0);
+          // task เริ่มทำงานจริงแล้ว (ไม่ค้างในคิว)
+          if (raw === 'PROGRESS' || raw === 'STARTED' || (data.progress || 0) > 0) {
+            sawProgressRef.current = true;
+          }
         }
       } catch (err) {
         if (cancelled) return;
@@ -190,9 +210,9 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
 
           {/* Progress bar */}
           <div className="mt-5">
-            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
               <div
-                className={`h-2 rounded-full transition-all duration-700 ease-out ${
+                className={`h-3 rounded-full transition-all duration-700 ease-out ${
                   isSuccess ? 'bg-emerald-500' :
                   isFailure ? 'bg-red-500' :
                   isPending ? 'bg-amber-400' :
@@ -201,13 +221,20 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
                 style={{ width: `${Math.max(progress, isPending ? 5 : 0)}%` }}
               />
             </div>
-            <div className="flex items-center justify-between mt-2 text-xs">
-              <span className="font-medium text-slate-600">{progress}% · ผ่านไป {formatTime(elapsedSec)}</span>
+            <div className="flex items-center justify-between mt-2.5 text-sm">
+              <span className="font-semibold text-slate-700">{progress}% · ผ่านไป {formatTime(elapsedSec)}</span>
               {eta != null && (
                 <span className="text-slate-400">เหลืออีกประมาณ {formatTime(eta)}</span>
               )}
             </div>
           </div>
+
+          {/* เตือนเมื่อใช้เวลานานกว่าปกติ แต่ยังทำงานอยู่ */}
+          {slowWarn && !isFailure && !isSuccess && (
+            <p className="text-xs text-amber-600 mt-4 max-w-sm mx-auto leading-relaxed">
+              ⏳ ใช้เวลานานกว่าปกติ (วิดีโอยาว/เครื่องช้า) — ยังทำงานอยู่ ไม่ต้องปิดหรือเริ่มใหม่
+            </p>
+          )}
 
           {/* บอก user ว่าปิดหน้าได้ ระบบทำงานต่อ */}
           {!isFailure && !isSuccess && (
@@ -219,23 +246,23 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
 
         {/* Step indicator */}
         {!isFailure && !isSuccess && (
-          <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/50">
-            <div className="grid grid-cols-4 gap-2">
+          <div className="border-t border-slate-100 px-6 py-6 bg-slate-50/50">
+            <div className="grid grid-cols-4 gap-3">
               {STEPS.map((s, idx) => {
                 const Icon = s.icon;
                 const isDone = idx < safeStepIdx;
                 const isCurrent = idx === safeStepIdx;
                 return (
                   <div key={s.id} className="flex flex-col items-center text-center">
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center text-base font-bold transition-all ${
                       isDone ? 'bg-emerald-500 text-white' :
                       isCurrent ? 'bg-indigo-600 text-white ring-4 ring-indigo-100' :
                       'bg-slate-200 text-slate-400'
                     }`}>
-                      {isDone ? '✓' : <Icon className={`h-3.5 w-3.5 ${isCurrent && Icon === Loader2 ? 'animate-spin' : ''}`} />}
+                      {isDone ? '✓' : <Icon className={`h-5 w-5 ${isCurrent && Icon === Loader2 ? 'animate-spin' : ''}`} />}
                     </div>
-                    <p className={`text-[10px] mt-1 leading-tight ${
-                      isCurrent ? 'font-medium text-indigo-700' :
+                    <p className={`text-xs mt-2 leading-tight ${
+                      isCurrent ? 'font-semibold text-indigo-700' :
                       isDone ? 'text-emerald-600' : 'text-slate-400'
                     }`}>
                       {s.label}

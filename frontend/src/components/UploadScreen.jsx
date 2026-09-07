@@ -1,35 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Upload, X, FileVideo, Scissors, ListChecks, Monitor, Smartphone, Loader2,
-  GraduationCap, Mic, Star, Video, Briefcase, Gamepad2, Sparkles, Captions, Eye,
+  Upload, X, FileVideo, Scissors, ListChecks, Flame, Monitor, Smartphone, Loader2,
+  GraduationCap, Mic, Star, Video, Sparkles, Captions, Eye, AudioLines,
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 
-// โหมดการตัด — base prompt ที่ส่งให้ AI
+// โหมดการตัด 3 แบบ — base prompt + ตัวตัดสิน edit_mode ที่ backend
 const CUT_MODES = {
-  prepare: {
+  full: {
     label: 'เก็บเนื้อหาครบ',
-    desc: 'ตัดแค่ช่วงเงียบ คำติดปาก เสียงรบกวน',
+    desc: 'ตัดแค่ช่วงเงียบ / นอกเรื่อง — เนื้อหาครบ ดูแทนคลิปเต็มได้',
     icon: Scissors,
-    text: 'ตัดเฉพาะช่วงเงียบ ช่วงหยุดคิดนาน คำติดปาก (อืม เอ่อ อ่อ) เสียงรบกวน และช่วงพูดซ้ำโดยไม่มีข้อมูลใหม่ — เก็บเนื้อหาที่พูดไว้ให้ครบ ไม่ตัดใจความ',
+    text: 'ตัดเฉพาะช่วงเงียบ ช่วงหยุดคิดนาน คำติดปาก (อืม เอ่อ อ่อ) เสียงรบกวน ปัญหาเทคนิค และช่วงพูดซ้ำโดยไม่มีข้อมูลใหม่ — เก็บเนื้อหาที่พูดไว้ให้ครบ ไม่ตัดใจความ ดูแล้วต้องเข้าใจว่าพูดเรื่องอะไร',
   },
   summary: {
-    label: 'สรุปสั้น',
-    desc: 'เก็บเฉพาะใจความสำคัญ ตัดที่เหลือทิ้ง',
+    label: 'สรุปให้เข้าใจครบ',
+    desc: 'ดูแทนคลิปเต็มได้ เข้าใจครบทุกประเด็น สั้นลงตามเนื้อหา',
     icon: ListChecks,
-    text: 'ตัดให้สั้นกระชับที่สุด เก็บเฉพาะใจความสำคัญและข้อสรุป — ตัดช่วงเกริ่นนำ ตัวอย่างเสริม และรายละเอียดปลีกย่อยออกทั้งหมด',
+    text: 'สรุปคลิปยาวให้คนที่ไม่มีเวลาดูเต็ม — เก็บทุกประเด็นหลัก เหตุผลที่จำเป็น ตัวอย่างสำคัญ และข้อสรุปให้ครบ ตัดเนื้อหาซ้ำ การพูดวกวน รายละเอียดปลีกย่อย และช่วงนอกเรื่องออก ให้สั้นที่สุดเท่าที่ยังเข้าใจครบ',
+  },
+  hook: {
+    label: 'ไฮไลต์ดึงคนดู',
+    desc: 'คลิปสั้นแนว TikTok/Reels เลือกช่วงเด็ด กระตุ้นให้ดูฉบับเต็ม',
+    icon: Flame,
+    text: 'เลือกเฉพาะช่วงที่มีพลังที่สุด 2-5 ช่วงจากคลิปยาว มาทำเป็นคลิปสั้น — เน้นช่วงที่เป็น hook สร้างความสงสัย กระตุ้นอารมณ์ ไม่ต้องเล่าครบ ทิ้งช่องให้อยากไปดูคลิปเต็มต่อ',
   },
 };
 
-// chips หัวข้อ — กดแล้วเติมข้อความลงช่อง textarea (แก้ต่อได้) เพื่อช่วย AI แม่นขึ้น
+// chips หัวข้อ — ไพรม์คำศัพท์ให้ Whisper (preset_id) + เติมบริบทลงช่องพิมพ์ (แก้ต่อได้)
 const TOPICS = [
   { id: 'tutorial', label: 'วิดีโอสอน', icon: GraduationCap, text: 'คลิปนี้เป็นวิดีโอสอน เน้นเก็บขั้นตอนการทำและคำอธิบาย ตัดช่วงเตรียมของหรือรอ' },
   { id: 'podcast',  label: 'พอดแคสต์', icon: Mic, text: 'คลิปนี้เป็นพอดแคสต์/สัมภาษณ์ เน้นเนื้อหาการพูดคุยที่สำคัญ ตัดช่วงทักทายและคุยนอกเรื่อง' },
   { id: 'review',   label: 'รีวิวสินค้า', icon: Star, text: 'คลิปนี้เป็นรีวิวสินค้า เน้นข้อดี ข้อเสีย และบทสรุป ตัดช่วงเกริ่นนำที่ยืดยาว' },
   { id: 'vlog',     label: 'Vlog', icon: Video, text: 'คลิปนี้เป็น Vlog เน้นช่วงไฮไลต์และเล่าเรื่องน่าสนใจ ตัดช่วงเดินทางหรือเตรียมตัว' },
-  { id: 'meeting',  label: 'ประชุม', icon: Briefcase, text: 'คลิปนี้เป็นการประชุม เน้นข้อสรุปและสิ่งที่ต้องทำต่อ ตัดช่วงคุยเล่นก่อนเริ่ม' },
-  { id: 'gaming',   label: 'เกม', icon: Gamepad2, text: 'คลิปนี้เป็นคลิปเล่นเกม เน้นช่วงมันส์ ๆ และไฮไลต์ ตัดช่วงรอหรือไม่มีอะไรเกิดขึ้น' },
 ];
 
 // จำกัดขนาดไฟล์ฝั่ง client — ตรงกับ MAX_FILE_SIZE_MB ของ backend
@@ -38,26 +42,38 @@ const MAX_FILE_MB = 2048;
 const UploadScreen = ({ onUploadSuccess }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [cutMode, setCutMode] = useState('prepare');
-  const [videoFormat, setVideoFormat] = useState('standard');
+  const [cutMode, setCutMode] = useState('full');
+  // aspect: 'landscape' (16:9) | 'portrait' (9:16) — จำกัดตาม orientation ของไฟล์ที่อัพ
+  const [aspect, setAspect] = useState('landscape');
+  const [sourceOrientation, setSourceOrientation] = useState(null); // null | 'landscape' | 'portrait'
   const [topicId, setTopicId] = useState(null);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [targetLength, setTargetLength] = useState(60);
+  const [targetLength, setTargetLength] = useState(30);
   const [burnSubtitle, setBurnSubtitle] = useState(false);
+  const [denoise, setDenoise] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
 
-  const isTiktok = videoFormat === 'tiktok';
+  const isHook = cutMode === 'hook';
+  const isPortrait = aspect === 'portrait';
+
+  // ตรวจ orientation จาก <video> ที่ preview อยู่แล้ว — คลิปแนวตั้งแปลงเป็น 16:9 ไม่ได้ (เสียเนื้อหา)
+  const handleVideoMeta = (e) => {
+    const v = e.target;
+    if (!v.videoWidth || !v.videoHeight) return;
+    const orient = v.videoWidth >= v.videoHeight ? 'landscape' : 'portrait';
+    setSourceOrientation(orient);
+    if (orient === 'portrait') setAspect('portrait');
+  };
 
   const buildPrompt = () => {
-    // ไม่เลือกโหมด → default เป็น 'prepare' เพื่อให้ AI มีทิศทางเสมอ
-    const base = CUT_MODES[cutMode]?.text || CUT_MODES.prepare.text;
+    const base = CUT_MODES[cutMode]?.text || CUT_MODES.full.text;
     const parts = [base];
     if (description.trim()) parts.push(description.trim());
-    if (isTiktok) parts.push('ทำเป็นคลิปสั้นแนวตั้ง 9:16 — เริ่มด้วย hook ดึงความสนใจใน 3 วินาทีแรก เน้นช่วงที่ปังที่สุด กระชับและ engaging');
+    if (isPortrait) parts.push('ผลลัพธ์เป็นคลิปแนวตั้ง 9:16 — เนื้อหาสำคัญควรอยู่กลางเฟรม เริ่มด้วยช่วงที่ดึงความสนใจ');
     return parts.join('\n');
   };
 
@@ -96,6 +112,9 @@ const UploadScreen = ({ onUploadSuccess }) => {
     setError('');
     setFile(selectedFile);
     setPreviewUrl(URL.createObjectURL(selectedFile));
+    // รีเซ็ต orientation — จะถูก set ใหม่จาก <video onLoadedMetadata>
+    setSourceOrientation(null);
+    setAspect('landscape');
   };
 
   const onDrop = (e) => {
@@ -108,6 +127,8 @@ const UploadScreen = ({ onUploadSuccess }) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
+    setSourceOrientation(null);
+    setAspect('landscape');
   };
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
@@ -121,9 +142,11 @@ const UploadScreen = ({ onUploadSuccess }) => {
     const formData = new FormData();
     formData.append('video', file);
     formData.append('prompt', buildPrompt());
-    formData.append('output_mode', isTiktok ? 'tiktok' : 'standard');
+    formData.append('edit_mode', cutMode);                                  // full | summary | hook
+    formData.append('output_mode', isPortrait ? 'tiktok' : 'standard');     // aspect: 9:16 | 16:9
     formData.append('target_length', String(targetLength));
     formData.append('burn_subtitle', String(burnSubtitle));
+    formData.append('denoise', String(denoise));
     formData.append('preview_mode', String(previewMode));
     formData.append('preset_id', topicId || cutMode);
 
@@ -148,22 +171,26 @@ const UploadScreen = ({ onUploadSuccess }) => {
 
   const sizeMB = file ? (file.size / 1024 / 1024).toFixed(1) : 0;
 
-  // การ์ดเลือก 2 ทาง (ธีมสว่าง)
+  // การ์ดเลือกโหมด (ธีมสว่าง) — วางแนวตั้ง ไอคอน+ชื่อบรรทัดบน คำอธิบายเต็มความกว้างด้านล่าง
   const Choice = ({ active, onClick, icon: Icon, title, desc }) => (
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-start gap-3 p-4 rounded-2xl border text-left transition-colors ${
+      className={`flex flex-col gap-2 p-4 rounded-2xl border text-left transition-colors ${
         active
-          ? 'border-indigo-500 bg-indigo-50/70'
+          ? 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-200'
           : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
       }`}
     >
-      <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400'}`} />
-      <div className="min-w-0">
-        <p className={`text-sm font-medium ${active ? 'text-indigo-900' : 'text-slate-800'}`}>{title}</p>
-        {desc && <p className="text-xs text-slate-500 mt-0.5 leading-snug">{desc}</p>}
-      </div>
+      <span className="flex items-center gap-2.5">
+        <span className={`h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+          active ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'
+        }`}>
+          <Icon className="h-5 w-5" />
+        </span>
+        <span className={`text-sm font-semibold ${active ? 'text-indigo-900' : 'text-slate-800'}`}>{title}</span>
+      </span>
+      {desc && <span className="text-xs text-slate-500 leading-relaxed">{desc}</span>}
     </button>
   );
 
@@ -209,7 +236,7 @@ const UploadScreen = ({ onUploadSuccess }) => {
               >
                 <X className="h-4 w-4" />
               </button>
-              <video src={previewUrl} controls className="w-full h-full object-contain" />
+              <video src={previewUrl} controls onLoadedMetadata={handleVideoMeta} className="w-full h-full object-contain" />
             </div>
             <div className="flex items-center gap-2.5 text-xs text-slate-600">
               <FileVideo className="h-4 w-4 text-slate-400 flex-shrink-0" />
@@ -220,23 +247,51 @@ const UploadScreen = ({ onUploadSuccess }) => {
         )}
       </div>
 
-      {/* โหมดการตัด */}
+      {/* โหมดการตัด — เลือก 1 ใน 3 */}
       <section>
-        <h3 className="text-sm font-medium text-slate-700 mb-2.5">โหมดการตัด</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <h3 className="text-sm font-medium text-slate-700 mb-3">โหมดการตัด</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {Object.entries(CUT_MODES).map(([id, m]) => (
-            <Choice key={id} active={cutMode === id} onClick={() => setCutMode(cutMode === id ? null : id)} icon={m.icon} title={m.label} desc={m.desc} />
+            <Choice key={id} active={cutMode === id} onClick={() => setCutMode(id)} icon={m.icon} title={m.label} desc={m.desc} />
           ))}
         </div>
+        <p className="text-xs text-slate-400 mt-2.5">ทุกโหมดตัดช่วงเงียบและลดเสียงรบกวนให้อัตโนมัติ</p>
       </section>
 
-      {/* รูปแบบวิดีโอ */}
+      {/* รูปแบบวิดีโอ — 2 ตัวเลือกสมดุล · คลิปแนวตั้งเลือกได้แค่ 9:16 */}
       <section>
-        <h3 className="text-sm font-medium text-slate-700 mb-2.5">รูปแบบวิดีโอ</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <Choice active={videoFormat === 'standard'} onClick={() => setVideoFormat(videoFormat === 'standard' ? null : 'standard')} icon={Monitor} title="มาตรฐาน 16:9" />
-          <Choice active={isTiktok} onClick={() => setVideoFormat(isTiktok ? null : 'tiktok')} icon={Smartphone} title="TikTok/Reels 9:16" />
-        </div>
+        <h3 className="text-sm font-medium text-slate-700 mb-3">รูปแบบวิดีโอ</h3>
+        {sourceOrientation === 'portrait' ? (
+          <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <Smartphone className="h-4 w-4 text-slate-400 flex-shrink-0" />
+            คลิปแนวตั้ง — ผลลัพธ์จะเป็น 9:16 (แปลงเป็นแนวนอนจะเสียเนื้อหาด้านซ้าย-ขวา)
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setAspect('landscape')}
+              className={`flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors ${
+                !isPortrait
+                  ? 'border-indigo-500 bg-indigo-50/70 text-indigo-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <Monitor className="h-4 w-4" /> แนวนอน 16:9
+            </button>
+            <button
+              type="button"
+              onClick={() => setAspect('portrait')}
+              className={`flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors ${
+                isPortrait
+                  ? 'border-indigo-500 bg-indigo-50/70 text-indigo-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <Smartphone className="h-4 w-4" /> แนวตั้ง 9:16
+            </button>
+          </div>
+        )}
       </section>
 
       {/* บอก AI เกี่ยวกับคลิปนี้ */}
@@ -247,7 +302,7 @@ const UploadScreen = ({ onUploadSuccess }) => {
         <textarea
           className="w-full p-3.5 text-sm bg-white border border-slate-200 rounded-2xl text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all resize-none"
           rows="3"
-          placeholder="เช่น คลิปสอนทำอาหาร ต้มยำกุ้ง เน้นขั้นตอนการปรุงรส · หรือกดหัวข้อด้านล่างเพื่อเติมให้"
+          placeholder="ชื่อคน / แบรนด์ / ศัพท์เฉพาะที่พูดบ่อย (ช่วยให้ซับแม่นขึ้น) · อยากเน้นหรือตัดช่วงไหนเป็นพิเศษ · หรือกดหัวข้อด้านล่าง"
           value={description}
           onChange={handleDescChange}
         />
@@ -280,11 +335,11 @@ const UploadScreen = ({ onUploadSuccess }) => {
       <section>
         <h3 className="text-sm font-medium text-slate-700 mb-2.5">ตั้งค่าเพิ่มเติม</h3>
         <div className="space-y-3">
-          {isTiktok && (
+          {isHook && (
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <label className="text-xs text-slate-500 block mb-1.5">ความยาวสูงสุด (คลิปสั้น)</label>
+              <label className="text-xs text-slate-500 block mb-1.5">ความยาวคลิปไฮไลต์ (โดยประมาณ)</label>
               <div className="grid grid-cols-3 gap-2">
-                {[30, 60, 90].map((sec) => (
+                {[15, 30, 60].map((sec) => (
                   <button
                     key={sec}
                     type="button"
@@ -311,6 +366,18 @@ const UploadScreen = ({ onUploadSuccess }) => {
                 <Captions className="h-4 w-4 text-indigo-600" /> ใส่คำบรรยาย (ซับ) ให้อัตโนมัติ
               </p>
               <p className="text-xs text-slate-500 mt-0.5">สร้างคำบรรยายจากเสียงพูด ในวิดีโอ</p>
+            </div>
+          </label>
+
+          <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-colors ${
+            denoise ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
+          }`}>
+            <input type="checkbox" checked={denoise} onChange={(e) => setDenoise(e.target.checked)} className="mt-0.5 rounded accent-indigo-600" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium text-slate-800 flex items-center gap-1.5">
+                <AudioLines className="h-4 w-4 text-indigo-600" /> ลดเสียงรบกวน (Noise Reduction)
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">สำหรับวิดีโอที่มีเสียง noise เช่น พัดลม แอร์ ถ่ายนอกสถานที่ — เสียงพูดอาจเปลี่ยนเล็กน้อย</p>
             </div>
           </label>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Download, RotateCcw } from 'lucide-react';
+import { Sparkles, Download, RotateCcw, Type } from 'lucide-react';
 import UploadScreen from './components/UploadScreen';
 import Processing from './components/Processing';
 import PreviewScreen from './components/PreviewScreen';
@@ -28,6 +28,8 @@ function App() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.SUMMARY) || 'null'); }
     catch { return null; }
   });
+  // true = ย้อนกลับมาแก้ซับหลัง render เสร็จแล้ว (กลับหน้า "เสร็จแล้ว" เมื่อกด "กลับ")
+  const [reediting, setReediting] = useState(false);
 
   useEffect(() => {
     if (jobId) localStorage.setItem(STORAGE_KEYS.JOB, jobId);
@@ -59,6 +61,10 @@ function App() {
     else localStorage.removeItem(STORAGE_KEYS.SELECTED_SEGS);
   }, [selectedSegs]);
 
+  // output_url ของ backend คงที่ ("{job}/final_summary.mp4") — เติม ?v= กัน browser
+  // เล่นไฟล์เก่าจาก cache หลัง render ใหม่ (โดยเฉพาะตอนย้อนกลับไปแก้ซับ)
+  const bustCache = (u) => `${u.split('?')[0]}?v=${Date.now()}`;
+
   // Callback จาก Processing — ทำงาน 2 กรณี
   const handleComplete = (urlOrPreview, summary) => {
     // ถ้า data.mode = "preview" → ไปหน้า preview
@@ -66,8 +72,9 @@ function App() {
       setPhase('preview');
       return;
     }
-    setVideoUrl(urlOrPreview);
+    setVideoUrl(bustCache(urlOrPreview));
     setPhase('done');
+    setReediting(false);
     if (summary) setEditSummary(summary);
   };
 
@@ -84,8 +91,22 @@ function App() {
   };
 
   const handleBackToPreview = () => {
+    if (reediting) {
+      // ยกเลิกการแก้ซับ → กลับหน้า "เสร็จแล้ว" (วิดีโอเดิม)
+      setReediting(false);
+      setVideoUrl(bustCache(`${jobId}/final_summary.mp4`));
+      setPhase('done');
+      return;
+    }
     setSelectedSegs(null);
     setPhase('preview');
+  };
+
+  // จากหน้า "เสร็จแล้ว" — กด "แก้คำบรรยาย" ย้อนกลับไปแก้ซับแล้ว render ใหม่ (ไม่ตัดใหม่)
+  const handleReedit = () => {
+    setReediting(true);
+    setVideoUrl(null);
+    setPhase('editing');
   };
 
   const handleReset = () => {
@@ -95,12 +116,22 @@ function App() {
     setPhase(null);
     setRenderTaskId(null);
     setSelectedSegs(null);
+    setReediting(false);
+  };
+
+  // ปุ่มมุมขวาบน — ล้างงานทั้งหมด กลับหน้าอัปโหลด (ถามยืนยันกันกดพลาด)
+  const handleResetConfirm = () => {
+    if (window.confirm('เริ่มทำวิดีโอใหม่? งานปัจจุบันและวิดีโอที่ตัดไว้จะถูกล้างทั้งหมด')) {
+      handleReset();
+    }
   };
 
   // Determine active jobId for Processing component
   const activeTaskId = phase === 'rendering' ? renderTaskId : jobId;
 
   const jobIdShort = videoUrl ? videoUrl.split('/')[0] : '';
+  // query string จาก videoUrl (?v=...) — ใช้ bust cache ของลิงก์ดาวน์โหลดด้วย
+  const cacheQuery = videoUrl && videoUrl.includes('?') ? videoUrl.slice(videoUrl.indexOf('?')) : '';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -117,12 +148,12 @@ function App() {
           </div>
           {(jobId || videoUrl) && (
             <button
-              onClick={handleReset}
-              title="เริ่มใหม่"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 px-3.5 py-1.5 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+              onClick={handleResetConfirm}
+              title="เริ่มทำวิดีโอใหม่ — ล้างงานทั้งหมด กลับหน้าอัปโหลด"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 bg-white border border-red-200 px-3.5 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
             >
               <RotateCcw className="h-4 w-4" />
-              เริ่มใหม่
+              เริ่มทำวิดีโอใหม่
             </button>
           )}
         </div>
@@ -150,12 +181,13 @@ function App() {
           />
         )}
 
-        {jobId && !videoUrl && phase === 'editing' && selectedSegs && (
+        {jobId && !videoUrl && phase === 'editing' && (
           <SubtitleEditScreen
             jobId={jobId}
             selectedSegments={selectedSegs}
             onRendering={handleRendering}
             onBack={handleBackToPreview}
+            backLabel={reediting ? 'กลับไปหน้าผลลัพธ์' : 'กลับไปเลือกช่วง'}
           />
         )}
 
@@ -182,24 +214,33 @@ function App() {
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            {/* Actions — ปุ่มเริ่มใหม่อยู่มุมขวาบน (header) ที่เดียว */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              {editSummary?.burn_subtitle && (
+                <button
+                  onClick={handleReedit}
+                  className="flex items-center justify-center gap-2 bg-white text-indigo-700 px-6 py-3.5 rounded-xl font-semibold border border-indigo-200 hover:bg-indigo-50 transition-colors active:scale-[0.98]"
+                >
+                  <Type className="h-5 w-5" />
+                  แก้คำบรรยาย
+                </button>
+              )}
               <a
-                href={`${API_URL}/download/${jobIdShort}`}
+                href={`${API_URL}/download/${jobIdShort}${cacheQuery}`}
                 download="ai_edited_video.mp4"
-                className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors active:scale-[0.98]"
+                className={`flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors active:scale-[0.98] ${
+                  editSummary?.burn_subtitle ? '' : 'sm:col-span-2'
+                }`}
               >
                 <Download className="h-5 w-5" />
                 ดาวน์โหลดวิดีโอ
               </a>
-              <button
-                onClick={handleReset}
-                className="flex-1 flex items-center justify-center gap-2 bg-white text-slate-700 px-6 py-3.5 rounded-xl font-semibold border border-slate-200 hover:bg-slate-50 transition-colors active:scale-[0.98]"
-              >
-                <RotateCcw className="h-5 w-5" />
-                ตัดต่อใหม่
-              </button>
             </div>
+            {editSummary?.burn_subtitle && (
+              <p className="text-center text-xs text-slate-400">
+                แก้คำบรรยายแล้วสร้างใหม่ได้เลย — ไม่ต้องตัดต่อใหม่ทั้งหมด
+              </p>
+            )}
           </div>
         )}
       </main>

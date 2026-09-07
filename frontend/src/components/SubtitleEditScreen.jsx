@@ -13,7 +13,7 @@ const formatTime = (sec) => {
   return `${m}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
 };
 
-const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) => {
+const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack, backLabel = 'กลับไปเลือกช่วง' }) => {
   const [phrases, setPhrases] = useState([]);
   const [originalPhrases, setOriginalPhrases] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +23,9 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
   const [dirtyCount, setDirtyCount] = useState(0);
   const [videoSrc, setVideoSrc] = useState(null);
   const [activeIdx, setActiveIdx] = useState(null);
+  // segments ที่จะ render — จาก prop (มาจาก preview) หรือจาก preview.json (ตอนย้อนกลับมาแก้)
+  const [fallbackSegs, setFallbackSegs] = useState(null);
+  const segsToRender = selectedSegments ?? fallbackSegs;
   const listRef = useRef(null);
   const videoRef = useRef(null);
   const playEndRef = useRef(null);
@@ -43,7 +46,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
         setError(err.response?.data?.detail || 'โหลดคำบรรยายไม่สำเร็จ');
         setLoading(false);
       });
-    // ดึง URL วิดีโอต้นฉบับ (best-effort — ไม่มีก็แค่ไม่โชว์ player)
+    // ดึง preview.json — เอา URL วิดีโอต้นฉบับ + segments (เผื่อย้อนกลับมาแก้ ไม่มี prop)
     axios.get(`${API_URL}/preview/${jobId}`)
       .then((res) => {
         if (cancelled) return;
@@ -52,19 +55,23 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
           const rel = p.replace(/\\/g, '/').replace(/^storage\//, '');
           setVideoSrc(`${API_URL}/storage/${rel}`);
         }
+        const segs = res.data?.selected_segments || res.data?.segments;
+        if (Array.isArray(segs) && segs.length) setFallbackSegs(segs);
       })
       .catch(() => { /* ignore */ });
     return () => { cancelled = true; };
   }, [jobId]);
 
   // เล่นพรีวิวเฉพาะช่วง phrase นั้น
+  // ผู้เล่นเป็น "วิดีโอต้นฉบับ" → ต้อง seek ด้วยเวลาในคลิปต้นฉบับ (orig_*)
+  // ไม่ใช่ start/end ที่เป็นเวลาใน output timeline (หลังตัด+ต่อ)
   const playPhrase = (idx, ph) => {
     const v = videoRef.current;
     if (!v) return;
-    playEndRef.current = ph.end;
+    playEndRef.current = ph.orig_end ?? ph.end;
     setActiveIdx(idx);
     try {
-      v.currentTime = ph.start;
+      v.currentTime = ph.orig_start ?? ph.start;
       v.play().catch(() => {});
       v.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch { /* ignore */ }
@@ -97,12 +104,16 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
   };
 
   const handleRender = async () => {
+    if (!segsToRender || !segsToRender.length) {
+      setSubmitError('ไม่พบช่วงที่จะตัด — กรุณากลับไปเริ่มใหม่');
+      return;
+    }
     setSubmitting(true);
     setSubmitError('');
     try {
       // ส่ง edited phrases + selected segments → render
       const res = await axios.post(`${API_URL}/render/${jobId}`, {
-        segments: selectedSegments,
+        segments: segsToRender,
         edited_phrases: phrases,
       });
       onRendering(res.data.task_id);
@@ -251,7 +262,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
             >
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-mono text-[11px] text-slate-500">
-                  {formatTime(ph.start)} → {formatTime(ph.end)}
+                  {formatTime(ph.orig_start ?? ph.start)} → {formatTime(ph.orig_end ?? ph.end)}
                 </span>
                 <div className="flex items-center gap-2">
                   {isEdited && (
@@ -329,7 +340,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack }) =>
           disabled={submitting}
           className="w-full py-3 rounded-xl font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50"
         >
-          ← กลับไปเลือกช่วง
+          ← {backLabel}
         </button>
       </div>
     </div>
