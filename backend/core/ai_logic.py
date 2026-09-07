@@ -1253,9 +1253,9 @@ except (TypeError, ValueError):
 # hook: สร้าง "รายการจุดจบประโยค" จาก transcript แล้ว snap ขอบไปหาจุดนั้น
 # (ต่างจาก _snap_bounds ที่ค่อย ๆ ขยายทีละท่อน ซึ่งเปราะกับขอบที่ AI ส่งมาแบบสุ่ม)
 try:
-    SENTENCE_END_MIN_GAP = float(os.getenv("SENTENCE_END_MIN_GAP", "") or 0.55)
+    SENTENCE_END_MIN_GAP = float(os.getenv("SENTENCE_END_MIN_GAP", "") or 0.35)
 except (TypeError, ValueError):
-    SENTENCE_END_MIN_GAP = 0.55
+    SENTENCE_END_MIN_GAP = 0.35
 # มองไปข้างหน้าจากขอบที่ AI เลือก กี่วินาที เพื่อหา "จุดจบประโยคจริง"
 try:
     SENTENCE_SNAP_FWD = float(os.getenv("SENTENCE_SNAP_FWD", "") or 10.0)
@@ -2049,31 +2049,70 @@ def _enrich_segments_with_text(segments: list[dict], transcript: list[dict],
     return enriched
 
 
+# คำลงท้ายประโยคไทย — สัญญาณจบประโยคที่แรงพอ ๆ กับการหยุดพูด
+_SENTENCE_FINAL = ("นะครับ", "นะคะ", "ครับผม", "ครับ", "ค่ะ", "คะ", "จ้า", "จ้ะ", "ฮะ")
+
+
+def _ends_sentence_final(text: str) -> bool:
+    t = (text or "").strip(_TRIM_TAIL_CHARS)
+    return any(t.endswith(p) for p in _SENTENCE_FINAL)
+
+
 def _sentence_ends(transcript: list[dict], min_gap: float | None = None) -> list[float]:
     """
     รายการเวลา (วินาที) ที่ "ประโยคจบจริง" — สร้างจาก transcript ครั้งเดียว
 
-    ท่อน tr[i].end นับเป็นจุดจบประโยค เมื่อ:
-      - เป็นท่อนสุดท้าย  หรือ  ช่องว่างถึงท่อนถัดไป >= min_gap (คนหยุดพูด)
-      - และท่อนนั้น **ไม่** ลงท้ายแบบค้างความคิด (_ends_incomplete: "...ปรากฏว่า")
+    เกณฑ์หลัก: ท่อนที่ **ไม่** ลงท้ายแบบค้างความคิด (_ends_incomplete) และ
+      - หยุดพูดถึงท่อนถัดไป >= min_gap  หรือ
+      - ลงท้ายด้วยคำลงท้ายประโยคไทย ("...นะครับ")
 
-    hook ใช้ snap ขอบไปหาจุดเหล่านี้ — เชื่อถือได้กว่าการค่อย ๆ ขยายทีละท่อน
-    เพราะ Whisper หั่นประโยคคนละที่กับที่ AI เลือกขอบ
+    ⚠️ วัดช่องว่างจาก **word timestamps** ไม่ใช่ segment start/end เพราะ Whisper
+    มักให้ timestamp ระดับ segment ต่อเนื่องกันจนช่องว่างเป็น 0 ทั้งที่คนหยุดพูดจริง
+
+    ถ้าเกณฑ์ช่องว่างยังจับได้น้อยเกินไป → ถอยไปใช้ "ทุกท่อนที่ไม่ค้างความคิด"
+    ดีกว่าปล่อยให้ไม่มีจุดให้ snap เลยแล้วงานล้มทั้งงาน
     """
     min_gap = SENTENCE_END_MIN_GAP if min_gap is None else min_gap
     tr = sorted((t for t in transcript
                  if t.get("start") is not None and t.get("end") is not None),
                 key=lambda t: t["start"])
-    ends: list[float] = []
+    if not tr:
+        return []
+
+    def _last_word_end(t: dict) -> float:
+        ws = t.get("words") or []
+        if ws and ws[-1].get("end") is not None:
+            return float(ws[-1]["end"])
+        return float(t["end"])
+
+    def _first_word_start(t: dict) -> float:
+        ws = t.get("words") or []
+        if ws and ws[0].get("start") is not None:
+            return float(ws[0]["start"])
+        return float(t["start"])
+
+    strong: list[float] = []
+    loose: list[float] = []
     for i, t in enumerate(tr):
+        text = (t.get("text") or "").strip()
+        if _ends_incomplete(text):
+            continue                       # ค้างความคิด — ไม่ใช่จุดจบประโยคแน่นอน
+        end_t = round(float(t["end"]), 2)
+        loose.append(end_t)
         nxt = tr[i + 1] if i + 1 < len(tr) else None
-        gap = (float(nxt["start"]) - float(t["end"])) if nxt else 1e9
-        if gap < min_gap:
+        if nxt is None:
+            strong.append(end_t)
             continue
-        if _ends_incomplete(t.get("text", "")):
-            continue
-        ends.append(round(float(t["end"]), 2))
-    return ends
+        gap = _first_word_start(nxt) - _last_word_end(t)
+        if gap >= min_gap or _ends_sentence_final(text):
+            strong.append(end_t)
+
+    if len(strong) >= max(3, len(tr) // 8):
+        return strong
+    print(f"[Sentence] เกณฑ์หยุดพูดจับจุดจบได้แค่ {len(strong)} จุด จาก {len(tr)} ท่อน "
+          f"(Whisper ให้ timestamp ต่อเนื่อง) — ใช้ทุกท่อนที่ไม่ค้างความคิดแทน "
+          f"({len(loose)} จุด)")
+    return loose
 
 
 def _snap_span_to_sentences(start: float, end: float, ends: list[float],
@@ -2208,11 +2247,17 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
     if not isinstance(raw, list):
         raise Exception("Gemini คืนค่า JSON ไม่ถูกต้อง: ไม่ใช่ array ของช่วง")
 
+    tr = sorted((t for t in transcript
+                 if t.get("start") is not None and t.get("end") is not None),
+                key=lambda t: t["start"])
     ends = _sentence_ends(transcript)
+    print(f"[HOOK] จุดจบประโยคที่ใช้ snap ได้: {len(ends)} จุด")
 
     # snap ขอบทั้งสองด้านไปหา "จุดจบประโยคจริง" + บังคับความยาวช่วง <= max_seg
-    #   _snap_span_to_sentences คืน None ถ้าจัดขอบให้ลงตัวไม่ได้ → drop ช่วงนั้น
-    rejected = {"bad": 0, "nosnap": 0}
+    #   ถ้าจัดขอบไม่ลงตัว **ห้าม drop ทิ้ง** — ถอยไปใช้ _snap_bounds แบบเดิม
+    #   (เคย drop แล้วเหลือ 0 candidate จนงานล้มทั้งที่ AI ตอบมาถูกต้อง 5 ช่วง)
+    rejected = {"bad": 0, "short": 0}
+    fallback_used = 0
     cand = []
     for seg in raw:
         if not isinstance(seg, dict):
@@ -2227,10 +2272,15 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
             rejected["bad"] += 1
             continue
         snapped = _snap_span_to_sentences(start, end, ends, total_duration, max_len=max_seg)
-        if snapped is None:
-            rejected["nosnap"] += 1
+        if snapped is not None:
+            s, e = snapped
+        else:
+            s, e = _snap_bounds(start, end, tr, total_duration) if tr else (start, end)
+            e = min(e, s + max_seg * 2)                # กันช่วงยาวเกินเหตุ
+            fallback_used += 1
+        if e - s < 2.0:
+            rejected["short"] += 1
             continue
-        s, e = snapped
         try:
             score = int(seg.get("score", 50) or 50)
         except (TypeError, ValueError):
@@ -2244,12 +2294,13 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
 
     if not cand:
         print(f"❌ [HOOK] AI ส่งมา {len(raw)} ช่วง แต่ใช้ไม่ได้เลย — "
-              f"จัดขอบให้จบประโยคไม่ได้ {rejected['nosnap']}, ข้อมูลเสีย {rejected['bad']} "
+              f"สั้นเกินไป {rejected['short']}, ข้อมูลเสีย {rejected['bad']} "
               f"(จุดจบประโยคที่ตรวจพบ: {len(ends)})")
         raise Exception("AI ไม่พบช่วงที่เด่นพอสำหรับคลิปไฮไลต์ — ลองใช้โหมด 'สรุปให้เข้าใจครบ' แทน")
-    if any(rejected.values()):
+    if any(rejected.values()) or fallback_used:
         print(f"[HOOK] ใช้ได้ {len(cand)}/{len(raw)} ช่วง "
-              f"(จัดขอบไม่ได้ {rejected['nosnap']}, เสีย {rejected['bad']})")
+              f"(สั้นเกิน {rejected['short']}, เสีย {rejected['bad']}, "
+              f"ถอยไปใช้ตัวขยายแบบเดิม {fallback_used})")
 
     # ตัด overlap (เก็บตัวคะแนนสูงกว่า) + รวมช่วงที่ snap แล้วซ้อน/ชนกัน
     cand.sort(key=lambda x: (-x["score"], x["start"]))
