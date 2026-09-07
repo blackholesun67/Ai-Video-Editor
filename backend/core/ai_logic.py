@@ -64,6 +64,16 @@ except (TypeError, ValueError):
 
 # hook mode: True → เอาช่วง role="hook" ขึ้นก่อน (ที่เหลือเรียงตามเวลา) ; False → เรียงตามเวลาล้วน
 HOOK_LEAD_FIRST = os.getenv("HOOK_LEAD_FIRST", "").strip().lower() in ("1", "true", "yes", "on")
+
+# hook: ยอมให้ผลรวมเกิน target_length ได้กี่เท่า (0.3 = +30%) และมีได้สูงสุดกี่ช่วง
+try:
+    HOOK_LENGTH_TOLERANCE = float(os.getenv("HOOK_LENGTH_TOLERANCE", "") or 0.3)
+except (TypeError, ValueError):
+    HOOK_LENGTH_TOLERANCE = 0.3
+try:
+    HOOK_MAX_SEGMENTS = int(os.getenv("HOOK_MAX_SEGMENTS", "") or 5)
+except (TypeError, ValueError):
+    HOOK_MAX_SEGMENTS = 5
 # นับอักษรไทย → ใช้ตัดสินภาษาหลักของเนื้อหา (ไม่บังคับแปลเป็นไทยถ้าต้นฉบับไม่ใช่ไทย)
 _THAI_CHAR_RE = re.compile(r"[฀-๿]")
 
@@ -1284,6 +1294,44 @@ def _protect_outro(keep_segments: list[dict], transcript: list[dict],
     )
 
 
+def _snap_bounds(start: float, end: float, tr: list[dict],
+                 total_duration: float) -> tuple[float, float]:
+    """
+    ขยับขอบช่วงเดียวให้ตกที่ "จุดที่คนพูดหยุดจริง" — ใช้ร่วมกันทั้ง deletion path และ hook
+
+    `tr` ต้องเรียงตามเวลาแล้ว ; ขยายออกอย่างเดียว ไม่หดเข้า
+    """
+    limit_lo, limit_hi = start - SNAP_MAX_EXTEND, end + SNAP_MAX_EXTEND
+
+    # ── ขอบหน้า: ถอยไปต้น segment ที่ค้างอยู่ แล้วถอยต่อผ่านช่วงพูดต่อเนื่อง ──
+    for i, t in enumerate(tr):
+        if t["end"] > start + 0.05:
+            if t["start"] < start:
+                start = float(t["start"])
+            j = i
+            while j > 0 and start - float(tr[j - 1]["end"]) < SENTENCE_PAUSE:
+                if float(tr[j - 1]["start"]) < limit_lo:
+                    break
+                j -= 1
+                start = float(tr[j]["start"])
+            break
+
+    # ── ขอบท้าย: ยืดไปท้าย segment ที่ค้างอยู่ แล้วยืดต่อผ่านช่วงพูดต่อเนื่อง ──
+    for i in range(len(tr) - 1, -1, -1):
+        if tr[i]["start"] < end - 0.05:
+            if tr[i]["end"] > end:
+                end = float(tr[i]["end"])
+            j = i
+            while j + 1 < len(tr) and float(tr[j + 1]["start"]) - end < SENTENCE_PAUSE:
+                if float(tr[j + 1]["end"]) > limit_hi:
+                    break
+                j += 1
+                end = float(tr[j]["end"])
+            break
+
+    return round(max(0.0, start), 2), round(min(end, total_duration), 2)
+
+
 def _snap_segments_to_sentences(segments: list[dict], transcript: list[dict],
                                 total_duration: float) -> list[dict]:
     """
@@ -1311,38 +1359,8 @@ def _snap_segments_to_sentences(segments: list[dict], transcript: list[dict],
 
     snapped: list[dict] = []
     for seg in segments:
-        start, end = float(seg["start"]), float(seg["end"])
-        limit_lo, limit_hi = start - SNAP_MAX_EXTEND, end + SNAP_MAX_EXTEND
-
-        # ── ขอบหน้า: ถอยไปต้น segment ที่ค้างอยู่ แล้วถอยต่อผ่านช่วงพูดต่อเนื่อง ──
-        for i, t in enumerate(tr):
-            if t["end"] > start + 0.05:
-                if t["start"] < start:
-                    start = float(t["start"])
-                j = i
-                while j > 0 and start - float(tr[j - 1]["end"]) < SENTENCE_PAUSE:
-                    if float(tr[j - 1]["start"]) < limit_lo:
-                        break
-                    j -= 1
-                    start = float(tr[j]["start"])
-                break
-
-        # ── ขอบท้าย: ยืดไปท้าย segment ที่ค้างอยู่ แล้วยืดต่อผ่านช่วงพูดต่อเนื่อง ──
-        for i in range(len(tr) - 1, -1, -1):
-            if tr[i]["start"] < end - 0.05:
-                if tr[i]["end"] > end:
-                    end = float(tr[i]["end"])
-                j = i
-                while j + 1 < len(tr) and float(tr[j + 1]["start"]) - end < SENTENCE_PAUSE:
-                    if float(tr[j + 1]["end"]) > limit_hi:
-                        break
-                    j += 1
-                    end = float(tr[j]["end"])
-                break
-
-        snapped.append({**seg,
-                        "start": round(max(0.0, start), 2),
-                        "end": round(min(end, total_duration), 2)})
+        s, e = _snap_bounds(float(seg["start"]), float(seg["end"]), tr, total_duration)
+        snapped.append({**seg, "start": s, "end": e})
 
     merged = merge_close_segments(snapped, gap_threshold=0.0)   # ขอบที่ขยายแล้วชนกัน → รวม
     moved = sum(1 for a, b in zip(segments, snapped)
@@ -1845,6 +1863,9 @@ def _enrich_segments_with_text(segments: list[dict], transcript: list[dict],
 
 def _analyze_hook_mode(user_prompt: str, transcript_json: str, transcript: list[dict],
                        total_duration: float, target_length: int) -> tuple[list[dict], list[dict]]:
+    # ช่วงเดียวยาวเกิน target ก็ไม่ใช่ไฮไลต์ — เพดานผูกกับ target ไม่ใช่ค่าคงที่
+    # (ใช้ค่าเดียวกันทั้งใน prompt และตอน validate ไม่งั้น AI ตอบตามกฎแล้วโดนคัดทิ้ง)
+    max_seg = max(10.0, min(45.0, target_length * 0.7))
     hook_prompt = f"""
 คุณเป็น editor คลิปไวรัลสำหรับ TikTok / Reels / YouTube Shorts มืออาชีพ
 งาน: เลือก **2-5 ช่วง** ที่เด็ดที่สุดจากคลิปยาว มาต่อเป็นคลิปสั้นราว {target_length} วินาที
@@ -1871,7 +1892,8 @@ Transcript (start, end, text):
    ช่วงที่ฟังแล้วอยากรู้ว่า "แล้วเกิดอะไรขึ้น?"
 3. **ห้ามเฉลย / ห้ามสรุปให้จบ** — ทิ้งช่องว่างให้อยากไปดูต่อ (curiosity gap)
 4. ช่วงสุดท้ายควรเป็น teaser ที่ชวนไปดูฉบับเต็ม (ถ้าในคลิปมีจังหวะแบบนั้น)
-5. แต่ละช่วงยาว 3-30 วินาที · snap ขอบให้ตรงประโยคจบ (ห้ามตัดกลางคำ/กลางประโยค)
+5. แต่ละช่วงยาว 3-{max_seg:.0f} วินาที · snap ขอบให้ตรงประโยคจบ (ห้ามตัดกลางคำ/กลางประโยค)
+   ⚠️ ช่วงที่ยาวเกิน {max_seg:.0f}s จะถูกระบบคัดทิ้ง — แบ่งเป็นช่วงสั้นหลายช่วงดีกว่า
 6. ผลรวมทุกช่วง ~{target_length} วินาที (ยืดหยุ่นได้ ±30%)
 7. ❌ ห้ามใช้เป็นช่วงเปิด: ทักทาย / แนะนำตัว / "วันนี้จะมาเล่า..." / "เอ่อ..."
 
@@ -1895,29 +1917,34 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
             "— กรุณาลองใหม่อีกครั้ง"
         )
 
-    json_match = re.search(r'\[\s*(\{.*?\}\s*,?\s*)*\]', response_text, re.DOTALL)
-    clean_text = json_match.group(0) if json_match else \
-        response_text.replace("```json", "").replace("```", "").strip()
     try:
-        raw = json.loads(clean_text)
+        raw = _extract_json(response_text)
     except json.JSONDecodeError as e:
         print(f"❌ Hook JSON parse error: {e}\nRaw:\n{response_text}")
         raise Exception(f"Gemini คืนค่า JSON ไม่ถูกต้อง: {e}")
+    if isinstance(raw, dict):                 # เผื่อโมเดลห่อ array ไว้ในอ็อบเจ็กต์
+        raw = raw.get("segments") or raw.get("clips") or raw.get("highlights") or []
+    if not isinstance(raw, list):
+        raise Exception("Gemini คืนค่า JSON ไม่ถูกต้อง: ไม่ใช่ array ของช่วง")
 
-    # normalize + snap ทั้งสองขอบให้ตรงประโยค
+    tr = sorted((t for t in transcript
+                 if t.get("start") is not None and t.get("end") is not None),
+                key=lambda t: t["start"])
+
+    # normalize + snap ทั้งสองขอบให้จบประโยคจริง (ตัวเดียวกับ deletion path
+    # — เดิม hook มี fallback ไปใช้ timestamp ดิบของ AI จึงตัดกลางคำได้)
     cand = []
     for seg in raw:
+        if not isinstance(seg, dict):
+            continue
         try:
             start = float(seg.get("start", 0)); end = float(seg.get("end", 0))
         except (TypeError, ValueError):
             continue
         if end <= start:
             continue
-        s = snap_to_sentence_boundary(start, transcript)
-        e = snap_to_sentence_boundary(end, transcript)
-        if e - s < 2.0:
-            s, e = start, end
-        if not (2.0 <= e - s <= 45.0):     # hook: ไม่สั้นไป ไม่ยาวไป
+        s, e = _snap_bounds(start, end, tr, total_duration) if tr else (start, end)
+        if not (2.0 <= e - s <= max_seg):
             continue
         try:
             score = int(seg.get("score", 50) or 50)
@@ -1941,13 +1968,26 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
             continue
         picked.append(c)
 
-    # คุมความยาว: drop ทั้ง segment ตัวคะแนนต่ำสุด จนผลรวม <= target_length (ไม่ truncate กลางประโยค)
+    # คุมความยาว: drop ทั้ง segment ตัวคะแนนต่ำสุด (ไม่ truncate กลางประโยค)
+    #   เดิม `len(kept) < 2` บังคับรับ 2 ช่วงแรกก่อนเช็ค budget → target 15s
+    #   อาจได้คลิปยาว 90s ; ตอนนี้เช็ค budget ก่อน แล้วค่อยเติมให้ครบ 2 ช่วงถ้าขาด
+    budget = target_length * (1 + HOOK_LENGTH_TOLERANCE)
     picked.sort(key=lambda x: -x["score"])
     kept, total = [], 0.0
     for c in picked:
+        if len(kept) >= HOOK_MAX_SEGMENTS:
+            break
         d = c["end"] - c["start"]
-        if len(kept) < 2 or total + d <= target_length:   # อย่างน้อย 2 ช่วงเสมอ
+        if total + d <= budget:
             kept.append(c); total += d
+    for c in picked:                       # ต้องมีอย่างน้อย 2 ช่วง แม้เกิน budget
+        if len(kept) >= 2:
+            break
+        if c not in kept:
+            kept.append(c); total += c["end"] - c["start"]
+
+    print(f"[HOOK] เลือก {len(kept)}/{len(picked)} ช่วง รวม {total:.1f}s "
+          f"(target {target_length}s, budget {budget:.0f}s, ช่วงละไม่เกิน {max_seg:.0f}s)")
 
     # เรียงลำดับ: ตามเวลา (default) หรือเอา hook ขึ้นก่อน (HOOK_LEAD_FIRST)
     if HOOK_LEAD_FIRST and any(c["role"] == "hook" for c in kept):
