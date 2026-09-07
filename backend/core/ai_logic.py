@@ -716,7 +716,9 @@ def merge_close_segments(segments: list[dict], gap_threshold: float = 2.0) -> li
     for current in segments[1:]:
         last = merged[-1]
         if current["start"] - last["end"] <= gap_threshold:
-            last["end"] = current["end"]
+            # max() สำคัญ: ถ้า last ครอบ current อยู่แล้ว (last.end > current.end)
+            # การกำหนดตรง ๆ จะ "หด" last ลง แล้วเนื้อหาท้ายหายไปเงียบ ๆ
+            last["end"] = max(float(last["end"]), float(current["end"]))
         else:
             merged.append(current.copy())
     return merged
@@ -1227,6 +1229,13 @@ try:
 except (TypeError, ValueError):
     SNAP_MAX_THOUGHT = 12.0
 
+# ถ้าท่อนถัดไปเริ่มเร็วกว่านี้ ถือว่า "หยุดหายใจกลางความคิด" ไม่ใช่จบประโยค
+# → ยืดเพิ่มได้อีก 1 ท่อน แม้ไม่มีคำเชื่อมให้จับ (0 = ปิด ใช้การแมตช์คำอย่างเดียว)
+try:
+    THOUGHT_GRACE = float(os.getenv("THOUGHT_GRACE", "") or 1.2)
+except (TypeError, ValueError):
+    THOUGHT_GRACE = 1.2
+
 # เพดานการยืด "ช่วงสุดท้ายของคลิป" ให้พูดจบประโยค — กว้างกว่าจุดอื่นโดยตั้งใจ
 # รอยตัดกลางเรื่องพอกลืนได้ แต่ตอนจบที่ค้างกลางประโยคทำให้คลิปเหมือนไฟล์เสีย
 try:
@@ -1319,7 +1328,9 @@ def _protect_outro(keep_segments: list[dict], transcript: list[dict],
 # เลือกเฉพาะคำที่ลงท้ายประโยคไทยเองไม่ได้จริง ๆ (เลี่ยง "เลย"/"พอ"/"ที่"/"หรือ"
 # ที่จบประโยคได้ปกติ และเลี่ยงคำที่ไปตรงกับท้ายคำอื่น เช่น "จน" ใน "ยากจน")
 _INCOMPLETE_TAILS = (
-    "ปรากฏว่า", "กลายเป็นว่า", "หมายความว่า", "นั่นก็คือ", "ก็คือ", "คือว่า", "คือ", "ว่า",
+    # "ปรากฏ" สะกดได้ทั้ง ฏ และ ฎ — Whisper ให้มาได้ทั้งคู่
+    "ปรากฏว่า", "ปรากฎว่า", "ปรากฏ", "ปรากฎ",
+    "กลายเป็นว่า", "หมายความว่า", "นั่นก็คือ", "ก็คือ", "คือว่า", "คือ", "ว่า",
     "เพราะว่า", "เพราะ", "เนื่องจาก", "เพื่อที่จะ", "เพื่อ",
     "ซึ่ง", "โดยที่", "โดย", "แต่ว่า", "แต่", "และก็", "แล้วก็", "และ",
     "ถ้าหาก", "ถ้า", "เมื่อ", "จึง", "ทำให้", "ส่งผลให้", "กับ", "ของ", "จาก",
@@ -1327,16 +1338,19 @@ _INCOMPLETE_TAILS = (
     "because", "which", "that", "and", "but", "so that", "such as",
 )
 
+# อักขระที่ต้องตัดทิ้งก่อนเทียบท้ายข้อความ (ช่องว่างทุกชนิด + วรรคตอน + zero-width)
+_TRIM_TAIL_CHARS = " \t\r\n ​‌‍﻿.-–—:;\"'`)]}»”’ๆฯ"
+
 
 def _ends_incomplete(text: str) -> bool:
     """ท่อนนี้จบแบบค้างความคิดไหม (ลงท้ายด้วยคำเชื่อม หรือ ... / ,)"""
-    t = (text or "").strip().rstrip("​")
+    t = (text or "").strip(_TRIM_TAIL_CHARS)
     if not t:
         return False
-    if t.endswith(("...", "…", ",", "،")):
+    if (text or "").rstrip(" \t\r\n ​").endswith(("...", "…", ",", "،", "、")):
         return True
-    t = t.rstrip(" \t.-–—:;\"'")
     low = t.lower()
+    # ไทยเขียนติดกันไม่มีเว้นวรรค — เทียบท้ายสตริงตรง ๆ พอ
     return any(low.endswith(tail) for tail in _INCOMPLETE_TAILS)
 
 
@@ -1399,11 +1413,24 @@ def _snap_bounds(start: float, end: float, tr: list[dict],
                 j += 1
                 end = float(tr[j]["end"])
 
-            # ── ชั้นเพิ่ม: ท่อนจบด้วยคำที่ยัง "พูดไม่จบความ" → ยืดต่อแม้มีการเว้นจังหวะ ──
-            #    คนพูดมักเว้นจังหวะก่อนเฉลย ("...ปรากฏว่า [เว้น] ค่าใช้จ่ายมากกว่ารายได้")
+            # ── ชั้นเพิ่ม: ยืดต่อเมื่อ "ยังพูดไม่จบความ" แม้มีการเว้นจังหวะ ──
+            #    คนพูดมักเว้นจังหวะก่อนเฉลย ("...ปรากฏว่า [เว้น 1s] ค่าใช้จ่ายมากกว่ารายได้")
             #    กฎช่องว่าง < SENTENCE_PAUSE จึงหยุดยืดตรงนั้น แล้วท่อนเฉลยหายไป
+            #
+            #    2 เกณฑ์ เพราะพึ่งการแมตช์คำอย่างเดียวไม่พอ (Whisper สะกดเพี้ยน /
+            #    ไม่มีคำเชื่อมให้จับ / แบ่งท่อนคนละที่กับที่คาด):
+            #      1. ท่อนลงท้ายด้วยคำเชื่อมที่ยังไม่เฉลย → ยืดต่อได้เรื่อย ๆ ในเพดาน
+            #      2. ท่อนถัดไปเริ่มเร็วกว่า THOUGHT_GRACE → เว้นจังหวะสั้นแบบนี้
+            #         คือหยุดหายใจกลางความคิด ไม่ใช่จบประโยค → ยืดเพิ่มได้ 1 ท่อน
             thought_hi = end + SNAP_MAX_THOUGHT
-            while j + 1 < len(tr) and _ends_incomplete(tr[j].get("text", "")):
+            grace_used = False
+            while j + 1 < len(tr):
+                if _ends_incomplete(tr[j].get("text", "")):
+                    pass
+                elif not grace_used and float(tr[j + 1]["start"]) - end <= THOUGHT_GRACE:
+                    grace_used = True
+                else:
+                    break
                 if float(tr[j + 1]["end"]) > thought_hi:
                     break
                 j += 1
@@ -1959,9 +1986,26 @@ confidence: "high" = มั่นใจว่าลบได้เลย | "medi
 
     print(f"✅ Final keep segments ({len(final_segments)} total):")
     for s in final_segments:
-        print(f"  {s['start']}s → {s['end']}s  ({s['end'] - s['start']:.1f}s)")
+        print(f"  {s['start']}s → {s['end']}s  ({s['end'] - s['start']:.1f}s)"
+              f"  จบที่: …{_tail_text(s['end'], transcript)}")
 
     return final_segments, transcript
+
+
+def _tail_text(boundary: float, transcript: list[dict], chars: int = 32) -> str:
+    """
+    ข้อความท้ายสุดก่อนรอยตัด — ไว้ตรวจใน log ว่ารอยตัดค้างกลางประโยคหรือไม่
+
+    ถ้าเห็นลงท้ายด้วยคำเชื่อม ("…ปรากฏว่า") แปลว่าตัวยืดขอบยังจับเคสนั้นไม่ได้
+    """
+    covering = [t for t in transcript
+                if t.get("start") is not None and float(t["start"]) < boundary]
+    if not covering:
+        return "?"
+    t = max(covering, key=lambda x: float(x["start"]))
+    text = (t.get("text") or "").strip()
+    flag = " ⚠️ค้างกลางความคิด" if _ends_incomplete(text) else ""
+    return f"{text[-chars:]}{flag}"
 
 
 def _enrich_segments_with_text(segments: list[dict], transcript: list[dict],
@@ -2178,4 +2222,5 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
     for c in final:
         print(f"  [{c.get('role')}] score={c.get('score')} {c['start']}s→{c['end']}s "
               f"— {str(c.get('reason',''))[:60]}")
+        print(f"      จบที่: …{_tail_text(c['end'], transcript)}")
     return final, transcript
