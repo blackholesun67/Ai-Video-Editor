@@ -28,9 +28,13 @@ MAX_FILE_SIZE_MB = 2048               # 2GB upload limit
 MAX_PROMPT_LENGTH = 2000               # 2000 chars prompt
 ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v"}
 ALLOWED_OUTPUT_MODES = {"standard", "tiktok"}   # รูปแบบ render (aspect): 16:9 / 9:16
-# วิธีตัด: full=เก็บเนื้อหาครบ / summary=สรุปให้เข้าใจครบ / hook=ไฮไลต์ดึงคนดู
-ALLOWED_EDIT_MODES = {"full", "summary", "hook"}
-_EDIT_MODE_ALIASES = {"short": "summary"}       # back-compat กับ client เก่า
+# วิธีตัด: full=เก็บเนื้อหาครบ / summary=สรุปให้เข้าใจครบ
+# hook (ไฮไลต์) ปิดไว้ — ผลลัพธ์ยังไม่นิ่งพอ (ดู README) ; โค้ดใน ai_logic ยังอยู่ครบ
+ALLOWED_EDIT_MODES = {"full", "summary"}
+_EDIT_MODE_ALIASES = {                          # back-compat กับ client เก่า
+    "short": "summary",
+    "hook": "summary",                          # ไฮไลต์ทำผ่านหน้า preview แทน
+}
 MIN_TARGET_LENGTH = 10
 MAX_TARGET_LENGTH = 600
 # NOTE: cleanup logic (JOB_RETENTION_DAYS, marker guard) ย้ายไป tasks.py แล้ว

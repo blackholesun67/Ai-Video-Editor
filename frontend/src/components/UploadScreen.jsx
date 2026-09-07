@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Upload, X, FileVideo, Scissors, ListChecks, Flame, Monitor, Smartphone, Loader2,
+  Upload, X, FileVideo, Scissors, ListChecks, Monitor, Smartphone, Loader2,
   GraduationCap, Mic, Star, Video, Sparkles, Captions, Eye, AudioLines,
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 
-// โหมดการตัด 3 แบบ — base prompt + ตัวตัดสิน edit_mode ที่ backend
+// โหมดการตัด — base prompt + ตัวตัดสิน edit_mode ที่ backend
+// (โหมด 'hook' ไฮไลต์ ถูกปิดไว้ — ทำไฮไลต์ผ่านหน้า preview แทน ดู README)
 const CUT_MODES = {
   full: {
     label: 'เก็บเนื้อหาครบ',
@@ -19,12 +20,6 @@ const CUT_MODES = {
     desc: 'ดูแทนคลิปเต็มได้ เข้าใจครบทุกประเด็น สั้นลงตามเนื้อหา',
     icon: ListChecks,
     text: 'สรุปคลิปยาวให้คนที่ไม่มีเวลาดูเต็ม — เก็บทุกประเด็นหลัก เหตุผลที่จำเป็น ตัวอย่างสำคัญ และข้อสรุปให้ครบ ตัดเนื้อหาซ้ำ การพูดวกวน รายละเอียดปลีกย่อย และช่วงนอกเรื่องออก ให้สั้นที่สุดเท่าที่ยังเข้าใจครบ',
-  },
-  hook: {
-    label: 'ไฮไลต์ดึงคนดู',
-    desc: 'คลิปสั้นแนว TikTok/Reels เลือกช่วงเด็ด กระตุ้นให้ดูฉบับเต็ม',
-    icon: Flame,
-    text: 'เลือกเฉพาะช่วงที่มีพลังที่สุด 2-5 ช่วงจากคลิปยาว มาทำเป็นคลิปสั้น — เน้นช่วงที่เป็น hook สร้างความสงสัย กระตุ้นอารมณ์ ไม่ต้องเล่าครบ ทิ้งช่องให้อยากไปดูคลิปเต็มต่อ',
   },
 };
 
@@ -49,7 +44,6 @@ const UploadScreen = ({ onUploadSuccess }) => {
   const [topicId, setTopicId] = useState(null);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [targetLength, setTargetLength] = useState(30);
   const [burnSubtitle, setBurnSubtitle] = useState(false);
   const [denoise, setDenoise] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
@@ -57,7 +51,6 @@ const UploadScreen = ({ onUploadSuccess }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
 
-  const isHook = cutMode === 'hook';
   const isPortrait = aspect === 'portrait';
 
   // ตรวจ orientation จาก <video> ที่ preview อยู่แล้ว — คลิปแนวตั้งแปลงเป็น 16:9 ไม่ได้ (เสียเนื้อหา)
@@ -142,9 +135,8 @@ const UploadScreen = ({ onUploadSuccess }) => {
     const formData = new FormData();
     formData.append('video', file);
     formData.append('prompt', buildPrompt());
-    formData.append('edit_mode', cutMode);                                  // full | summary | hook
+    formData.append('edit_mode', cutMode);                                  // full | summary
     formData.append('output_mode', isPortrait ? 'tiktok' : 'standard');     // aspect: 9:16 | 16:9
-    formData.append('target_length', String(targetLength));
     formData.append('burn_subtitle', String(burnSubtitle));
     formData.append('denoise', String(denoise));
     formData.append('preview_mode', String(previewMode));
@@ -250,7 +242,7 @@ const UploadScreen = ({ onUploadSuccess }) => {
       {/* โหมดการตัด — เลือก 1 ใน 3 */}
       <section>
         <h3 className="text-sm font-medium text-slate-700 mb-3">โหมดการตัด</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {Object.entries(CUT_MODES).map(([id, m]) => (
             <Choice key={id} active={cutMode === id} onClick={() => setCutMode(id)} icon={m.icon} title={m.label} desc={m.desc} />
           ))}
@@ -335,28 +327,6 @@ const UploadScreen = ({ onUploadSuccess }) => {
       <section>
         <h3 className="text-sm font-medium text-slate-700 mb-2.5">ตั้งค่าเพิ่มเติม</h3>
         <div className="space-y-3">
-          {isHook && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <label className="text-xs text-slate-500 block mb-1.5">ความยาวคลิปไฮไลต์ (โดยประมาณ)</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[15, 30, 60].map((sec) => (
-                  <button
-                    key={sec}
-                    type="button"
-                    onClick={() => setTargetLength(sec)}
-                    className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
-                      targetLength === sec
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    {sec}s
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-colors ${
             burnSubtitle ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
           }`}>
