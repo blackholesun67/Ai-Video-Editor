@@ -1227,6 +1227,13 @@ try:
 except (TypeError, ValueError):
     SNAP_MAX_THOUGHT = 12.0
 
+# เพดานการยืด "ช่วงสุดท้ายของคลิป" ให้พูดจบประโยค — กว้างกว่าจุดอื่นโดยตั้งใจ
+# รอยตัดกลางเรื่องพอกลืนได้ แต่ตอนจบที่ค้างกลางประโยคทำให้คลิปเหมือนไฟล์เสีย
+try:
+    LAST_SENTENCE_MAX_EXTEND = float(os.getenv("LAST_SENTENCE_MAX_EXTEND", "") or 20.0)
+except (TypeError, ValueError):
+    LAST_SENTENCE_MAX_EXTEND = 20.0
+
 
 def _looks_like_outro(text: str) -> bool:
     low = (text or "").lower()
@@ -1404,6 +1411,51 @@ def _snap_bounds(start: float, end: float, tr: list[dict],
             break
 
     return round(max(0.0, start), 2), round(min(end, total_duration), 2)
+
+
+def _finish_last_sentence(segments: list[dict], transcript: list[dict],
+                          total_duration: float) -> list[dict]:
+    """
+    บังคับให้ **ช่วงสุดท้ายของคลิป** จบที่ประโยคสมบูรณ์
+
+    ต่างจาก _snap_bounds ตรงที่ยอมยืดได้ไกลกว่ามาก (LAST_SENTENCE_MAX_EXTEND)
+    เพราะรอยตัดกลางเรื่องพอกลืนได้ แต่ "ตอนจบ" ที่ค้างกลางประโยคทำให้คลิป
+    เหมือนไฟล์เสีย — เพดานปกติ (SNAP_MAX_SENTENCE/SNAP_MAX_THOUGHT) แคบเกินสำหรับจุดนี้
+    """
+    if not segments or not transcript:
+        return segments
+
+    tr = sorted((t for t in transcript
+                 if t.get("start") is not None and t.get("end") is not None),
+                key=lambda t: t["start"])
+    if not tr:
+        return segments
+
+    last = segments[-1]
+    end0 = end = float(last["end"])
+    cap = end0 + LAST_SENTENCE_MAX_EXTEND
+
+    for i in range(len(tr) - 1, -1, -1):
+        if tr[i]["start"] < end - 0.05:
+            # ค้างกลางท่อนไหน → ยืดไปจบท่อนนั้น
+            if end < float(tr[i]["end"]) <= cap:
+                end = float(tr[i]["end"])
+            # ยืดต่อผ่านท่อนที่ยังพูดไม่จบความ ("...ปรากฏว่า" ฯลฯ)
+            j = i
+            while j + 1 < len(tr) and _ends_incomplete(tr[j].get("text", "")):
+                if float(tr[j + 1]["end"]) > cap:
+                    break
+                j += 1
+                end = float(tr[j]["end"])
+            break
+
+    end = round(min(end, total_duration), 2)
+    if end - end0 < 0.01:
+        return segments
+
+    print(f"🏁 [Ending] ยืดช่วงสุดท้ายให้พูดจบประโยค +{end - end0:.1f}s "
+          f"({end0:.1f}s → {end:.1f}s)")
+    return segments[:-1] + [{**last, "end": end}]
 
 
 def _snap_segments_to_sentences(segments: list[dict], transcript: list[dict],
@@ -1900,6 +1952,7 @@ confidence: "high" = มั่นใจว่าลบได้เลย | "medi
     # ── ตัวกันเชิงโครงสร้าง: คลิปต้องไม่จบดื้อ ๆ และขอบต้องไม่ค้างกลางประโยค ──
     final_segments = _protect_outro(final_segments, transcript, total_duration, voice_segments)
     final_segments = _snap_segments_to_sentences(final_segments, transcript, total_duration)
+    final_segments = _finish_last_sentence(final_segments, transcript, total_duration)
 
     # ── Enrich each keep_segment ด้วย text content จาก transcript (สำหรับ Preview) ──
     final_segments = _enrich_segments_with_text(final_segments, transcript)
@@ -2117,6 +2170,8 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
 
     final = [{"start": c["start"], "end": c["end"], "role": c["role"],
               "score": c["score"], "reason": c["reason"]} for c in ordered]
+    # ช่วงสุดท้าย (ตามลำดับที่จะ render จริง) ต้องจบที่ประโยคสมบูรณ์
+    final = _finish_last_sentence(final, transcript, total_duration)
     final = _enrich_segments_with_text(final, transcript)
 
     print(f"✅ [HOOK] {len(final)} ช่วง รวม {total:.1f}s (target ~{target_length}s):")
