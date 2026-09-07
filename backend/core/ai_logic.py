@@ -1250,6 +1250,18 @@ try:
 except (TypeError, ValueError):
     LAST_SENTENCE_MAX_EXTEND = 20.0
 
+# hook: สร้าง "รายการจุดจบประโยค" จาก transcript แล้ว snap ขอบไปหาจุดนั้น
+# (ต่างจาก _snap_bounds ที่ค่อย ๆ ขยายทีละท่อน ซึ่งเปราะกับขอบที่ AI ส่งมาแบบสุ่ม)
+try:
+    SENTENCE_END_MIN_GAP = float(os.getenv("SENTENCE_END_MIN_GAP", "") or 0.55)
+except (TypeError, ValueError):
+    SENTENCE_END_MIN_GAP = 0.55
+# มองไปข้างหน้าจากขอบที่ AI เลือก กี่วินาที เพื่อหา "จุดจบประโยคจริง"
+try:
+    SENTENCE_SNAP_FWD = float(os.getenv("SENTENCE_SNAP_FWD", "") or 10.0)
+except (TypeError, ValueError):
+    SENTENCE_SNAP_FWD = 10.0
+
 
 def _looks_like_outro(text: str) -> bool:
     low = (text or "").lower()
@@ -2037,6 +2049,72 @@ def _enrich_segments_with_text(segments: list[dict], transcript: list[dict],
     return enriched
 
 
+def _sentence_ends(transcript: list[dict], min_gap: float | None = None) -> list[float]:
+    """
+    รายการเวลา (วินาที) ที่ "ประโยคจบจริง" — สร้างจาก transcript ครั้งเดียว
+
+    ท่อน tr[i].end นับเป็นจุดจบประโยค เมื่อ:
+      - เป็นท่อนสุดท้าย  หรือ  ช่องว่างถึงท่อนถัดไป >= min_gap (คนหยุดพูด)
+      - และท่อนนั้น **ไม่** ลงท้ายแบบค้างความคิด (_ends_incomplete: "...ปรากฏว่า")
+
+    hook ใช้ snap ขอบไปหาจุดเหล่านี้ — เชื่อถือได้กว่าการค่อย ๆ ขยายทีละท่อน
+    เพราะ Whisper หั่นประโยคคนละที่กับที่ AI เลือกขอบ
+    """
+    min_gap = SENTENCE_END_MIN_GAP if min_gap is None else min_gap
+    tr = sorted((t for t in transcript
+                 if t.get("start") is not None and t.get("end") is not None),
+                key=lambda t: t["start"])
+    ends: list[float] = []
+    for i, t in enumerate(tr):
+        nxt = tr[i + 1] if i + 1 < len(tr) else None
+        gap = (float(nxt["start"]) - float(t["end"])) if nxt else 1e9
+        if gap < min_gap:
+            continue
+        if _ends_incomplete(t.get("text", "")):
+            continue
+        ends.append(round(float(t["end"]), 2))
+    return ends
+
+
+def _snap_span_to_sentences(start: float, end: float, ends: list[float],
+                            total_duration: float,
+                            max_len: float | None = None) -> tuple[float, float] | None:
+    """
+    ขยับ [start, end] ให้ตกที่จุดจบประโยค (จาก _sentence_ends)
+
+    - end   : จุดจบประโยคที่ใกล้ end — เลือกจุดที่ >= end ในหน้าต่าง SENTENCE_SNAP_FWD ก่อน
+              (ไม่ให้ประโยคขาด) ไม่มีค่อยเอาจุดที่ใกล้ที่สุด
+    - start : "ต้นประโยค" = 0.0 หรือจุดจบประโยคก่อนหน้า ที่ใกล้ start ที่สุด
+    - max_len : ถ้าช่วงยาวเกิน → หด end ไปจุดจบประโยคล่าสุดที่ยังไม่เกิน
+    - คืน None ถ้าจัดเป็นช่วง >= 2s ที่ลงตัวไม่ได้ (ให้ caller drop ช่วงนั้น)
+    """
+    if not ends:
+        return None
+
+    fwd = [e for e in ends if end <= e <= end + SENTENCE_SNAP_FWD]
+    new_end = min(fwd) if fwd else min(ends, key=lambda e: abs(e - end))
+
+    starts = [0.0] + [e for e in ends if e <= new_end - 2.0]
+    new_start = min(starts, key=lambda e: abs(e - start))
+
+    new_start = max(0.0, round(float(new_start), 2))
+    new_end = round(min(float(new_end), total_duration), 2)
+
+    if max_len and new_end - new_start > max_len:
+        fit = [e for e in ends if new_start + 2.0 <= e <= new_start + max_len]
+        if fit:
+            new_end = round(max(fit), 2)
+        else:                                  # ประโยคยาวรวดเดียว — ยอมเกิน max_len นิดหน่อย
+            over = [e for e in ends if new_start + 2.0 < e <= new_start + max_len * 1.5]
+            if not over:
+                return None
+            new_end = round(min(over), 2)
+
+    if new_end - new_start < 2.0:
+        return None
+    return new_start, new_end
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # HOOK MODE — เลือก 2-5 ช่วงเด็ดจากคลิปยาว มาต่อเป็นคลิปสั้นดึงคนไปดูฉบับเต็ม
 # (selection/scoring — คนละแนวกับ full/summary ที่เป็น deletion)
@@ -2073,8 +2151,9 @@ Transcript (start, end, text):
    ช่วงที่ฟังแล้วอยากรู้ว่า "แล้วเกิดอะไรขึ้น?"
 3. **ห้ามเฉลย / ห้ามสรุปให้จบ** — ทิ้งช่องว่างให้อยากไปดูต่อ (curiosity gap)
 4. ช่วงสุดท้ายควรเป็น teaser ที่ชวนไปดูฉบับเต็ม (ถ้าในคลิปมีจังหวะแบบนั้น)
-5. แต่ละช่วงยาว 3-{max_seg:.0f} วินาที · snap ขอบให้ตรงประโยคจบ (ห้ามตัดกลางคำ/กลางประโยค)
-   ⚠️ ช่วงที่ยาวเกิน {max_seg:.0f}s จะถูกระบบคัดทิ้ง — แบ่งเป็นช่วงสั้นหลายช่วงดีกว่า
+5. แต่ละช่วงยาว 3-{max_seg:.0f} วินาที · เลือกขอบที่ **ต้นประโยค** ถึง **ท้ายประโยค** (อย่าตัดกลาง)
+   ระบบจะ snap ขอบไปจุดจบประโยคที่ใกล้ที่สุดให้อีกชั้น — แต่ถ้าช่วงยาวเกิน {max_seg:.0f}s
+   หรือยาวรวดเดียวจนไม่มีจุดจบประโยคข้างใน จะถูกคัดทิ้ง → แบ่งเป็นช่วงสั้นหลายช่วงดีกว่า
 6. ผลรวมทุกช่วง ~{target_length} วินาที (ยืดหยุ่นได้ ±30%)
 7. ❌ ห้ามใช้เป็นช่วงเปิด: ทักทาย / แนะนำตัว / "วันนี้จะมาเล่า..." / "เอ่อ..."
 
@@ -2129,19 +2208,11 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
     if not isinstance(raw, list):
         raise Exception("Gemini คืนค่า JSON ไม่ถูกต้อง: ไม่ใช่ array ของช่วง")
 
-    tr = sorted((t for t in transcript
-                 if t.get("start") is not None and t.get("end") is not None),
-                key=lambda t: t["start"])
+    ends = _sentence_ends(transcript)
 
-    # normalize + snap ทั้งสองขอบให้จบประโยคจริง (ตัวเดียวกับ deletion path
-    # — เดิม hook มี fallback ไปใช้ timestamp ดิบของ AI จึงตัดกลางคำได้)
-    #
-    # ⚠️ กรองความยาวด้วยค่า "ดิบ" ที่ AI ตั้งใจ ไม่ใช่ค่าหลัง snap —
-    #    snap ขยายได้ถึง SNAP_MAX_EXTEND ต่อด้าน ถ้าเช็คหลัง snap ช่วงที่ AI
-    #    ส่งมาถูกต้องจะถูกคัดทิ้งจนหมด แล้วโยน "ไม่พบช่วงที่เด่นพอ" ทั้งที่ AI ตอบมาแล้ว
-    hard_max = max_seg + 2 * SNAP_MAX_EXTEND
-    rejected = {"bad": 0, "short": 0, "long": 0}
-
+    # snap ขอบทั้งสองด้านไปหา "จุดจบประโยคจริง" + บังคับความยาวช่วง <= max_seg
+    #   _snap_span_to_sentences คืน None ถ้าจัดขอบให้ลงตัวไม่ได้ → drop ช่วงนั้น
+    rejected = {"bad": 0, "nosnap": 0}
     cand = []
     for seg in raw:
         if not isinstance(seg, dict):
@@ -2155,16 +2226,11 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
         if end <= start:
             rejected["bad"] += 1
             continue
-        if end - start < 2.0:
-            rejected["short"] += 1
+        snapped = _snap_span_to_sentences(start, end, ends, total_duration, max_len=max_seg)
+        if snapped is None:
+            rejected["nosnap"] += 1
             continue
-        if end - start > hard_max:
-            rejected["long"] += 1
-            continue
-        s, e = _snap_bounds(start, end, tr, total_duration) if tr else (start, end)
-        if e - s < 2.0:
-            rejected["short"] += 1
-            continue
+        s, e = snapped
         try:
             score = int(seg.get("score", 50) or 50)
         except (TypeError, ValueError):
@@ -2178,14 +2244,14 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
 
     if not cand:
         print(f"❌ [HOOK] AI ส่งมา {len(raw)} ช่วง แต่ใช้ไม่ได้เลย — "
-              f"สั้นไป {rejected['short']}, ยาวเกิน {hard_max:.0f}s {rejected['long']}, "
-              f"ข้อมูลเสีย {rejected['bad']}")
+              f"จัดขอบให้จบประโยคไม่ได้ {rejected['nosnap']}, ข้อมูลเสีย {rejected['bad']} "
+              f"(จุดจบประโยคที่ตรวจพบ: {len(ends)})")
         raise Exception("AI ไม่พบช่วงที่เด่นพอสำหรับคลิปไฮไลต์ — ลองใช้โหมด 'สรุปให้เข้าใจครบ' แทน")
     if any(rejected.values()):
         print(f"[HOOK] ใช้ได้ {len(cand)}/{len(raw)} ช่วง "
-              f"(ตกเกณฑ์: สั้น {rejected['short']}, ยาว {rejected['long']}, เสีย {rejected['bad']})")
+              f"(จัดขอบไม่ได้ {rejected['nosnap']}, เสีย {rejected['bad']})")
 
-    # ตัด overlap (เก็บตัวคะแนนสูงกว่า)
+    # ตัด overlap (เก็บตัวคะแนนสูงกว่า) + รวมช่วงที่ snap แล้วซ้อน/ชนกัน
     cand.sort(key=lambda x: (-x["score"], x["start"]))
     picked = []
     for c in cand:
@@ -2193,26 +2259,23 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
             continue
         picked.append(c)
 
-    # คุมความยาว: drop ทั้ง segment ตัวคะแนนต่ำสุด (ไม่ truncate กลางประโยค)
-    #   เดิม `len(kept) < 2` บังคับรับ 2 ช่วงแรกก่อนเช็ค budget → target 15s
-    #   อาจได้คลิปยาว 90s ; ตอนนี้เช็ค budget ก่อน แล้วค่อยเติมให้ครบ 2 ช่วงถ้าขาด
+    # คุมความยาว: เก็บตามคะแนนจนเต็ม budget ; ถ้ายังไม่ครบ 2 ช่วง ยอมถึง hard_cap
+    #   (ไม่บังคับเติมช่วงเกินขนาดแบบเดิม ที่เคยทำ target 30s → คลิป 66s)
     budget = target_length * (1 + HOOK_LENGTH_TOLERANCE)
+    hard_cap = target_length * (1 + 2 * HOOK_LENGTH_TOLERANCE)
     picked.sort(key=lambda x: -x["score"])
     kept, total = [], 0.0
     for c in picked:
         if len(kept) >= HOOK_MAX_SEGMENTS:
             break
         d = c["end"] - c["start"]
-        if total + d <= budget:
+        if total + d <= budget or (len(kept) < 2 and total + d <= hard_cap):
             kept.append(c); total += d
-    for c in picked:                       # ต้องมีอย่างน้อย 2 ช่วง แม้เกิน budget
-        if len(kept) >= 2:
-            break
-        if c not in kept:
-            kept.append(c); total += c["end"] - c["start"]
 
+    note = "" if len(kept) >= 2 else "  ⚠️ ได้ช่วงเดียว (ที่เหลือคะแนนต่ำ/ยาวเกิน)"
     print(f"[HOOK] เลือก {len(kept)}/{len(picked)} ช่วง รวม {total:.1f}s "
-          f"(target {target_length}s, budget {budget:.0f}s, ช่วงละไม่เกิน {max_seg:.0f}s)")
+          f"(target {target_length}s, budget {budget:.0f}s, hard cap {hard_cap:.0f}s, "
+          f"ช่วงละไม่เกิน {max_seg:.0f}s){note}")
 
     # เรียงลำดับ: ตามเวลา (default) หรือเอา hook ขึ้นก่อน (HOOK_LEAD_FIRST)
     if HOOK_LEAD_FIRST and any(c["role"] == "hook" for c in kept):
@@ -2224,8 +2287,7 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
 
     final = [{"start": c["start"], "end": c["end"], "role": c["role"],
               "score": c["score"], "reason": c["reason"]} for c in ordered]
-    # ช่วงสุดท้าย (ตามลำดับที่จะ render จริง) ต้องจบที่ประโยคสมบูรณ์
-    final = _finish_last_sentence(final, transcript, total_duration)
+    # ขอบทุกช่วง snap ไปจุดจบประโยคแล้วใน _snap_span_to_sentences ไม่ต้องทำซ้ำ
     final = _enrich_segments_with_text(final, transcript)
 
     print(f"✅ [HOOK] {len(final)} ช่วง รวม {total:.1f}s (target ~{target_length}s):")
