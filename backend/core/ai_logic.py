@@ -1213,6 +1213,13 @@ try:
 except (TypeError, ValueError):
     SNAP_MAX_EXTEND = 6.0
 
+# ท่อนถอดเสียงที่ยาวเกินค่านี้ ถือว่าไม่ใช่ "ประโยคเดียว" แล้ว — ไม่กลืนทั้งก้อน
+# แต่ไปใช้ขอบคำแทน (Whisper บางทีให้ segment ยาวเป็นนาที ถ้ากลืนหมดช่วงจะบวมมาก)
+try:
+    SNAP_MAX_SENTENCE = float(os.getenv("SNAP_MAX_SENTENCE", "") or 25.0)
+except (TypeError, ValueError):
+    SNAP_MAX_SENTENCE = 25.0
+
 
 def _looks_like_outro(text: str) -> bool:
     low = (text or "").lower()
@@ -1294,6 +1301,26 @@ def _protect_outro(keep_segments: list[dict], transcript: list[dict],
     )
 
 
+def _word_bound(seg: dict, pos: float, before: bool) -> float:
+    """
+    ขอบ "คำ" ที่ใกล้ที่สุดภายใน segment เดียว — ใช้เมื่อ segment ยาวเกินกว่าจะขยายไปทั้งก้อน
+
+    before=True  → ต้นคำที่ครอบ pos อยู่ (ถอยหลัง)
+    before=False → ท้ายคำที่ครอบ pos อยู่ (เดินหน้า)
+    ไม่มี word timestamps → คืน pos เดิม
+    """
+    words = seg.get("words") or []
+    if not words:
+        return pos
+    if before:
+        cands = [float(w["start"]) for w in words
+                 if w.get("start") is not None and float(w["start"]) <= pos]
+        return max(cands) if cands else pos
+    cands = [float(w["end"]) for w in words
+             if w.get("end") is not None and float(w["end"]) >= pos]
+    return min(cands) if cands else pos
+
+
 def _snap_bounds(start: float, end: float, tr: list[dict],
                  total_duration: float) -> tuple[float, float]:
     """
@@ -1307,7 +1334,11 @@ def _snap_bounds(start: float, end: float, tr: list[dict],
     for i, t in enumerate(tr):
         if t["end"] > start + 0.05:
             if t["start"] < start:
-                start = float(t["start"])
+                # Whisper อาจให้ segment ยาวเป็นนาที — กลืนทั้งก้อนแล้วช่วงจะบวมมาก
+                # จึงกลืนเฉพาะท่อนที่ยาวสมเหตุผล (≤ SNAP_MAX_SENTENCE)
+                # นอกนั้นตกไปใช้ขอบคำ (มี word timestamps อยู่แล้ว) เพื่อไม่ให้ค้างกลางคำ
+                start = (float(t["start"]) if start - float(t["start"]) <= SNAP_MAX_SENTENCE
+                         else _word_bound(t, start, before=True))
             j = i
             while j > 0 and start - float(tr[j - 1]["end"]) < SENTENCE_PAUSE:
                 if float(tr[j - 1]["start"]) < limit_lo:
@@ -1320,7 +1351,8 @@ def _snap_bounds(start: float, end: float, tr: list[dict],
     for i in range(len(tr) - 1, -1, -1):
         if tr[i]["start"] < end - 0.05:
             if tr[i]["end"] > end:
-                end = float(tr[i]["end"])
+                end = (float(tr[i]["end"]) if float(tr[i]["end"]) - end <= SNAP_MAX_SENTENCE
+                       else _word_bound(tr[i], end, before=False))
             j = i
             while j + 1 < len(tr) and float(tr[j + 1]["start"]) - end < SENTENCE_PAUSE:
                 if float(tr[j + 1]["end"]) > limit_hi:
@@ -1933,18 +1965,35 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
 
     # normalize + snap ทั้งสองขอบให้จบประโยคจริง (ตัวเดียวกับ deletion path
     # — เดิม hook มี fallback ไปใช้ timestamp ดิบของ AI จึงตัดกลางคำได้)
+    #
+    # ⚠️ กรองความยาวด้วยค่า "ดิบ" ที่ AI ตั้งใจ ไม่ใช่ค่าหลัง snap —
+    #    snap ขยายได้ถึง SNAP_MAX_EXTEND ต่อด้าน ถ้าเช็คหลัง snap ช่วงที่ AI
+    #    ส่งมาถูกต้องจะถูกคัดทิ้งจนหมด แล้วโยน "ไม่พบช่วงที่เด่นพอ" ทั้งที่ AI ตอบมาแล้ว
+    hard_max = max_seg + 2 * SNAP_MAX_EXTEND
+    rejected = {"bad": 0, "short": 0, "long": 0}
+
     cand = []
     for seg in raw:
         if not isinstance(seg, dict):
+            rejected["bad"] += 1
             continue
         try:
             start = float(seg.get("start", 0)); end = float(seg.get("end", 0))
         except (TypeError, ValueError):
+            rejected["bad"] += 1
             continue
         if end <= start:
+            rejected["bad"] += 1
+            continue
+        if end - start < 2.0:
+            rejected["short"] += 1
+            continue
+        if end - start > hard_max:
+            rejected["long"] += 1
             continue
         s, e = _snap_bounds(start, end, tr, total_duration) if tr else (start, end)
-        if not (2.0 <= e - s <= max_seg):
+        if e - s < 2.0:
+            rejected["short"] += 1
             continue
         try:
             score = int(seg.get("score", 50) or 50)
@@ -1958,7 +2007,13 @@ score: 0-100 (ยิ่งดึงดูด/น่าติดตาม ยิ�
         })
 
     if not cand:
+        print(f"❌ [HOOK] AI ส่งมา {len(raw)} ช่วง แต่ใช้ไม่ได้เลย — "
+              f"สั้นไป {rejected['short']}, ยาวเกิน {hard_max:.0f}s {rejected['long']}, "
+              f"ข้อมูลเสีย {rejected['bad']}")
         raise Exception("AI ไม่พบช่วงที่เด่นพอสำหรับคลิปไฮไลต์ — ลองใช้โหมด 'สรุปให้เข้าใจครบ' แทน")
+    if any(rejected.values()):
+        print(f"[HOOK] ใช้ได้ {len(cand)}/{len(raw)} ช่วง "
+              f"(ตกเกณฑ์: สั้น {rejected['short']}, ยาว {rejected['long']}, เสีย {rejected['bad']})")
 
     # ตัด overlap (เก็บตัวคะแนนสูงกว่า)
     cand.sort(key=lambda x: (-x["score"], x["start"]))
