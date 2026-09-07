@@ -1038,10 +1038,85 @@ _SUMMARY_BLOCK_NARRATIVE = """
 """
 
 
+_FULL_BLOCK_CLEANING = """
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[โหมดนี้: เก็บเนื้อหาครบ — งาน "คลีนนิ่ง" ไม่ใช่งานตัดต่อเชิงเนื้อหา]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+เป้าหมาย: เตรียมไฟล์ส่งต่อให้ **คนตัดต่อ** — ลบเฉพาะส่วนที่ไม่มีใครอยากเก็บแน่ ๆ
+เพื่อให้เขาไม่ต้องเสียเวลาไล่หาช่วงเงียบ/เทคเสียเอง
+
+⚠️ **การตัดสินใจว่าเนื้อหาไหนควรอยู่หรือไม่ควรอยู่ เป็นงานของคนตัดต่อ ไม่ใช่ของคุณ**
+
+✂️ ตัดได้ **เฉพาะ 3 อย่างนี้เท่านั้น**:
+  1. ช่วงเงียบ / ไม่มีเสียงพูด ที่ยาวผิดปกติ
+  2. ติดขัด พูดผิดแล้วพูดใหม่ทันที คำเติมล้วน ๆ ("เอ่อ…", "อืม…") ที่ยาวพอสมควร
+  3. ปัญหาเทคนิค — เสียงหาย, รอโหลด, จัดกล้อง, "ได้ยินไหมครับ", เทคเสีย
+
+⛔ **ห้ามตัดเด็ดขาดในโหมดนี้** (ต่างจากโหมดอื่น):
+  - **ห้ามตัด off-topic / tangent** — เรื่องเล่าที่ดูไม่เกี่ยวอาจเป็นสีสัน เป็นการเท้าความ
+    หรือเป็นเนื้อเรื่องเอง (โดยเฉพาะคลิปเล่าเรื่อง/ประวัติศาสตร์) → ปล่อยให้คนตัดต่อตัดสิน
+  - **ห้ามตัด repetition** — การย้ำ/ทวนเป็นเทคนิคการเล่าเรื่องและการสอน
+  - ห้ามตัดเพราะ "น่าจะไม่สำคัญ" หรือ "อยากให้สั้นลง" — **โหมดนี้ไม่มีเป้าความยาว**
+
+📌 กฎด้านบนที่บอกให้ตัด "Off-topic tangent" กับ "Filler / วนซ้ำ (พูดซ้ำความคิดเดิม)"
+   **ไม่ใช้กับโหมดนี้** — ยึดรายการ 3 ข้อข้างบนเท่านั้น
+   (ส่วน "เก็บไว้เสมอ" ทั้งหมดยังใช้ตามปกติ)
+
+ถ้าคลิปสะอาดอยู่แล้ว ไม่มีช่วงเงียบยาวหรือเทคเสีย → **คืนค่า [] ได้เลย ถือว่าถูกต้อง**
+"""
+
+
 def _summary_intensity_block(content_type: str) -> str:
     """เลือกกติกาการตัดของโหมด summary ตามชนิดเนื้อหา (เล่าเรื่อง = ตัดเบากว่ามาก)"""
     return (_SUMMARY_BLOCK_NARRATIVE if content_type == "narrative"
             else _SUMMARY_BLOCK_INFORMATIONAL)
+
+
+# ตัวอย่างการตัดสำหรับโหมดที่ตัดเชิงเนื้อหาได้ (summary)
+_EXAMPLES_EDITORIAL = """
+ตัวอย่างที่ 3 — Off-topic tangent:
+  Transcript: "...กลับมาที่หัวข้อ Python นะครับ จริง ๆ เมื่อวานผมไปกินข้าวกับเพื่อน เพื่อนผมเล่าเรื่อง... (5 นาที) ...เอาล่ะ กลับมาที่ list"
+  Output: [{"start": 120.0, "end": 420.0, "reason": "STORY_TANGENT เรื่องกินข้าวเพื่อน ไม่เกี่ยวกับ Python", "confidence": "high"}]
+
+ตัวอย่างที่ 4 — Repetition:
+  Transcript: "...append คือเพิ่มข้อมูลท้าย list... เอ๊ะ ที่ผมพูดเมื่อกี้ ก็คือ append เพิ่มข้อมูลท้าย list นั่นแหละ"
+  Output: [{"start": 180.0, "end": 195.0, "reason": "REPETITION พูดซ้ำเรื่อง append", "confidence": "medium"}]
+"""
+
+# โหมดคลีนนิ่ง (full) — ตัวอย่างต้องสอน "ไม่ตัด" สองกรณีนี้ ไม่ใช่สอนให้ตัด
+_EXAMPLES_CLEANING = """
+ตัวอย่างที่ 3 — Off-topic tangent (โหมดนี้ **ไม่ตัด**):
+  Transcript: "...กลับมาที่หัวข้อนะครับ จริง ๆ เมื่อวานผมไปกินข้าวกับเพื่อน เพื่อนผมเล่าเรื่อง... (5 นาที) ...เอาล่ะ กลับมาที่เรื่องเดิม"
+  Output: []   # ❌ ไม่ตัด — เป็นเนื้อหา คนตัดต่อจะตัดสินใจเอง
+
+ตัวอย่างที่ 4 — พูดซ้ำ/ย้ำประเด็น (โหมดนี้ **ไม่ตัด**):
+  Transcript: "...ข้อสำคัญคือต้องทำแบบนี้... ย้ำอีกครั้งนะครับ ต้องทำแบบนี้เท่านั้น"
+  Output: []   # ❌ ไม่ตัด — การย้ำเป็นเทคนิคการเล่าเรื่อง
+
+ตัวอย่างที่ 4b — ติดขัด/พูดผิดแล้วพูดใหม่ (โหมดนี้ **ตัด**):
+  Transcript: "แล้วเขาก็เดินทางไปที่... เอ่อ... เดี๋ยวนะ... อืม... แล้วเขาก็เดินทางไปที่เมืองหลวง"
+  Output: [{"start": 88.0, "end": 94.0, "reason": "ติดขัด พูดผิดแล้วเริ่มประโยคใหม่", "confidence": "high"}]
+"""
+
+
+def _examples_block(edit_mode: str) -> str:
+    """ตัวอย่างการตัดต้องสอดคล้องกับสิทธิ์การตัดของแต่ละโหมด ไม่งั้นตัวอย่างจะสอนสวนกฎ"""
+    return _EXAMPLES_CLEANING if edit_mode == "full" else _EXAMPLES_EDITORIAL
+
+
+def _intensity_block(edit_mode: str, content_type: str) -> str:
+    """
+    กติกาความเข้มของการตัดตามโหมด
+
+    full    : คลีนนิ่งล้วน — ตัดได้แค่ช่วงเงียบ/ติดขัด/ปัญหาเทคนิค
+              (ห้ามตัด tangent + repetition ซึ่ง prompt ฐานสั่งไว้ — เป็นงานของคนตัดต่อ)
+    summary : ตัดเชิงเนื้อหา ความเข้มขึ้นกับชนิดเนื้อหา
+    """
+    if edit_mode == "full":
+        return _FULL_BLOCK_CLEANING
+    if edit_mode == "summary":
+        return _summary_intensity_block(content_type)
+    return ""
 
 
 def _format_outline_block(outline: list[dict]) -> str:
@@ -1524,6 +1599,8 @@ def analyze_video_content(
 
     # กติกาความเข้มของ summary เลือกทีหลัง — ต้องรู้ชนิดเนื้อหาจาก outline ก่อน
     # (ไม่มี outline → ใช้บล็อก informational เป็นค่าตั้งต้น)
+    examples_block = _examples_block(edit_mode)
+
     def _build_deletion_prompt(outline_block: str = "", intensity_block: str = "") -> str:
         return f"""
 คุณคือ บรรณาธิการวิดีโอมืออาชีพ (Senior Video Editor)
@@ -1571,14 +1648,7 @@ def analyze_video_content(
   Transcript: "ขั้นแรกเรา import library, ขั้นสองสร้าง list, ขั้นสาม append ค่า"
   Output: []   # ❌ ไม่ตัดเลย — เนื้อหา core content
 
-ตัวอย่างที่ 3 — Off-topic tangent:
-  Transcript: "...กลับมาที่หัวข้อ Python นะครับ จริง ๆ เมื่อวานผมไปกินข้าวกับเพื่อน เพื่อนผมเล่าเรื่อง... (5 นาที) ...เอาล่ะ กลับมาที่ list"
-  Output: [{{"start": 120.0, "end": 420.0, "reason": "STORY_TANGENT เรื่องกินข้าวเพื่อน ไม่เกี่ยวกับ Python", "confidence": "high"}}]
-
-ตัวอย่างที่ 4 — Repetition:
-  Transcript: "...append คือเพิ่มข้อมูลท้าย list... เอ๊ะ ที่ผมพูดเมื่อกี้ ก็คือ append เพิ่มข้อมูลท้าย list นั่นแหละ"
-  Output: [{{"start": 180.0, "end": 195.0, "reason": "REPETITION พูดซ้ำเรื่อง append", "confidence": "medium"}}]
-
+{examples_block}
 ตัวอย่างที่ 5 — Technical issue:
   Transcript: "เสียงหายไหม ได้ยินไหม... รอแป๊บนึง... โอเค ได้แล้ว"
   Output: [{{"start": 45.0, "end": 60.0, "reason": "ปัญหาเทคนิคเสียง", "confidence": "high"}}]
@@ -1636,7 +1706,7 @@ confidence: "high" = มั่นใจว่าลบได้เลย | "medi
             outline, content_type = _build_summary_outline(
                 user_prompt, ai_json_data, total_duration)
             _ping(70, "AI กำลังเลือกช่วงที่จะเก็บ")
-        intensity_block = _summary_intensity_block(content_type) if edit_mode == "summary" else ""
+        intensity_block = _intensity_block(edit_mode, content_type)
         _deletion_future = _ex.submit(
             _run_deletion,
             _build_deletion_prompt(_format_outline_block(outline), intensity_block),
