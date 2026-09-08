@@ -31,6 +31,8 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
 
   const videoRef = useRef(null);
   const playEndRef = useRef(null);
+  const auditionRef = useRef(null);       // debounce ฟังรอยตัดหลังขยับขอบ
+  const rowsRef = useRef([]);             // rows ล่าสุด สำหรับ callback ที่ debounce
 
   const {
     rows, stats, dirty, toggle, setAll, resetToAI, nudge, applyVideoDuration,
@@ -88,6 +90,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
 
   // ขอบของแถวที่กำลังเล่นเปลี่ยน (จากการขยับขอบ) → อัปเดตจุดหยุดให้ตรง
   useEffect(() => {
+    rowsRef.current = rows;                     // ให้ callback ที่ debounce อ่านค่าล่าสุดได้
     if (activeId == null || playEndRef.current == null) return;
     const active = rows.find((r) => r.id === activeId);
     if (active) playEndRef.current = active.end;
@@ -99,6 +102,31 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
       v.pause();
       playEndRef.current = null;
     }
+  };
+
+  // เลิกนับเวลาฟังรอยตัดเมื่อออกจากหน้า
+  useEffect(() => () => clearTimeout(auditionRef.current), []);
+
+  /**
+   * ขยับขอบแล้วเล่นให้ฟังรอบ ๆ รอยตัดอัตโนมัติ
+   * จำเป็นเพราะไม่มี timeline scrubber — ไม่งั้นผู้ใช้กดปุ่มโดยไม่รู้ว่าได้ผลยังไง
+   */
+  const handleNudge = (row, edge, delta) => {
+    nudge(row.id, edge, delta);
+    clearTimeout(auditionRef.current);
+    auditionRef.current = setTimeout(() => {
+      const v = videoRef.current;
+      if (!v) return;
+      const fresh = rowsRef.current.find((r) => r.id === row.id);
+      if (!fresh) return;
+      const at = edge === 'start' ? fresh.start : fresh.end;
+      playEndRef.current = Math.min(at + 1.0, fresh.end + 1.0);
+      setActiveId(row.id);
+      try {
+        v.currentTime = Math.max(0, at - 1.5);
+        v.play().catch(() => {});
+      } catch { /* ignore */ }
+    }, 400);
   };
 
   const handleConfirm = async () => {
@@ -161,6 +189,9 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         </h2>
         <p className="text-sm text-slate-500 mt-1">
           กด ▶ ฟังก่อนได้ · ช่วงเส้นประคือช่วงที่ AI ตัดออก — กดเพื่อเอากลับมา
+        </p>
+        <p className="text-xs text-slate-400 mt-0.5">
+          ตัดไม่พอดี? ใช้ปุ่ม − / + ขยับหัวท้ายทีละวินาที (ระบบจะเล่นให้ฟังรอยตัดให้)
         </p>
       </div>
 
@@ -250,10 +281,10 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             row={row}
             isActive={activeId === row.id}
             canPreview={!!videoSrc}
-            showNudge={false}
+            showNudge
             onToggle={() => toggle(row.id)}
             onPreview={() => previewRow(row)}
-            onNudge={(edge, d) => nudge(row.id, edge, d)}
+            onNudge={(edge, d) => handleNudge(row, edge, d)}
           />
         ))}
         {visibleRows.length === 0 && (
