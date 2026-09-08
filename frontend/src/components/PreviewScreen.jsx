@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import {
-  Sparkles, X, Eye, Clock, Sigma, Play, Loader2, AlertTriangle, RotateCcw,
+  X, Eye, Play, Loader2, AlertTriangle, RotateCcw,
 } from 'lucide-react';
 import { API_URL, PREVIEW_ROWS_KEY } from '../config';
 import useTimelineRows, { toRenderSegments } from './useTimelineRows';
 import SegmentRow from './SegmentRow';
-import PlayheadBar from './PlayheadBar';
+import TimelineStrip from './TimelineStrip';
 import { formatLength } from './time';
 
 const FILTERS = [
@@ -34,7 +34,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   const flashRef = useRef(null);
 
   const {
-    rows, stats, dirty, toggle, setAll, resetToAI, nudge, splitAt, applyVideoDuration,
+    rows, duration, stats, dirty, toggle, setAll, resetToAI, nudge, splitAt, applyVideoDuration,
   } = useTimelineRows(preview, jobId, PREVIEW_ROWS_KEY);
 
   // Load preview data
@@ -73,6 +73,15 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
     ai: rows.filter((r) => r.kind === 'ai').length,
     cut: rows.filter((r) => r.kind === 'cut').length,
   }), [rows]);
+
+  // คำแนะนำตามสถานการณ์ — ดีกว่าอธิบาย 4 ขั้นตอนค้างไว้ตลอดเวลา
+  const hint = useMemo(() => {
+    if (rows.length === 0) return '';
+    if (stats.count === 0) return 'ติ๊กช่วงที่อยากเก็บไว้ในวิดีโอ';
+    if (rows.length === 1) return 'อยากตัดเป็นช่วงย่อย? เลื่อนวิดีโอไปจุดที่ต้องการแล้วกด "แยกตรงนี้"';
+    if (!dirty) return 'ทำไฮไลต์: กด "ล้าง" แล้วติ๊กเฉพาะช่วงที่ชอบ · ตัดไม่พอดีใช้ปุ่มปรับในแถวได้';
+    return '';
+  }, [rows.length, stats.count, dirty]);
 
   // เล่นพรีวิวเฉพาะช่วงนั้น — seek ไป start แล้วหยุดที่ end
   const previewRow = (row) => {
@@ -208,10 +217,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           เลือกช่วงที่จะ<span className="text-indigo-600">เก็บไว้</span>
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          กด ▶ ฟังก่อนได้ · ช่วงเส้นประคือช่วงที่ AI ตัดออก — กดเพื่อเอากลับมา
-        </p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          ตัดไม่พอดี? เลือกขนาดก้าวแล้วกด − / + ที่หัวท้ายแถว (ระบบจะเล่นให้ฟังรอยตัดให้)
+          แถบสีคือช่วงที่จะเก็บ · ลายทแยงคือช่วงที่ AI ตัดออก — กดที่แถวเพื่อสลับ
         </p>
       </div>
 
@@ -229,45 +235,46 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         </div>
       )}
 
-      <PlayheadBar
+      <TimelineStrip
         videoSrc={videoSrc}
         videoRef={videoRef}
         rows={rows}
-        step={step}
-        onStepChange={setStep}
+        duration={duration}
         onSplit={handleSplit}
       />
 
-      {/* Stats card */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center">
-            <Sigma className="h-4 w-4 text-indigo-600" />
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-500 uppercase font-medium">ที่เลือก</p>
-            <p className="text-lg font-bold text-slate-800">{stats.count} ช่วง</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center">
-            <Clock className="h-4 w-4 text-indigo-600" />
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-500 uppercase font-medium">ความยาวรวม</p>
-            <p className="text-lg font-bold text-slate-800">{formatLength(stats.dur)}</p>
-          </div>
-        </div>
-        <div className="col-span-2 sm:col-span-1 flex items-center gap-2 justify-end flex-wrap">
+      {/* แถบเดียว: สรุป + ตัวกรอง + ปุ่มจัดการ (เดิมเป็น 3 กล่องซ้อนกัน) */}
+      <div className="flex items-center gap-2 flex-wrap border-y border-slate-200 py-2.5">
+        <span className="text-sm font-semibold text-slate-800">
+          {stats.count} ช่วง · {formatLength(stats.dur)}
+        </span>
+
+        <span className="inline-flex items-center gap-1 ml-1">
+          {FILTERS.filter((f) => counts[f.id] > 0 || f.id === filter).map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`text-[11px] px-2 py-1 rounded-md border font-medium transition-colors ${
+                filter === f.id
+                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {f.label} <span className="opacity-60">({counts[f.id]})</span>
+            </button>
+          ))}
+        </span>
+
+        <span className="ml-auto inline-flex items-center gap-1.5">
           <button
             onClick={() => setAll(true)}
-            className="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 font-medium"
+            className="text-[11px] px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 font-medium"
           >
             เลือกทั้งหมด
           </button>
           <button
             onClick={() => setAll(false)}
-            className="text-xs px-3 py-1.5 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 font-medium"
+            className="text-[11px] px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 font-medium"
           >
             ล้าง
           </button>
@@ -276,36 +283,19 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             onBlur={() => setConfirmReset(false)}
             disabled={!dirty}
             title="กลับไปใช้ช่วงที่ AI เลือกให้ — การติ๊ก ขยับขอบ และแยกช่วงจะหายทั้งหมด"
-            className={`text-xs px-3 py-1.5 rounded-md font-medium inline-flex items-center gap-1 border disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`text-[11px] px-2.5 py-1 rounded-md font-medium inline-flex items-center gap-1 border disabled:opacity-40 disabled:cursor-not-allowed ${
               confirmReset
                 ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <RotateCcw className="h-3 w-3" /> {confirmReset ? 'กดอีกครั้งเพื่อยืนยัน' : 'คืนค่า AI'}
+            <RotateCcw className="h-3 w-3" /> {confirmReset ? 'ยืนยัน?' : 'คืนค่า AI'}
           </button>
-        </div>
-      </div>
-
-      {/* ตัวกรอง */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
-              filter === f.id
-                ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {f.label} <span className="opacity-60">({counts[f.id]})</span>
-          </button>
-        ))}
-        <span className="ml-auto text-[11px] text-slate-400">
-          💡 ทำไฮไลต์: กด "ล้าง" → เลื่อนวิดีโอไปจุดที่ชอบ → "แยกตรงนี้" สองครั้ง → ติ๊กช่วงตรงกลาง
         </span>
       </div>
+
+      {/* คำแนะนำตามสถานการณ์ — แทนคำอธิบาย 4 ขั้นตอนที่ยัดอยู่มุมขวา */}
+      {hint && <p className="text-[11px] text-slate-400 -mt-1">💡 {hint}</p>}
 
       {/* Segments list */}
       <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
@@ -317,7 +307,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             isNew={flashIds.includes(row.id)}
             canPreview={!!videoSrc}
             step={step}
-            showNudge
+            onStepChange={setStep}
             onToggle={() => toggle(row.id)}
             onPreview={() => previewRow(row)}
             onNudge={(edge, d) => handleNudge(row, edge, d)}
