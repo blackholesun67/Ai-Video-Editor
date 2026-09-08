@@ -4,7 +4,7 @@ import UploadScreen from './components/UploadScreen';
 import Processing from './components/Processing';
 import PreviewScreen from './components/PreviewScreen';
 import SubtitleEditScreen from './components/SubtitleEditScreen';
-import { API_URL } from './config';
+import { API_URL, PREVIEW_ROWS_KEY } from './config';
 
 const STORAGE_KEYS = {
   JOB: 'aive_job_id',
@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   PHASE: 'aive_phase',     // "processing" | "preview" | "editing" | "rendering" | "done"
   RENDER_TASK: 'aive_render_task',
   SELECTED_SEGS: 'aive_selected_segments',
+  PREVIEW_ROWS: PREVIEW_ROWS_KEY,   // แถวไทม์ไลน์หน้า preview (PreviewScreen เขียนเอง)
 };
 
 function App() {
@@ -117,6 +118,8 @@ function App() {
     setRenderTaskId(null);
     setSelectedSegs(null);
     setReediting(false);
+    // PreviewScreen เขียนคีย์นี้เอง (ไม่มี state ใน App) → ต้องล้างตรงนี้
+    try { localStorage.removeItem(STORAGE_KEYS.PREVIEW_ROWS); } catch { /* ignore */ }
   };
 
   // ปุ่มมุมขวาบน — ล้างงานทั้งหมด กลับหน้าอัปโหลด (ถามยืนยันกันกดพลาด)

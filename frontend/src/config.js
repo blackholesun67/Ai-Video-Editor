@@ -23,6 +23,10 @@ if (ENV_URL) {
 
 export const API_URL = inferredBackend;
 
+// สถานะแถวไทม์ไลน์ของหน้า preview (ติ๊กไว้ / ขอบที่ขยับ)
+// เก็บไว้เพราะ App remount PreviewScreen ตอนกดกลับจากหน้าแก้ซับ — ไม่งั้นงานที่แก้หายหมด
+export const PREVIEW_ROWS_KEY = "aive_preview_rows";
+
 // ── API key (optional) ───────────────────────────────────────────────────────
 // ถ้า build ด้วย VITE_API_KEY → แนบ header X-API-Key ให้ทุก request อัตโนมัติ
 // (ต้องตรงกับค่าใน API_KEYS ฝั่ง backend) ปล่อยว่าง = ไม่แนบ (dev)

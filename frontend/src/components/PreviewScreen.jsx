@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import {
-  Sparkles, Check, X, Eye, Clock, Sigma, Play, Loader2, AlertTriangle,
+  Sparkles, X, Eye, Clock, Sigma, Play, Loader2, AlertTriangle, RotateCcw,
 } from 'lucide-react';
-import { API_URL } from '../config';
+import { API_URL, PREVIEW_ROWS_KEY } from '../config';
+import useTimelineRows, { toRenderSegments } from './useTimelineRows';
+import SegmentRow from './SegmentRow';
 
 const formatTime = (sec) => {
   const s = Math.floor(sec || 0);
@@ -12,17 +14,27 @@ const formatTime = (sec) => {
   return `${m}:${r.toString().padStart(2, '0')}`;
 };
 
+const FILTERS = [
+  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'ai', label: 'AI เลือก' },
+  { id: 'cut', label: 'AI ตัดออก' },
+];
+
 const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   const [preview, setPreview] = useState(null);
-  const [selected, setSelected] = useState({});  // {idx: true/false}
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');   // inline (แทน alert)
-  const [activeIdx, setActiveIdx] = useState(null);      // segment ที่กำลังเล่นพรีวิว
+  const [submitError, setSubmitError] = useState('');
+  const [activeId, setActiveId] = useState(null);      // แถวที่กำลังเล่นพรีวิว
+  const [filter, setFilter] = useState('all');
 
   const videoRef = useRef(null);
-  const playEndRef = useRef(null);   // เวลา end ที่จะให้หยุดเล่น
+  const playEndRef = useRef(null);
+
+  const {
+    rows, stats, dirty, toggle, setAll, resetToAI, nudge, applyVideoDuration,
+  } = useTimelineRows(preview, jobId, PREVIEW_ROWS_KEY);
 
   // Load preview data
   useEffect(() => {
@@ -31,9 +43,6 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
       .then((res) => {
         if (cancelled) return;
         setPreview(res.data);
-        const init = {};
-        res.data.segments.forEach((_, i) => { init[i] = true; });
-        setSelected(init);
         setLoading(false);
       })
       .catch((err) => {
@@ -44,10 +53,6 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
     return () => { cancelled = true; };
   }, [jobId]);
 
-  const segments = preview?.segments || [];
-  // โหมดไฮไลต์ → segment มี role/score สำหรับโชว์ badge
-  const isHighlight = preview?.edit_mode === 'hook';
-
   // URL วิดีโอต้นฉบับ (preview.video_path = "storage/{job_id}/{file}") — /storage เสิร์ฟแบบ seek ได้
   const videoSrc = useMemo(() => {
     const p = preview?.video_path;
@@ -56,30 +61,37 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
     return `${API_URL}/storage/${rel}`;
   }, [preview]);
 
-  const toggle = (idx) => setSelected((s) => ({ ...s, [idx]: !s[idx] }));
-  const selectAll = () => {
-    const all = {};
-    segments.forEach((_, i) => { all[i] = true; });
-    setSelected(all);
-  };
-  const deselectAll = () => {
-    const none = {};
-    segments.forEach((_, i) => { none[i] = false; });
-    setSelected(none);
-  };
+  const visibleRows = useMemo(() => {
+    if (filter === 'ai') return rows.filter((r) => r.kind === 'ai');
+    if (filter === 'cut') return rows.filter((r) => r.kind === 'cut');
+    return rows;
+  }, [rows, filter]);
+
+  const counts = useMemo(() => ({
+    all: rows.length,
+    ai: rows.filter((r) => r.kind === 'ai').length,
+    cut: rows.filter((r) => r.kind === 'cut').length,
+  }), [rows]);
 
   // เล่นพรีวิวเฉพาะช่วงนั้น — seek ไป start แล้วหยุดที่ end
-  const previewSegment = (idx, seg) => {
+  const previewRow = (row) => {
     const v = videoRef.current;
     if (!v) return;
-    playEndRef.current = seg.end;
-    setActiveIdx(idx);
+    playEndRef.current = row.end;
+    setActiveId(row.id);
     try {
-      v.currentTime = seg.start;
+      v.currentTime = row.start;
       v.play().catch(() => {});
       v.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch { /* ignore */ }
   };
+
+  // ขอบของแถวที่กำลังเล่นเปลี่ยน (จากการขยับขอบ) → อัปเดตจุดหยุดให้ตรง
+  useEffect(() => {
+    if (activeId == null || playEndRef.current == null) return;
+    const active = rows.find((r) => r.id === activeId);
+    if (active) playEndRef.current = active.end;
+  }, [rows, activeId]);
 
   const onTimeUpdate = () => {
     const v = videoRef.current;
@@ -89,21 +101,13 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
     }
   };
 
-  const stats = useMemo(() => {
-    let count = 0, dur = 0;
-    segments.forEach((s, i) => {
-      if (selected[i]) { count++; dur += (s.end - s.start); }
-    });
-    return { count, dur };
-  }, [segments, selected]);
-
   const handleConfirm = async () => {
     if (stats.count === 0) {
       setSubmitError('กรุณาเลือกอย่างน้อย 1 ช่วง');
       return;
     }
     setSubmitError('');
-    const chosen = segments.filter((_, i) => selected[i]);
+    const chosen = toRenderSegments(rows);
 
     if (preview?.burn_subtitle && onEditSubtitle) {
       onEditSubtitle(chosen);
@@ -153,10 +157,10 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           ดูตัวอย่าง
         </div>
         <h2 className="text-2xl font-semibold text-slate-900">
-          ดูช่วงที่ AI <span className="text-indigo-600">เลือกให้</span>
+          เลือกช่วงที่จะ<span className="text-indigo-600">เก็บไว้</span>
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          กด ▶ เพื่อดูแต่ละช่วงก่อน — ติ๊กเก็บหรือตัดออกได้ แล้วกด "ตัดต่อ"
+          กด ▶ ฟังก่อนได้ · ช่วงเส้นประคือช่วงที่ AI ตัดออก — กดเพื่อเอากลับมา
         </p>
       </div>
 
@@ -168,6 +172,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             src={videoSrc}
             controls
             onTimeUpdate={onTimeUpdate}
+            onLoadedMetadata={(e) => applyVideoDuration(e.currentTarget.duration)}
             className="w-full max-h-[45vh] object-contain bg-black"
           />
         </div>
@@ -181,7 +186,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           </div>
           <div>
             <p className="text-[10px] text-slate-500 uppercase font-medium">ที่เลือก</p>
-            <p className="text-lg font-bold text-slate-800">{stats.count} / {segments.length}</p>
+            <p className="text-lg font-bold text-slate-800">{stats.count} ช่วง</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -193,87 +198,67 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             <p className="text-lg font-bold text-slate-800">{formatTime(stats.dur)}</p>
           </div>
         </div>
-        <div className="col-span-2 sm:col-span-1 flex items-center gap-2 justify-end">
+        <div className="col-span-2 sm:col-span-1 flex items-center gap-2 justify-end flex-wrap">
           <button
-            onClick={selectAll}
+            onClick={() => setAll(true)}
             className="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 font-medium"
           >
             เลือกทั้งหมด
           </button>
           <button
-            onClick={deselectAll}
+            onClick={() => setAll(false)}
             className="text-xs px-3 py-1.5 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 font-medium"
           >
             ล้าง
           </button>
+          <button
+            onClick={resetToAI}
+            disabled={!dirty}
+            title="กลับไปใช้ช่วงที่ AI เลือกให้"
+            className="text-xs px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RotateCcw className="h-3 w-3" /> คืนค่า AI
+          </button>
         </div>
+      </div>
+
+      {/* ตัวกรอง */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+              filter === f.id
+                ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {f.label} <span className="opacity-60">({counts[f.id]})</span>
+          </button>
+        ))}
+        <span className="ml-auto text-[11px] text-slate-400">
+          💡 อยากทำคลิปไฮไลต์? กด "ล้าง" แล้วติ๊กเฉพาะช่วงที่ชอบ
+        </span>
       </div>
 
       {/* Segments list */}
       <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-        {segments.map((seg, idx) => {
-          const isOn = !!selected[idx];
-          const isActive = activeIdx === idx;
-          const duration = seg.end - seg.start;
-          return (
-            <div
-              key={idx}
-              onClick={() => toggle(idx)}
-              className={`w-full text-left p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
-                isActive
-                  ? 'border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-200'
-                  : isOn
-                  ? 'border-indigo-400 bg-indigo-50/40 shadow-sm'
-                  : 'border-slate-200 bg-slate-50/50 opacity-60 hover:opacity-80'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className={`h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors ${
-                  isOn ? 'bg-indigo-500 text-white' : 'bg-slate-300 text-slate-500'
-                }`}>
-                  {isOn ? <Check className="h-4 w-4" /> : <X className="h-3.5 w-3.5" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5 flex-wrap">
-                    <span className="font-mono">
-                      {formatTime(seg.start)} – {formatTime(seg.end)}
-                    </span>
-                    <span className="font-semibold text-slate-700">({duration.toFixed(1)}s)</span>
-                    {isHighlight && seg.role && (
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        seg.role === 'hook' ? 'bg-indigo-100 text-indigo-700' : 'bg-indigo-50 text-indigo-600'
-                      }`}>
-                        {{ hook: '🔥 Hook', insight: '💡 Insight', tension: '⚡ ปม', tease: '👀 ชวนดูต่อ' }[seg.role] || seg.role}
-                      </span>
-                    )}
-                    {/* ปุ่มดูช่วงนี้ */}
-                    {videoSrc && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); previewSegment(idx, seg); }}
-                        className={`ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                          isActive
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
-                        }`}
-                      >
-                        <Play className="h-3 w-3" /> ดูช่วงนี้
-                      </button>
-                    )}
-                  </div>
-                  {seg.text && (
-                    <p className={`text-sm leading-relaxed ${isOn ? 'text-slate-800' : 'text-slate-500'}`}>
-                      "{seg.text}"
-                    </p>
-                  )}
-                  {seg.reason && (
-                    <p className="text-xs text-slate-500 mt-1 italic">💡 {seg.reason}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {visibleRows.map((row) => (
+          <SegmentRow
+            key={row.id}
+            row={row}
+            isActive={activeId === row.id}
+            canPreview={!!videoSrc}
+            showNudge={false}
+            onToggle={() => toggle(row.id)}
+            onPreview={() => previewRow(row)}
+            onNudge={(edge, d) => nudge(row.id, edge, d)}
+          />
+        ))}
+        {visibleRows.length === 0 && (
+          <p className="text-center text-sm text-slate-400 py-8">ไม่มีช่วงในหมวดนี้</p>
+        )}
       </div>
 
       {/* inline error (แทน alert) */}
