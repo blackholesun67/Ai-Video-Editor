@@ -1,34 +1,32 @@
 import React from 'react';
-import { Check, X, Play, Scissors, Minus, Plus } from 'lucide-react';
-
-const formatTime = (sec) => {
-  const s = Math.floor(sec || 0);
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${r.toString().padStart(2, '0')}`;
-};
+import { Check, X, Play, Scissors, Minus, Plus, SplitSquareHorizontal } from 'lucide-react';
+import { formatClock, formatLength, formatStep } from './time';
 
 const ROLE_LABEL = {
   hook: '🔥 Hook', insight: '💡 Insight', tension: '⚡ ปม', tease: '👀 ชวนดูต่อ',
 };
 
-/** ปุ่มขยับขอบ ±1 วินาที — หยุด propagation ไม่ให้ไป toggle แถว */
-function NudgeGroup({ label, onNudge, disabled }) {
-  const btn = 'h-6 w-6 inline-flex items-center justify-center rounded border text-slate-500 ' +
-    'border-slate-200 bg-white hover:bg-slate-50 hover:text-slate-700 disabled:opacity-30 ' +
-    'disabled:cursor-not-allowed transition-colors';
+const CHIP = 'px-1.5 py-0.5 rounded text-[10px] font-medium';
+
+/**
+ * ปุ่มขยับขอบ — ต้องเขียนขนาดก้าวบนตัวปุ่มเอง ("+5 วิ" ไม่ใช่ "+")
+ * ตัวเลือกขนาดก้าวอยู่บนสุดของหน้า ถ้าปุ่มไม่บอก แถวจะโกหกว่ากดแล้วเกิดอะไร
+ */
+function NudgeGroup({ label, step, onNudge }) {
+  const btn = 'h-6 px-1.5 inline-flex items-center gap-0.5 justify-center rounded border '
+    + 'text-[10px] text-slate-600 border-slate-200 bg-white hover:bg-slate-50 '
+    + 'hover:text-slate-800 transition-colors';
+  const unit = formatStep(step);
   return (
     <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
       <span className="text-[10px] text-slate-400">{label}</span>
-      <button type="button" className={btn} disabled={disabled}
-              title={`${label} เร็วขึ้น 1 วินาที`}
-              onClick={(e) => { e.stopPropagation(); onNudge(-1); }}>
-        <Minus className="h-3 w-3" />
+      <button type="button" className={btn} title={`${label} เร็วขึ้น ${unit}`}
+              onClick={(e) => { e.stopPropagation(); onNudge(-step); }}>
+        <Minus className="h-2.5 w-2.5" />{unit}
       </button>
-      <button type="button" className={btn} disabled={disabled}
-              title={`${label} ช้าลง 1 วินาที`}
-              onClick={(e) => { e.stopPropagation(); onNudge(1); }}>
-        <Plus className="h-3 w-3" />
+      <button type="button" className={btn} title={`${label} ช้าลง ${unit}`}
+              onClick={(e) => { e.stopPropagation(); onNudge(step); }}>
+        <Plus className="h-2.5 w-2.5" />{unit}
       </button>
     </span>
   );
@@ -39,13 +37,14 @@ function NudgeGroup({ label, onNudge, disabled }) {
  * และช่วงที่ AI ตัดทิ้ง (kind='cut') ซึ่งผู้ใช้กดเอากลับมาได้
  *
  * สีบอก "ติ๊กอยู่ไหม" · เส้นขอบบอก "มาจากไหน" (ทึบ=AI, ประ=ช่วงที่ถูกตัด)
+ * เวลาช่วงกับความยาวใช้ทศนิยม 1 ตำแหน่งเท่ากัน และความยาวมีคำว่า "ยาว ... วิ" กำกับ
+ * เพื่อไม่ให้อ่านเป็น timestamp อีกตัวแล้วงงว่าคลิปที่ได้จะยาวเท่าไหร่
  */
 export default function SegmentRow({
-  row, isActive, canPreview, onToggle, onPreview, onNudge, showNudge,
+  row, isActive, isNew, canPreview, step, onToggle, onPreview, onNudge, showNudge,
 }) {
-  const { kind, start, end, on, text, role, reason, origStart, origEnd } = row;
+  const { kind, start, end, on, text, role, reason, origStart, origEnd, split } = row;
   const isCut = kind === 'cut';
-  const duration = end - start;
   const edited = start !== origStart || end !== origEnd;
 
   const border = isActive
@@ -56,10 +55,11 @@ export default function SegmentRow({
 
   return (
     <div
+      data-row-id={row.id}
       onClick={onToggle}
       className={`w-full text-left p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
         isCut ? 'border-dashed' : ''
-      } ${border}`}
+      } ${border} ${isNew ? 'ring-2 ring-indigo-300' : ''}`}
     >
       <div className="flex items-start gap-3">
         <div className={`h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -69,12 +69,14 @@ export default function SegmentRow({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5 flex-wrap">
-            <span className="font-mono">{formatTime(start)} – {formatTime(end)}</span>
-            <span className="font-semibold text-slate-700">({duration.toFixed(1)}s)</span>
+          <div className="flex items-center gap-2 text-xs mb-1.5 flex-wrap">
+            <span className="font-mono text-slate-400">
+              {formatClock(start)} – {formatClock(end)}
+            </span>
+            <span className="font-semibold text-slate-700">ยาว {formatLength(end - start)}</span>
 
             {isCut && (
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+              <span className={`${CHIP} inline-flex items-center gap-1 ${
                 on ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'
               }`}>
                 <Scissors className="h-2.5 w-2.5" />
@@ -82,15 +84,14 @@ export default function SegmentRow({
               </span>
             )}
             {!isCut && role && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600">
-                {ROLE_LABEL[role] || role}
+              <span className={`${CHIP} bg-indigo-50 text-indigo-600`}>{ROLE_LABEL[role] || role}</span>
+            )}
+            {split && (
+              <span className={`${CHIP} inline-flex items-center gap-1 bg-slate-100 text-slate-600`}>
+                <SplitSquareHorizontal className="h-2.5 w-2.5" /> แยกเอง
               </span>
             )}
-            {edited && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
-                ปรับเวลาแล้ว
-              </span>
-            )}
+            {edited && <span className={`${CHIP} bg-amber-100 text-amber-700`}>ปรับเวลาแล้ว</span>}
 
             {canPreview && (
               <button
@@ -118,9 +119,9 @@ export default function SegmentRow({
           {reason && <p className="text-xs text-slate-500 mt-1 italic">💡 {reason}</p>}
 
           {showNudge && (
-            <div className="flex items-center gap-4 mt-2.5 pt-2 border-t border-slate-200/70">
-              <NudgeGroup label="เริ่ม" onNudge={(d) => onNudge('start', d)} />
-              <NudgeGroup label="จบ" onNudge={(d) => onNudge('end', d)} />
+            <div className="flex items-center gap-4 mt-2.5 pt-2 border-t border-slate-200/70 flex-wrap">
+              <NudgeGroup label="เริ่ม" step={step} onNudge={(d) => onNudge('start', d)} />
+              <NudgeGroup label="จบ" step={step} onNudge={(d) => onNudge('end', d)} />
             </div>
           )}
         </div>

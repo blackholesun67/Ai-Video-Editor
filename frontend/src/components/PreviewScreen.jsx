@@ -6,13 +6,8 @@ import {
 import { API_URL, PREVIEW_ROWS_KEY } from '../config';
 import useTimelineRows, { toRenderSegments } from './useTimelineRows';
 import SegmentRow from './SegmentRow';
-
-const formatTime = (sec) => {
-  const s = Math.floor(sec || 0);
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${r.toString().padStart(2, '0')}`;
-};
+import PlayheadBar from './PlayheadBar';
+import { formatLength } from './time';
 
 const FILTERS = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -28,14 +23,18 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   const [submitError, setSubmitError] = useState('');
   const [activeId, setActiveId] = useState(null);      // แถวที่กำลังเล่นพรีวิว
   const [filter, setFilter] = useState('all');
+  const [step, setStep] = useState(1);              // ขนาดก้าวของปุ่มขยับขอบ
+  const [flashIds, setFlashIds] = useState([]);     // แถวที่เพิ่งถูกแยก (ไฮไลต์ชั่วคราว)
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const videoRef = useRef(null);
   const playEndRef = useRef(null);
   const auditionRef = useRef(null);       // debounce ฟังรอยตัดหลังขยับขอบ
   const rowsRef = useRef([]);             // rows ล่าสุด สำหรับ callback ที่ debounce
+  const flashRef = useRef(null);
 
   const {
-    rows, stats, dirty, toggle, setAll, resetToAI, nudge, applyVideoDuration,
+    rows, stats, dirty, toggle, setAll, resetToAI, nudge, splitAt, applyVideoDuration,
   } = useTimelineRows(preview, jobId, PREVIEW_ROWS_KEY);
 
   // Load preview data
@@ -105,14 +104,15 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   };
 
   // เลิกนับเวลาฟังรอยตัดเมื่อออกจากหน้า
-  useEffect(() => () => clearTimeout(auditionRef.current), []);
+  useEffect(() => () => { clearTimeout(auditionRef.current); clearTimeout(flashRef.current); }, []);
 
   /**
    * ขยับขอบแล้วเล่นให้ฟังรอบ ๆ รอยตัดอัตโนมัติ
    * จำเป็นเพราะไม่มี timeline scrubber — ไม่งั้นผู้ใช้กดปุ่มโดยไม่รู้ว่าได้ผลยังไง
    */
   const handleNudge = (row, edge, delta) => {
-    nudge(row.id, edge, delta);
+    const { moved } = nudge(row.id, edge, delta);
+    if (!moved) return;                      // ชน clamp แล้ว — อย่าให้วิดีโอกระโดดเล่นซ้ำโดยไม่มีอะไรเปลี่ยน
     clearTimeout(auditionRef.current);
     auditionRef.current = setTimeout(() => {
       const v = videoRef.current;
@@ -127,6 +127,26 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         v.play().catch(() => {});
       } catch { /* ignore */ }
     }, 400);
+  };
+
+  /** แยกช่วงตรงตำแหน่งที่เล่นอยู่ แล้วเลื่อนไปหาครึ่งขวาให้เห็น */
+  const handleSplit = (at) => {
+    const res = splitAt(at);
+    if (!res.ok) return;
+    setFlashIds(res.ids);
+    clearTimeout(flashRef.current);
+    flashRef.current = setTimeout(() => setFlashIds([]), 1500);
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-row-id="${res.ids[1]}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
+
+  const handleReset = () => {
+    if (!confirmReset) { setConfirmReset(true); return; }   // ลบ split ทิ้งด้วย → ยืนยัน 2 คลิก
+    resetToAI();
+    setActiveId(null);
+    setConfirmReset(false);
   };
 
   const handleConfirm = async () => {
@@ -191,7 +211,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           กด ▶ ฟังก่อนได้ · ช่วงเส้นประคือช่วงที่ AI ตัดออก — กดเพื่อเอากลับมา
         </p>
         <p className="text-xs text-slate-400 mt-0.5">
-          ตัดไม่พอดี? ใช้ปุ่ม − / + ขยับหัวท้ายทีละวินาที (ระบบจะเล่นให้ฟังรอยตัดให้)
+          ตัดไม่พอดี? เลือกขนาดก้าวแล้วกด − / + ที่หัวท้ายแถว (ระบบจะเล่นให้ฟังรอยตัดให้)
         </p>
       </div>
 
@@ -208,6 +228,15 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           />
         </div>
       )}
+
+      <PlayheadBar
+        videoSrc={videoSrc}
+        videoRef={videoRef}
+        rows={rows}
+        step={step}
+        onStepChange={setStep}
+        onSplit={handleSplit}
+      />
 
       {/* Stats card */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -226,7 +255,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           </div>
           <div>
             <p className="text-[10px] text-slate-500 uppercase font-medium">ความยาวรวม</p>
-            <p className="text-lg font-bold text-slate-800">{formatTime(stats.dur)}</p>
+            <p className="text-lg font-bold text-slate-800">{formatLength(stats.dur)}</p>
           </div>
         </div>
         <div className="col-span-2 sm:col-span-1 flex items-center gap-2 justify-end flex-wrap">
@@ -243,12 +272,17 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             ล้าง
           </button>
           <button
-            onClick={resetToAI}
+            onClick={handleReset}
+            onBlur={() => setConfirmReset(false)}
             disabled={!dirty}
-            title="กลับไปใช้ช่วงที่ AI เลือกให้"
-            className="text-xs px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            title="กลับไปใช้ช่วงที่ AI เลือกให้ — การติ๊ก ขยับขอบ และแยกช่วงจะหายทั้งหมด"
+            className={`text-xs px-3 py-1.5 rounded-md font-medium inline-flex items-center gap-1 border disabled:opacity-40 disabled:cursor-not-allowed ${
+              confirmReset
+                ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
           >
-            <RotateCcw className="h-3 w-3" /> คืนค่า AI
+            <RotateCcw className="h-3 w-3" /> {confirmReset ? 'กดอีกครั้งเพื่อยืนยัน' : 'คืนค่า AI'}
           </button>
         </div>
       </div>
@@ -269,7 +303,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           </button>
         ))}
         <span className="ml-auto text-[11px] text-slate-400">
-          💡 อยากทำคลิปไฮไลต์? กด "ล้าง" แล้วติ๊กเฉพาะช่วงที่ชอบ
+          💡 ทำไฮไลต์: กด "ล้าง" → เลื่อนวิดีโอไปจุดที่ชอบ → "แยกตรงนี้" สองครั้ง → ติ๊กช่วงตรงกลาง
         </span>
       </div>
 
@@ -280,7 +314,9 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             key={row.id}
             row={row}
             isActive={activeId === row.id}
+            isNew={flashIds.includes(row.id)}
             canPreview={!!videoSrc}
+            step={step}
             showNudge
             onToggle={() => toggle(row.id)}
             onPreview={() => previewRow(row)}
@@ -321,12 +357,12 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           ) : preview?.burn_subtitle ? (
             <>
               <Play className="h-5 w-5" />
-              ถัดไป — แก้ subtitle ({stats.count} ช่วง · {formatTime(stats.dur)})
+              ถัดไป — แก้ subtitle ({stats.count} ช่วง · {formatLength(stats.dur)})
             </>
           ) : (
             <>
               <Play className="h-5 w-5" />
-              ตัดต่อตามที่เลือก ({stats.count} ช่วง · {formatTime(stats.dur)})
+              ตัดต่อตามที่เลือก ({stats.count} ช่วง · {formatLength(stats.dur)})
             </>
           )}
         </button>
