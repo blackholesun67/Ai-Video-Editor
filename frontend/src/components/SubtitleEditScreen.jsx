@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
-  Type, Check, Play, Loader2, AlertTriangle, RotateCcw, Sparkles, X,
+  Type, Check, Play, Loader2, AlertTriangle, RotateCcw, Sparkles, Scissors, X,
 } from 'lucide-react';
 import { API_URL } from '../config';
+import { formatLength } from './time';
 
 const formatTime = (sec) => {
   const total = Math.max(0, sec || 0);
@@ -23,44 +24,59 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack, back
   const [dirtyCount, setDirtyCount] = useState(0);
   const [videoSrc, setVideoSrc] = useState(null);
   const [activeIdx, setActiveIdx] = useState(null);
-  // segments ที่จะ render — จาก prop (มาจาก preview) หรือจาก preview.json (ตอนย้อนกลับมาแก้)
-  const [fallbackSegs, setFallbackSegs] = useState(null);
-  const segsToRender = selectedSegments ?? fallbackSegs;
+  // ช่วงที่จะ render — จาก prop (มาจาก preview) หรือจาก preview.json (ตอนย้อนกลับมาแก้)
+  const [segsToRender, setSegsToRender] = useState(null);
   const listRef = useRef(null);
   const videoRef = useRef(null);
   const playEndRef = useRef(null);
 
-  // Load subtitle phrases + วิดีโอต้นฉบับ (จาก preview.json)
+  const totalLen = (segsToRender || []).reduce((a, s) => a + (s.end - s.start), 0);
+
+  // โหลด preview ก่อน (เอา URL วิดีโอ + ช่วงสำรอง) แล้วค่อยขอวรรคซับ "ตามช่วงที่เลือกจริง"
+  // ต้องเรียงกัน ไม่ขนาน — วรรคขึ้นกับ selection ซึ่งอาจต้องอ่านจาก preview.json ก่อน
   useEffect(() => {
     let cancelled = false;
-    axios.get(`${API_URL}/subtitle/${jobId}`)
-      .then((res) => {
+    setLoading(true);
+    setError(null);
+    (async () => {
+      let segs = selectedSegments;
+      try {
+        const pv = await axios.get(`${API_URL}/preview/${jobId}`);
         if (cancelled) return;
-        const data = res.data?.phrases || [];
-        setPhrases(data.map((p) => ({ ...p })));
-        setOriginalPhrases(data.map((p) => ({ ...p })));
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err.response?.data?.detail || 'โหลดคำบรรยายไม่สำเร็จ');
-        setLoading(false);
-      });
-    // ดึง preview.json — เอา URL วิดีโอต้นฉบับ + segments (เผื่อย้อนกลับมาแก้ ไม่มี prop)
-    axios.get(`${API_URL}/preview/${jobId}`)
-      .then((res) => {
-        if (cancelled) return;
-        const p = res.data?.video_path;
+        const p = pv.data?.video_path;
         if (p) {
           const rel = p.replace(/\\/g, '/').replace(/^storage\//, '');
           setVideoSrc(`${API_URL}/storage/${rel}`);
         }
-        const segs = res.data?.selected_segments || res.data?.segments;
-        if (Array.isArray(segs) && segs.length) setFallbackSegs(segs);
-      })
-      .catch(() => { /* ignore */ });
+        if (!segs?.length) {
+          const fb = pv.data?.selected_segments || pv.data?.segments;
+          if (Array.isArray(fb) && fb.length) segs = fb;
+        }
+      } catch { /* preview โหลดไม่ได้ → ยังลองต่อด้วย prop ที่มี */ }
+      if (cancelled) return;
+
+      setSegsToRender(segs?.length ? segs : null);
+      if (!segs?.length) {
+        setError('ไม่พบช่วงที่เลือก — กรุณากลับไปเลือกช่วงใหม่');
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await axios.post(`${API_URL}/subtitle/${jobId}`, {
+          segments: segs.map((s) => ({ start: s.start, end: s.end })),
+        });
+        if (cancelled) return;
+        const data = res.data?.phrases || [];
+        setPhrases(data.map((p) => ({ ...p })));
+        setOriginalPhrases(data.map((p) => ({ ...p })));
+      } catch (err) {
+        if (cancelled) return;
+        setError(err.response?.data?.detail || 'โหลดคำบรรยายไม่สำเร็จ');
+      }
+      setLoading(false);
+    })();
     return () => { cancelled = true; };
-  }, [jobId]);
+  }, [jobId, selectedSegments]);
 
   // เล่นพรีวิวเฉพาะช่วง phrase นั้น
   // ผู้เล่นเป็น "วิดีโอต้นฉบับ" → ต้อง seek ด้วยเวลาในคลิปต้นฉบับ (orig_*)
@@ -187,7 +203,7 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack, back
           ตรวจและแก้ <span className="text-indigo-600">คำบรรยาย</span> ก่อนตัดต่อ
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          แก้คำที่ผิดได้ เช่น ชื่อเฉพาะ หรือศัพท์เฉพาะทาง
+          เฉพาะช่วงที่คุณเลือกไว้ — แก้คำที่ผิดได้ เช่น ชื่อเฉพาะ หรือศัพท์เฉพาะทาง
         </p>
       </div>
 
@@ -216,6 +232,23 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack, back
               <p className="text-lg font-bold text-slate-800">{phrases.length}</p>
             </div>
           </div>
+          {/* บอกว่ารายการนี้ครอบคลุมแค่ช่วงที่เลือก ไม่ใช่ทั้งคลิป */}
+          {segsToRender && (
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Scissors className="h-4 w-4 text-slate-500" />
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 uppercase font-medium">ช่วงที่จะตัด</p>
+                <p className="text-lg font-bold text-slate-800">
+                  {segsToRender.length} ช่วง
+                  <span className="text-xs font-medium text-slate-500 ml-1.5">
+                    {formatLength(totalLen)}
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
           {dirtyCount > 0 && (
             <div className="flex items-center gap-2">
               <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">

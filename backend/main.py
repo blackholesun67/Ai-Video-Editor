@@ -15,6 +15,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from pydantic import BaseModel
+from core.srt_utils import generate_phrases_from_transcript, apply_saved_edits
 from tasks import (
     process_video_task, render_only_task, cleanup_old_jobs,
     celery_app, set_cancel_flag,
@@ -280,6 +281,34 @@ class RenderRequest(BaseModel):
     edited_phrases: list[dict] | None = None  # [{"start": float, "end": float, "text": str}] (optional)
 
 
+class SubtitleRequest(BaseModel):
+    segments: list[dict]   # ช่วงที่ผู้ใช้เลือกไว้ตอนนี้ (ยังไม่ถูกบันทึกฝั่ง server)
+
+
+def _clean_segments(segments: list[dict]) -> list[dict]:
+    """Validate + ปัดเศษ segments จาก client — ครอบ float() กัน 500 ถ้า start/end ไม่ใช่ตัวเลข"""
+    cleaned = []
+    for s in segments:
+        try:
+            start = float(s.get("start", 0))
+            end = float(s.get("end", 0))
+        except (TypeError, ValueError):
+            continue
+        if end <= start:
+            continue
+        cleaned.append({"start": round(start, 2), "end": round(end, 2)})
+    return cleaned
+
+
+def _phrases_for_segments(data: dict, segments: list[dict]) -> tuple[list[dict], int]:
+    """สร้างวรรคซับให้ตรงกับ segments ชุดนี้ แล้วเอาข้อความที่ผู้ใช้เคยแก้ไว้มาทับ"""
+    transcript = data.get("transcript") or []
+    if not transcript or not segments:
+        return [], 0
+    phrases = generate_phrases_from_transcript(transcript, segments)
+    return apply_saved_edits(phrases, data.get("edited_subtitle_phrases") or [])
+
+
 def _validate_phrases(phrases: list[dict]) -> list[dict]:
     """Validate + sanitize phrases ที่ user ส่งมาจาก /subtitle หรือ /render"""
     if len(phrases) > MAX_SUBTITLE_PHRASES:
@@ -326,18 +355,7 @@ async def render_preview(request: Request, job_id: str, body: RenderRequest):
     if not body.segments:
         raise HTTPException(status_code=400, detail="ต้องเลือก segments อย่างน้อย 1 ช่วง")
 
-    # Validate segments — ครอบ float() กัน 500 ถ้า start/end ไม่ใช่ตัวเลข (คืน 400 แทน)
-    cleaned = []
-    for s in body.segments:
-        try:
-            start = float(s.get("start", 0))
-            end = float(s.get("end", 0))
-        except (TypeError, ValueError):
-            continue
-        if end <= start:
-            continue
-        cleaned.append({"start": round(start, 2), "end": round(end, 2)})
-
+    cleaned = _clean_segments(body.segments)
     if not cleaned:
         raise HTTPException(status_code=400, detail="ไม่มี segment ที่ valid")
 
@@ -360,37 +378,60 @@ async def render_preview(request: Request, job_id: str, body: RenderRequest):
     return {"task_id": new_task_id, "job_id": job_id}
 
 
-@app.get("/subtitle/{job_id}")
-async def get_subtitle(job_id: str):
-    """ดึง subtitle phrases ที่ pre-generate ไว้ (frontend โหลดไปให้ user แก้ก่อน render)"""
+def _load_preview(job_id: str) -> dict:
+    """อ่าน preview.json ของงานนี้ — 400 ถ้า job_id ผิดรูป, 404 ถ้ายังไม่มี preview"""
     if not UUID_PATTERN.match(job_id):
         raise HTTPException(status_code=400, detail="job_id ผิดรูปแบบ")
     preview_file = os.path.join(STORAGE_DIR, job_id, "preview.json")
     if not os.path.exists(preview_file):
         raise HTTPException(status_code=404, detail="ไม่พบ preview")
     with open(preview_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    # ถ้าเคยแก้ซับไว้แล้ว → คืน edit ล่าสุด, ไม่งั้นคืน phrases ที่ auto-generate
-    phrases = data.get("edited_subtitle_phrases") or data.get("subtitle_phrases", [])
+        return json.load(f)
+
+
+@app.post("/subtitle/{job_id}", dependencies=[Depends(require_api_key)])
+def build_subtitle(job_id: str, body: SubtitleRequest):
+    """
+    สร้างวรรคซับให้ตรงกับ "ช่วงที่ผู้ใช้เลือกอยู่ตอนนี้" แล้วเอาข้อความที่เคยแก้ไว้มาทับ
+
+    ทำไมต้อง POST: รายการวรรคขึ้นกับ selection ที่ยังอยู่ในหน้าเว็บ ซึ่ง server ยังไม่รู้
+    (จะถูกบันทึกตอน /render เท่านั้น) — ถ้าอ่านจาก preview.json จะได้วรรคที่ผูกกับ
+    ข้อเสนอของ AI ตอนวิเคราะห์ ซึ่งไม่ตรงกับสิ่งที่จะถูก render ทันทีที่ผู้ใช้แก้ selection
+
+    เป็น def ไม่ใช่ async def → FastAPI รันใน threadpool ; การตัดคำ PyThaiNLP กิน CPU
+    เป็นวินาทีสำหรับคลิปยาว ถ้ารันบน event loop จะบล็อกทุก request ที่เหลือ
+    """
+    data = _load_preview(job_id)
+    cleaned = _clean_segments(body.segments)
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="ไม่มี segment ที่ valid")
+    phrases, applied = _phrases_for_segments(data, cleaned)
+    total = sum(s["end"] - s["start"] for s in cleaned)
+    print(f"📝 [SUBTITLE] {len(phrases)} วรรค สำหรับ {len(cleaned)} ช่วง ({total:.1f}s)"
+          f"{f' · คงข้อความที่ผู้ใช้แก้ไว้ {applied} วรรค' if applied else ''}")
     return {"phrases": phrases}
 
 
-# NOTE: subtitle ที่ user แก้ถูกส่งตรงเข้า POST /render (edited_phrases) ไม่ต้อง persist
-# ก่อน render — จึงไม่มี POST /subtitle (เคยเป็น dead code ที่ frontend ไม่เรียก)
+@app.get("/subtitle/{job_id}")
+def get_subtitle(job_id: str):
+    """
+    เวอร์ชันไม่มี selection — ใช้ช่วงที่บันทึกไว้ล่าสุด (selected_segments) เป็นตัวตั้ง
+
+    เก็บไว้เป็น fallback เท่านั้น หน้าแก้ซับใช้ POST /subtitle เพราะรู้ selection ปัจจุบัน
+    """
+    data = _load_preview(job_id)
+    segments = data.get("selected_segments") or data.get("segments") or []
+    phrases, _ = _phrases_for_segments(data, segments)
+    # transcript หาย (preview เก่า) → ตกมาใช้วรรคที่ pre-generate ไว้ตอนวิเคราะห์
+    if not phrases:
+        phrases = data.get("edited_subtitle_phrases") or data.get("subtitle_phrases", [])
+    return {"phrases": phrases}
 
 
 @app.get("/preview/{job_id}")
 async def get_preview(job_id: str):
     """ดึงข้อมูล preview ที่ AI วิเคราะห์แล้ว"""
-    if not UUID_PATTERN.match(job_id):
-        raise HTTPException(status_code=400, detail="job_id ผิดรูปแบบ")
-
-    preview_file = os.path.join(STORAGE_DIR, job_id, "preview.json")
-    if not os.path.exists(preview_file):
-        raise HTTPException(status_code=404, detail="ไม่พบ preview")
-
-    with open(preview_file, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return _load_preview(job_id)
 
 
 @app.post("/cancel/{task_id}")

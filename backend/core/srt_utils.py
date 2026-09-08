@@ -572,6 +572,64 @@ def remap_edited_phrases(phrases: list[dict],
     return [p for p in out if p["end"] - p["start"] > MIN_PHRASE_DURATION]
 
 
+def _orig_overlap(a: dict, b: dict) -> float:
+    """วรรคสองอันทับกันกี่วินาทีบนไทม์ไลน์ต้นฉบับ (ไม่ทับ / ไม่มี orig_* → 0)"""
+    a0, a1 = a.get("orig_start"), a.get("orig_end")
+    b0, b1 = b.get("orig_start"), b.get("orig_end")
+    if a0 is None or a1 is None or b0 is None or b1 is None:
+        return 0.0
+    return max(0.0, min(float(a1), float(b1)) - max(float(a0), float(b0)))
+
+
+def _orig_len(p: dict) -> float:
+    return max(0.0, float(p["orig_end"]) - float(p["orig_start"]))
+
+
+# วรรคที่สั้นกว่าต้องจมอยู่ในวรรคที่ยาวกว่าเกินสัดส่วนนี้ จึงถือว่าเป็นวรรคเดียวกัน
+# ใช้ "containment" (ov / ตัวที่สั้นกว่า) ไม่ใช่ IoU เพราะวรรคที่คร่อมขอบช่วงที่เลือก
+# จะถูก clip ให้สั้นลง — IoU จะร่วงจนไม่แมตช์ ทั้งที่เป็นวรรคเดียวกันและข้อความเท่าเดิม
+# (generate_phrases_from_transcript ตัดเฉพาะ "เวลา" ไม่ตัดข้อความ)
+# ส่วนกรณีวรรคคนละอันมาเฉี่ยวขอบกัน ov จะเล็กเมื่อเทียบกับตัวที่สั้นกว่า → ตกเกณฑ์
+EDIT_MATCH_RATIO = 0.6
+
+
+def apply_saved_edits(phrases: list[dict], saved: list[dict]) -> tuple[list[dict], int]:
+    """
+    เอาข้อความที่ผู้ใช้เคยแก้ไว้ มาทับวรรคที่เพิ่งสร้างใหม่ → คืน (phrases, จำนวนที่ทับ)
+
+    ทำไมต้องจับคู่ด้วยเวลา ไม่ใช่ index: วรรคถูกสร้างใหม่ตาม "ช่วงที่เลือกจริง"
+    เลือกช่วงต่างกัน จำนวนวรรคก็ต่างกัน index จึงเชื่อไม่ได้ แต่ orig_start/orig_end
+    มาจาก transcript ชุดเดียวกันเสมอ วรรคที่อยู่ห่างขอบที่เปลี่ยนจึงตรงกันเป๊ะ
+
+    จับคู่แบบหนึ่งต่อหนึ่ง (used) กันข้อความเดียวไปแปะหลายวรรค
+    """
+    if not saved:
+        return phrases, 0
+    used: set[int] = set()
+    applied = 0
+    out: list[dict] = []
+    for ph in phrases:
+        best_i, best_score = None, 0.0
+        for i, sv in enumerate(saved):
+            if i in used:
+                continue
+            ov = _orig_overlap(ph, sv)
+            if ov <= 0:
+                continue
+            shorter = min(_orig_len(ph), _orig_len(sv))
+            score = ov / shorter if shorter > 0 else 0.0
+            if score > best_score:
+                best_i, best_score = i, score
+        if best_i is not None and best_score >= EDIT_MATCH_RATIO:
+            used.add(best_i)
+            text = (saved[best_i].get("text") or "").strip()
+            if text and text != ph["text"]:
+                ph = {**ph, "text": text}
+                applied += 1
+        out.append(ph)
+    return out, applied
+
+
 def generate_phrases_from_transcript(
     transcript: list[dict],
     keep_segments: list[dict],
