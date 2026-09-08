@@ -207,16 +207,24 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack, back
         </p>
       </div>
 
-      {/* Video player (ต้นฉบับ) — กด "ดู" ที่บรรทัดเพื่อฟังช่วงนั้น */}
+      {/* Video player (ต้นฉบับ) — กด "ดู" ที่บรรทัดเพื่อฟังช่วงนั้น
+          ต้องเป็นคลิปเต็ม ไม่ใช่คลิปที่ตัดแล้ว เพราะเวลาของแต่ละบรรทัดเป็นเวลา
+          ในคลิปต้นฉบับ (orig_*) — ถ้าใช้คลิปที่ตัดแล้ว ปุ่ม "ดู" จะ seek ไปผิดจุด */}
       {videoSrc && (
-        <div className="rounded-2xl overflow-hidden bg-slate-900 border border-slate-200">
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            controls
-            onTimeUpdate={onTimeUpdate}
-            className="w-full max-h-[40vh] object-contain bg-black"
-          />
+        <div className="space-y-1.5">
+          <div className="rounded-2xl overflow-hidden bg-slate-900 border border-slate-200">
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              controls
+              onTimeUpdate={onTimeUpdate}
+              className="w-full max-h-[40vh] object-contain bg-black"
+            />
+          </div>
+          <p className="text-[11px] text-slate-400 text-center">
+            นี่คือคลิป<strong className="font-semibold text-slate-500">ต้นฉบับเต็ม</strong> ไว้กดฟังเทียบเสียงแต่ละบรรทัด —
+            คลิปที่ได้จริงจะยาว {formatLength(totalLen)}
+          </p>
         </div>
       )}
 
@@ -232,20 +240,17 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack, back
               <p className="text-lg font-bold text-slate-800">{phrases.length}</p>
             </div>
           </div>
-          {/* บอกว่ารายการนี้ครอบคลุมแค่ช่วงที่เลือก ไม่ใช่ทั้งคลิป */}
+          {/* บอกว่ารายการนี้ครอบคลุมแค่ช่วงที่เลือก ไม่ใช่ทั้งคลิป
+              ไม่โชว์ "จำนวนช่วง" เพราะ toRenderSegments รวมแถวที่ติดกันก่อนส่ง —
+              เลขจะไม่ตรงกับที่หน้า preview นับเป็นแถว (4 แถว → 2 ช่วง) ทั้งที่ถูกต้องทั้งคู่ */}
           {segsToRender && (
             <div className="flex items-center gap-2">
               <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center">
                 <Scissors className="h-4 w-4 text-slate-500" />
               </div>
               <div>
-                <p className="text-[10px] text-slate-500 uppercase font-medium">ช่วงที่จะตัด</p>
-                <p className="text-lg font-bold text-slate-800">
-                  {segsToRender.length} ช่วง
-                  <span className="text-xs font-medium text-slate-500 ml-1.5">
-                    {formatLength(totalLen)}
-                  </span>
-                </p>
+                <p className="text-[10px] text-slate-500 uppercase font-medium">ความยาวที่จะได้</p>
+                <p className="text-lg font-bold text-slate-800">{formatLength(totalLen)}</p>
               </div>
             </div>
           )}

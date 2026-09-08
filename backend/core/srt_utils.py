@@ -46,6 +46,14 @@ PHRASE_GAP = 0.02
 MIN_PHRASE_DURATION = 0.05
 # Min char ของ phrase — ถ้าน้อยกว่านี้ตอน scan break point ให้รวมต่อ
 MIN_PHRASE_CHARS = 9
+# เพดานเวลาที่ซับ 1 วรรคค้างบนจอ คิดจากจำนวนตัวอักษร (ตัวอักษร/วินาที)
+# ที่มา: Whisper วนลูปหลอนทับช่วงเพลง/เงียบได้ — คืน word ซ้ำ ๆ ('หลับ' x58) พร้อม
+# timestamp ยาว 29 วิ แต่ text ยุบเหลือคำเดียว → ได้ซับ 1 บรรทัดค้างนิ่ง 29 วินาที
+# ตั้ง 5 ตัวอักษร/วินาที = ช้ากว่าคนพูดจริงราวครึ่งหนึ่ง (28 ตัวอักษรใน 2.2 วิ ≈ 12.7)
+# → วรรคปกติไม่ถูกแตะเลย บีบเฉพาะวรรคที่เวลายาวเกินกว่าข้อความจะสมเหตุสมผล
+SUBTITLE_CHARS_PER_SEC = _env_num("SUBTITLE_CHARS_PER_SEC", 5.0, float)
+# ต่อให้ข้อความสั้นมาก ก็ต้องค้างอย่างน้อยเท่านี้ให้อ่านทัน
+SUBTITLE_MIN_DISPLAY = 1.0
 # Subtitle Lead Time (วินาที) — subtitle ปรากฏก่อนเสียงพูดเล็กน้อย ให้ผู้ดูทันอ่าน
 # Whisper มัก return start ช้ากว่าเสียงจริง ~100-300ms → ชดเชยด้วยค่านี้
 # ปรับผ่าน env SUBTITLE_LEAD_TIME ได้ (0.05 = ตามเสียงเป๊ะ, 0.25 = ขึ้นก่อนเสียงเยอะ)
@@ -572,6 +580,24 @@ def remap_edited_phrases(phrases: list[dict],
     return [p for p in out if p["end"] - p["start"] > MIN_PHRASE_DURATION]
 
 
+def _clamp_phrase_duration(parts: list[dict]) -> list[dict]:
+    """
+    หดวรรคที่ค้างบนจอนานเกินกว่าจำนวนตัวอักษรจะสมเหตุสมผล
+
+    ไม่ตัดทิ้ง เพราะช่วงนั้นอาจมีเสียงพูดจริงปนอยู่ — แค่ให้ซับหายไปหลังอ่านจบ
+    แทนที่จะค้างนิ่งจนดูเหมือนระบบแฮงก์ ; วรรคปกติ (~2 วิ) ไม่เข้าเงื่อนไขนี้เลย
+    """
+    if SUBTITLE_CHARS_PER_SEC <= 0:
+        return parts
+    out = []
+    for ph in parts:
+        s, e = float(ph["start"]), float(ph["end"])
+        budget = max(SUBTITLE_MIN_DISPLAY,
+                     len((ph.get("text") or "").strip()) / SUBTITLE_CHARS_PER_SEC)
+        out.append({**ph, "start": s, "end": min(e, s + budget)})
+    return out
+
+
 def _orig_overlap(a: dict, b: dict) -> float:
     """วรรคสองอันทับกันกี่วินาทีบนไทม์ไลน์ต้นฉบับ (ไม่ทับ / ไม่มี orig_* → 0)"""
     a0, a1 = a.get("orig_start"), a.get("orig_end")
@@ -676,6 +702,8 @@ def generate_phrases_from_transcript(
             a_start = min(max(a_start, 0.0), seg_end)
             a_end = max(a_end, a_start + 0.05)
             parts = _split_segment_text(seg_text, a_start, a_end)
+
+        parts = _clamp_phrase_duration(parts)
 
         for ph in parts:
             text = (ph.get("text") or "").strip()
