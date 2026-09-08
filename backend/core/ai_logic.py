@@ -227,7 +227,9 @@ def audio_file_hash(path: str) -> str:
     return h.hexdigest()[:16]
 
 
-def _cache_path(hash_id: str, suffix: str = "transcript") -> str:
+# v2 = หลังเพิ่ม Pass 3 (ซ่อม/ทิ้งท่อนที่หลอน) — cache v1 เก็บผลหลอนไว้แล้ว
+# ถ้าไม่เปลี่ยน key วิดีโอที่เคยถอดไว้จะ hit ของเก่าและไม่ได้ประโยชน์จากการแก้เลย
+def _cache_path(hash_id: str, suffix: str = "transcript_v2") -> str:
     return os.path.join(TRANSCRIPT_CACHE_DIR, f"{suffix}_{hash_id}.json")
 
 
@@ -318,6 +320,81 @@ def get_initial_prompt(preset_id: str | None) -> str:
 GAP_RETRANSCRIBE_THRESHOLD = 5.0   # gap > 5s ใน transcript → ลอง re-transcribe
 MIN_RETRANSCRIBE_DUR = 1.5         # gap สั้นกว่านี้ไม่คุ้ม retranscribe
 
+# ── ตรวจจับ segment ที่ Whisper "หลอน" (repetition loop) ─────────────────────
+# Whisper เป็น autoregressive: ช่วงที่เสียงฟังยาก (ดนตรีคลอ พูดเบา ห้องก้อง) มันจะเลิก
+# อิงเสียง แล้วเดาต่อจากสิ่งที่ตัวเองเพิ่งพิมพ์ → ติดลูปพ่นคำเดิมซ้ำเป็นร้อยรอบ
+# เคสจริง: ช่วง 29 วิ ได้ words 179 token เป็น 'หลับ' ซ้ำ ~58 รอบ ส่วน text ยุบเหลือ
+# 'เทสโทสเตอโรน' คำเดียว → เนื้อหาหายทั้งท่อน และเอาไปทำซับจะได้ 1 บรรทัดค้าง 29 วิ
+#
+# เกณฑ์วัดจาก transcript จริง 3,073 segment ใน storage:
+#   ตัวอักษร/วินาที : ค่ากลางเนื้อหาจริง 13.7 — ต่ำสุดที่ยังเป็นของจริง 3.3 → ตั้ง 2.0
+#   loop ratio      : ของจริงสูงสุด 0.61 — ตัวหลอนต่ำสุด 0.76 → ตั้ง 0.70 กลางช่องว่าง
+try:
+    HALLUC_MIN_DUR = float(os.getenv("HALLUC_MIN_DUR", "") or 5.0)
+    HALLUC_MAX_CPS = float(os.getenv("HALLUC_MAX_CPS", "") or 2.0)
+    HALLUC_LOOP_RATIO = float(os.getenv("HALLUC_LOOP_RATIO", "") or 0.70)
+except (TypeError, ValueError):
+    HALLUC_MIN_DUR, HALLUC_MAX_CPS, HALLUC_LOOP_RATIO = 5.0, 2.0, 0.70
+
+# ด่านรับผลถอดใหม่: avg_logprob ต่ำกว่านี้ = โมเดลเดามั่ว ไม่รับ
+# วัดจากเคสจริง (ท่อน 29 วิ ที่หลอน ถอดใหม่หลายรอบ):
+#   -2.56 / -2.47  ข้อความอ่านไม่รู้เรื่องเลย ('In Max', 'An Batt монeter')
+#   -1.37          อ่านออกและตรงเรื่อง ('โกรทฮอร์โมนหลั่งในช่วงต้นของการนอน' แม้สะกดเพี้ยน)
+#   -0.25          อ่านรู้เรื่องชัดเจน
+# ตั้ง -2.0 กลางช่องว่าง — ยอมรับข้อความที่สะกดเพี้ยนแต่ได้ใจความ เพราะขั้นถัดไป
+# (correct_transcript_with_ai) มีหน้าที่แก้คำที่ Whisper ฟังผิดอยู่แล้ว และผู้ใช้ยังแก้
+# เองได้ในหน้าแก้ซับ ; ตั้งเข้มกว่านี้เท่ากับทิ้งเนื้อหาที่กู้คืนได้จริง
+try:
+    HALLUC_MIN_LOGPROB = float(os.getenv("HALLUC_MIN_LOGPROB", "") or -2.0)
+except (TypeError, ValueError):
+    HALLUC_MIN_LOGPROB = -2.0
+
+
+def _loop_ratio(s: str) -> float:
+    """
+    สัดส่วนของสตริงที่เป็น "หน่วยเดิมซ้ำติดกัน >= 3 รอบ" (0 = ไม่ซ้ำ, 1 = วนลูปล้วน)
+
+    ต้องเป็น "ติดกัน" ไม่ใช่แค่ "ซ้ำบ่อย" — Whisper ตัด token ไทยเป็นเศษพยางค์
+    ตัวอักษรจึงซ้ำกันเป็นปกติอยู่แล้ว ถ้าวัดแค่ความถี่จะจับเนื้อหาจริงผิดเกือบหมด
+    (วัดจริง: ของจริงได้ 0.28-0.61 ส่วนท่อนที่หลอนได้ 0.76-1.00)
+    """
+    n = len(s)
+    if n < 9:
+        return 0.0
+    best = 0
+    for k in range(1, 13):
+        if n < k * 3:
+            break
+        i = 0
+        while i + k <= n:
+            reps = 1
+            while (i + (reps + 1) * k <= n
+                   and s[i + reps * k: i + (reps + 1) * k] == s[i: i + k]):
+                reps += 1
+            if reps >= 3:
+                best = max(best, reps * k)
+                i += reps * k
+            else:
+                i += 1
+    return best / n
+
+
+def _degenerate_reason(seg: dict) -> str | None:
+    """คืนเหตุผลถ้า segment นี้น่าจะเป็นผลหลอน — None ถ้าดูปกติ"""
+    joined = "".join((w.get("text") or "") for w in (seg.get("words") or []))
+    lr = _loop_ratio(joined)
+    if lr >= HALLUC_LOOP_RATIO:
+        # เช็กก่อน ไม่สนความยาว — ลูปคือลูป ('ขอบคุณ ขอบคุณ ขอบคุณ' ใน 1.8 วิ ก็นับ
+        return f"คำวนซ้ำติดกัน {lr * 100:.0f}% ของท่อน"
+    dur = float(seg.get("end", 0)) - float(seg.get("start", 0))
+    if dur >= HALLUC_MIN_DUR:
+        # ท่อนสั้นตัดสินด้วย cps ไม่ได้ — คนเว้นจังหวะ 2-3 วิ กลางประโยคเป็นเรื่องปกติ
+        text = (seg.get("text") or "").strip()
+        cps = len(text) / dur
+        if cps < HALLUC_MAX_CPS:
+            return f"ข้อความสั้นผิดปกติ ({len(text)} ตัวอักษรใน {dur:.1f}s = {cps:.2f} ตัว/วิ)"
+    return None
+
 
 def _whisper_segments_to_dicts(segments) -> list[dict]:
     """Convert faster-whisper segment objects → JSON-friendly dicts."""
@@ -334,12 +411,21 @@ def _whisper_segments_to_dicts(segments) -> list[dict]:
                     "end":   round(w.end, 2),
                     "text":  token,
                 })
-        transcript.append({
+        entry = {
             "start": round(seg.start, 2),
             "end":   round(seg.end, 2),
             "text":  (seg.text or "").strip(),
             "words": words_data,
-        })
+        }
+        # ค่าความมั่นใจของ Whisper — เดิมโยนทิ้ง ทั้งที่เป็นสัญญาณเดียวที่บอกได้ว่า
+        # "ข้อความนี้เชื่อได้แค่ไหน" ; ใช้เป็นด่านตัดสินตอนซ่อมท่อนที่หลอน (Pass 3)
+        #   avg_logprob   ยิ่งติดลบมาก = ยิ่งไม่มั่นใจ (ปกติราว -0.3 ถึง -0.7)
+        #   no_speech_prob ยิ่งสูง = ยิ่งน่าจะไม่ใช่เสียงพูด
+        for k in ("avg_logprob", "no_speech_prob"):
+            v = getattr(seg, k, None)
+            if v is not None:
+                entry[k] = round(float(v), 3)
+        transcript.append(entry)
     return transcript
 
 
@@ -365,6 +451,114 @@ def _retranscribe_gap(audio_path: str, model, gap_start: float, gap_end: float) 
     except Exception as e:
         print(f"   [gap-fill] {gap_start:.1f}s–{gap_end:.1f}s failed: {e}")
         return []
+
+
+def _retranscribe_clean(audio_path: str, model, start: float, end: float,
+                        language: str | None) -> list[dict]:
+    """
+    ถอดเสียงช่วงที่หลอนใหม่ ด้วยค่าที่ทนต่อการวนลูปมากกว่า Pass 1
+
+    ต่างจาก Pass 1 ตรงไหน:
+      - ใช้ WhisperModel ตรง ๆ ไม่ผ่าน BatchedInferencePipeline — ตัว batched แลก
+        ความทนทานมาเป็นความเร็ว temperature fallback ทำงานไม่เต็มที่
+      - temperature เป็นบันได: ถ้า decode รอบแรกได้ข้อความซ้ำผิดปกติ (วัดด้วย
+        compression_ratio_threshold) จะ decode ใหม่ที่ temperature สูงขึ้น
+        การสุ่มที่เพิ่มขึ้นคือทางเดียวที่จะหลุดจากลูปของ greedy decoding
+      - repetition_penalty ลดโอกาสพ่น token เดิมซ้ำโดยตรง
+      - ไม่ส่ง initial_prompt เพราะคำใน prompt เองก็ถูกพ่นซ้ำได้
+
+    ⚠️ language ต้องส่งมาจาก Pass 1 เสมอ ห้ามปล่อย None: วัดจริงกับท่อนที่หลอน
+    การให้ auto-detect บนคลิปสั้น 29 วิ คืนผลลัพธ์ 0 ท่อน แต่พอระบุ "th" ได้ 9 ท่อน
+    (คลิปสั้นเกินกว่าจะ detect ภาษาได้แม่น โดยเฉพาะช่วงที่เสียงกำกวมอยู่แล้ว)
+
+    ไม่ตั้ง no_repeat_ngram_size / hallucination_silence_threshold: ทดสอบแล้วทั้งคู่
+    กดผลจนเหลือศูนย์ — token ไทยเป็นเศษพยางค์ n-gram ซ้ำกันเป็นเรื่องปกติ
+    """
+    try:
+        segments, _info = model.transcribe(
+            audio_path,
+            beam_size=5,
+            language=language,
+            word_timestamps=True,
+            condition_on_previous_text=False,
+            initial_prompt=None,
+            clip_timestamps=[start, end],
+            temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+            compression_ratio_threshold=2.4,
+            log_prob_threshold=-1.0,
+            no_speech_threshold=0.6,
+            repetition_penalty=1.15,
+        )
+        return _whisper_segments_to_dicts(segments)
+    except Exception as e:
+        print(f"   [ซ่อม] {start:.1f}s–{end:.1f}s ถอดใหม่ไม่สำเร็จ: {e}")
+        return []
+
+
+def _usable_after_repair(seg: dict) -> bool:
+    """
+    ท่อนที่ถอดใหม่มาใช้ได้ไหม — เข้มกว่าตอนตรวจจับ เพราะกำลังจะเอาไปแทนของเดิม
+
+    ต้องผ่านทั้ง 3 ด่าน: มีข้อความ, ไม่เข้าเกณฑ์หลอน, และโมเดลมั่นใจพอ
+    ด่าน avg_logprob สำคัญที่สุด — ผลถอดใหม่ที่ "ไม่วนลูปแล้วแต่ยังอ่านไม่รู้เรื่อง"
+    ผ่านสองด่านแรกได้สบาย ('In Max', 'An Batt монeter') แต่ตกด่านนี้ที่ -2.56
+    """
+    if not (seg.get("text") or "").strip():
+        return False
+    if _degenerate_reason(seg) is not None:
+        return False
+    lp = seg.get("avg_logprob")
+    return lp is None or float(lp) >= HALLUC_MIN_LOGPROB
+
+
+def _repair_hallucinated(transcript: list[dict], audio_path: str,
+                         language: str | None, ping=None) -> list[dict]:
+    """
+    Pass 3: หา segment ที่ Whisper หลอน → ถอดใหม่ → ถ้ายังหลอนอยู่ก็ทิ้ง
+
+    ทำไมทิ้งดีกว่าเก็บ: ข้อความหลอนไปโผล่สองที่ — Gemini เห็นเป็นเนื้อหาแล้วตัดสินใจ
+    ตัด/เก็บผิด และหน้าแก้ซับเอาไปทำวรรคได้ซับผิดค้างยาว ไม่มีข้อมูลดีกว่ามีข้อมูลผิด
+    (ช่วงที่ถูกทิ้งยังอยู่ในวิดีโอตามปกติ แค่ไม่มีทรานสคริปต์/ซับของมัน)
+    """
+    flagged = [(i, r) for i, s in enumerate(transcript)
+               if (r := _degenerate_reason(s)) is not None]
+    if not flagged:
+        return transcript
+
+    print(f"🩹 Pass 3: เจอ {len(flagged)} ท่อนที่ Whisper น่าจะหลอน — ถอดใหม่")
+    try:
+        model = get_whisper_model()
+    except Exception as e:
+        print(f"⚠️ Pass 3: โหลดโมเดลไม่ได้ ({e}) — ข้ามการซ่อม")
+        return transcript
+
+    replacements: dict[int, list[dict]] = {}
+    fixed = dropped = 0
+    for n, (i, reason) in enumerate(flagged, start=1):
+        seg = transcript[i]
+        s, e = float(seg["start"]), float(seg["end"])
+        if callable(ping):
+            ping(57, f"ซ่อมเสียงที่ถอดไม่ชัด {n}/{len(flagged)}")
+        print(f"   [{s:.1f}-{e:.1f}] {reason} — {(seg.get('text') or '')[:40]!r}")
+        redo = [r for r in _retranscribe_clean(audio_path, model, s, e, language)
+                if _usable_after_repair(r)]
+        replacements[i] = redo
+        if redo:
+            fixed += 1
+            print(f"      ✅ กู้คืนได้ {len(redo)} ท่อน: {(redo[0].get('text') or '')[:40]!r}")
+        else:
+            dropped += 1
+            print("      🗑️ ถอดใหม่แล้วยังใช้ไม่ได้ — ทิ้งท่อนนี้")
+
+    out: list[dict] = []
+    for i, seg in enumerate(transcript):
+        if i in replacements:
+            out.extend(replacements[i])
+        else:
+            out.append(seg)
+    out.sort(key=lambda s: float(s["start"]))
+    print(f"🩹 Pass 3: ซ่อมได้ {fixed} ทิ้ง {dropped} → เหลือ {len(out)} ท่อน")
+    return out
 
 
 def transcribe_audio(audio_path: str, initial_prompt: str | None = None,
@@ -449,6 +643,12 @@ def transcribe_audio(audio_path: str, initial_prompt: str | None = None,
                 # Merge + sort by start
                 transcript = sorted(transcript + extra, key=lambda s: s["start"])
                 print(f"Pass 2: total {len(transcript)} segments after gap-fill")
+
+    # Pass 3: ซ่อม/ทิ้ง segment ที่ Whisper หลอน (repetition loop)
+    #         ต้องทำก่อนบันทึก cache — ไม่งั้นผลหลอนจะถูกเก็บไว้ใช้ซ้ำทุกครั้ง
+    if transcript:
+        transcript = _repair_hallucinated(transcript, audio_path,
+                                          info.language, ping=_ping)
 
     print(f"Transcribed {len(transcript)} segments "
           f"({sum(len(s['words']) for s in transcript)} word tokens).")
