@@ -46,6 +46,8 @@ const UploadScreen = ({ onUploadSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [burnSubtitle, setBurnSubtitle] = useState(false);
   const [denoise, setDenoise] = useState(false);
+  // วิธีจัดเฟรมตอนแปลงเป็น 9:16 — ตั้งต้น blur เพราะ crop กินความกว้างไปมากในคลิปไวด์
+  const [tiktokFit, setTiktokFit] = useState('blur');
   const [previewMode, setPreviewMode] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -137,6 +139,7 @@ const UploadScreen = ({ onUploadSuccess }) => {
     formData.append('prompt', buildPrompt());
     formData.append('edit_mode', cutMode);                                  // full | summary
     formData.append('output_mode', isPortrait ? 'tiktok' : 'standard');     // aspect: 9:16 | 16:9
+    if (isPortrait) formData.append('tiktok_fit', tiktokFit);                // blur = เห็นครบ | crop = เต็มจอ
     formData.append('burn_subtitle', String(burnSubtitle));
     formData.append('denoise', String(denoise));
     formData.append('preview_mode', String(previewMode));
@@ -282,6 +285,40 @@ const UploadScreen = ({ onUploadSuccess }) => {
             >
               <Smartphone className="h-4 w-4" /> แนวตั้ง 9:16
             </button>
+          </div>
+        )}
+
+        {/* วิธีจัดเฟรม 9:16 — มีผลเฉพาะเมื่อต้นฉบับกว้างกว่า 9:16
+            ต้นฉบับที่เป็นแนวตั้งอยู่แล้วสองแบบให้ผลเหมือนกัน จึงไม่ต้องอธิบายให้งง */}
+        {isPortrait && (
+          <div className="mt-3">
+            <p className="text-xs text-slate-500 mb-2">ถ้าต้นฉบับกว้างกว่า 9:16 จะจัดเฟรมยังไง</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { id: 'blur', title: 'เห็นครบ', desc: 'ย่อทั้งเฟรม เติมขอบเบลอ' },
+                { id: 'crop', title: 'เต็มจอ', desc: 'ตัดซ้าย-ขวาทิ้ง' },
+              ].map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setTiktokFit(o.id)}
+                  className={`px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                    tiktokFit === o.id
+                      ? 'border-indigo-500 bg-indigo-50/70'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className={`block text-sm font-medium ${
+                    tiktokFit === o.id ? 'text-indigo-700' : 'text-slate-700'}`}>{o.title}</span>
+                  <span className="block text-[11px] text-slate-500 mt-0.5">{o.desc}</span>
+                </button>
+              ))}
+            </div>
+            {tiktokFit === 'crop' && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                คลิปไวด์ (2.35:1) จะเหลือความกว้างแค่ ~24% — ข้อความเต็มบรรทัดและภาพเทียบซ้าย-ขวาจะหาย
+              </p>
+            )}
           </div>
         )}
       </section>

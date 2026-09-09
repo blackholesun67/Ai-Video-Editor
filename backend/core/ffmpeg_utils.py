@@ -169,13 +169,21 @@ def _build_trim_concat_graph(bounds, has_audio, video_chain=None,
         cat_in = "".join(f"[v{i}]" for i in range(n))
         parts.append(f"{cat_in}concat=n={n}:v=1:a=0[vcat]")
 
-    chain = list(video_chain or [])
-    if subs_file:
-        chain.append(f"subtitles={subs_file}:force_style='{subs_style}'")
+    # video_chain เป็น list = ฟิลเตอร์ต่อกันเป็นสายเดียว (เคสปกติ)
+    # เป็น str = กราฟย่อยที่ประกาศ {IN}/{OUT} เอง — ต้องใช้เมื่อกราฟต้องแตกสาย
+    # (split/overlay) ซึ่งเขียนเป็นสายเดียวไม่ได้เพราะต้องมี ";" คั่นหลายท่อน
+    graph_tpl = video_chain if isinstance(video_chain, str) else None
+    chain = [] if graph_tpl else list(video_chain or [])
 
     vlabel = "[vcat]"
+    if graph_tpl:
+        parts.append(graph_tpl.replace("{IN}", vlabel).replace("{OUT}", "[vfit]"))
+        vlabel = "[vfit]"
+    if subs_file:
+        # ซับต้องเบิร์นหลังจัดเฟรมเสร็จ ไม่งั้นตัวหนังสือโดน scale/crop ตามไปด้วย
+        chain.append(f"subtitles={subs_file}:force_style='{subs_style}'")
     if chain:
-        parts.append(f"[vcat]{','.join(chain)}[vout]")
+        parts.append(f"{vlabel}{','.join(chain)}[vout]")
         vlabel = "[vout]"
 
     alabel = "[acat]" if has_audio else None
@@ -355,6 +363,39 @@ _TIKTOK_SCALE_PAD = (
 )
 
 
+# ความแรงของการเบลอพื้นหลัง — แค่ต้องไม่ดึงสายตาไปจากภาพจริงตรงกลาง
+BLUR_RADIUS = int(os.getenv("TIKTOK_BLUR_RADIUS", "40"))
+BLUR_PASSES = int(os.getenv("TIKTOK_BLUR_PASSES", "4"))
+
+# โหมดจัดเฟรม 9:16
+#   crop = ขยายจนเต็มจอแล้วตัดส่วนล้น (เต็มจอ ไม่มีขอบ แต่เนื้อหานอกกรอบหายหมด)
+#   blur = ย่อทั้งเฟรมให้เห็นครบ แล้วเติมขอบด้วยภาพเดิมที่เบลอ
+#
+# ทำไม blur เป็นค่าตั้งต้น: วัดจากคลิปจริง 2.35:1 (1280x544) พบว่า crop เก็บความกว้าง
+# ต้นฉบับไว้แค่ 24% — ตัวอักษรเต็มบรรทัด ภาพเทียบซ้าย-ขวา และกริดคลิปย่อย พังหมด
+# (สุ่มดู 12 เฟรม เสียหาย 10) ส่วนต้นฉบับที่เป็น 9:16 อยู่แล้ว สองโหมดให้ผลเท่ากัน
+# เพราะไม่มีส่วนล้นให้ตัดและไม่มีขอบให้เติม
+TIKTOK_FIT_MODES = ("blur", "crop")
+
+
+def _tiktok_video_chain(fit_mode: str):
+    """คืน video_chain ให้ _build_trim_concat_graph — list (crop) หรือ str (blur)"""
+    if fit_mode != "blur":
+        return [
+            f"scale=w={TIKTOK_W}:h={TIKTOK_H}:force_original_aspect_ratio=increase:flags=lanczos",
+            f"crop={TIKTOK_W}:{TIKTOK_H}",
+            "setsar=1",
+        ]
+    # แตกสองสาย: พื้นหลังทำแบบ crop แล้วเบลอ / สายหน้าย่อให้พอดีทั้งเฟรมแล้ววางทับกลาง
+    return (
+        "{IN}split=2[bgsrc][fgsrc];"
+        f"[bgsrc]scale=w={TIKTOK_W}:h={TIKTOK_H}:force_original_aspect_ratio=increase,"
+        f"crop={TIKTOK_W}:{TIKTOK_H},boxblur={BLUR_RADIUS}:{BLUR_PASSES}[bg];"
+        f"[fgsrc]scale=w={TIKTOK_W}:h={TIKTOK_H}:force_original_aspect_ratio=decrease:flags=lanczos[fg];"
+        "[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1{OUT}"
+    )
+
+
 def verify_output_dimensions(video_path: str) -> tuple[int, int, str]:
     """ตรวจ dimensions + SAR ของ output ด้วย ffprobe → log + return"""
     result = subprocess.run(
@@ -377,18 +418,24 @@ def verify_output_dimensions(video_path: str) -> tuple[int, int, str]:
 
 def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_dir,
                         target_length=60, burn_subtitle=True, edited_phrases=None,
-                        denoise=False, tail_pad: float = 0.2):
+                        denoise=False, tail_pad: float = 0.2, fit_mode: str = "blur"):
     """
+    fit_mode = "blur" (ตั้งต้น) เห็นครบทั้งเฟรม เติมขอบด้วยภาพเดิมที่เบลอ
+             = "crop" เต็มจอแบบเดิม ตัดส่วนที่ล้นทิ้ง
+
     TikTok render: ตัดช่วงที่เลือก → center-crop 9:16 (1080x1920) → burn subtitle
     ทำใน filter_complex pass เดียว (frame/sample-accurate, subtitle ตรง timeline output)
     """
     print("\n" + "=" * 50)
-    print(f"🎬 TIKTOK RENDER (target ≤ {target_length}s, subtitle={burn_subtitle})")
+    print(f"🎬 TIKTOK RENDER (fit={fit_mode}, target ≤ {target_length}s, subtitle={burn_subtitle})")
     print("=" * 50 + "\n")
 
     if not keep_segments:
         print("⚠️ No segments to render. Aborted.")
         return None
+
+    if fit_mode not in TIKTOK_FIT_MODES:
+        fit_mode = "blur"
 
     temp_dir = os.path.abspath(os.path.join(job_dir, "tiktok_temp"))
     os.makedirs(temp_dir, exist_ok=True)
@@ -404,12 +451,7 @@ def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_
     if burn_subtitle and (transcript or edited_phrases):
         subs_file = _write_subs(temp_dir, clean_segs, transcript, edited_phrases)
 
-    # scale UP จนเต็ม 1080x1920 แล้ว crop ส่วนล้น (TikTok cover style, ไม่มีขอบดำ)
-    tiktok_chain = [
-        f"scale=w={TIKTOK_W}:h={TIKTOK_H}:force_original_aspect_ratio=increase:flags=lanczos",
-        f"crop={TIKTOK_W}:{TIKTOK_H}",
-        "setsar=1",
-    ]
+    tiktok_chain = _tiktok_video_chain(fit_mode)
 
     if len(bounds) <= FILTERGRAPH_MAX_SEGMENTS:
         try:

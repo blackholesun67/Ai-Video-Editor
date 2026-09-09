@@ -29,6 +29,10 @@ MAX_FILE_SIZE_MB = 2048               # 2GB upload limit
 MAX_PROMPT_LENGTH = 2000               # 2000 chars prompt
 ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v"}
 ALLOWED_OUTPUT_MODES = {"standard", "tiktok"}   # รูปแบบ render (aspect): 16:9 / 9:16
+# วิธีจัดเฟรมตอนแปลงเป็น 9:16 — blur = ย่อให้เห็นครบแล้วเติมขอบเบลอ / crop = เต็มจอ ตัดส่วนล้น
+# ตั้งต้นเป็น blur เพราะคลิปไวด์ (2.35:1) ถ้า crop จะเหลือความกว้างแค่ 24% ข้อความเต็มบรรทัด
+# กับภาพเทียบซ้าย-ขวาหายหมด ; ต้นฉบับที่เป็น 9:16 อยู่แล้วสองโหมดให้ผลเท่ากัน
+ALLOWED_TIKTOK_FIT = {"blur", "crop"}
 # วิธีตัด: full=เก็บเนื้อหาครบ / summary=สรุปให้เข้าใจครบ
 # hook (ไฮไลต์) ปิดไว้ — ผลลัพธ์ยังไม่นิ่งพอ (ดู README) ; โค้ดใน ai_logic ยังอยู่ครบ
 ALLOWED_EDIT_MODES = {"full", "summary"}
@@ -132,6 +136,7 @@ async def upload_video(
     preview_mode: bool = Form(False),
     preset_id: str = Form(""),
     denoise: bool = Form(False),
+    tiktok_fit: str = Form("blur"),
 ):
     # ── Input validation ────────────────────────────────────────────────────
     prompt = (prompt or "").strip()
@@ -158,6 +163,9 @@ async def upload_video(
             status_code=400,
             detail=f"ไฟล์ {ext} ไม่รองรับ (ต้องเป็น {ALLOWED_VIDEO_EXTS})",
         )
+
+    if tiktok_fit not in ALLOWED_TIKTOK_FIT:
+        tiktok_fit = "blur"
 
     print(f"DEBUG: Upload received: file={fname}, edit_mode={edit_mode}, aspect={output_mode}, "
           f"target_length={target_length}s, burn_subtitle={burn_subtitle}, denoise={denoise}")
@@ -191,7 +199,7 @@ async def upload_video(
 
         process_video_task.apply_async(
             args=[job_id, video_path, prompt, output_mode, target_length, burn_subtitle,
-                  preview_mode, preset_id, edit_mode, denoise],
+                  preview_mode, preset_id, edit_mode, denoise, tiktok_fit],
             task_id=job_id,
         )
 
