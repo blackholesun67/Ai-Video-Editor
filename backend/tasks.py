@@ -419,9 +419,11 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
                 final_phrases = generate_phrases_from_transcript(transcript, clean_segs)
                 print(f"📝 Auto-generated {len(final_phrases)} subtitle phrases")
 
+        # ขอบชุดนี้ผู้ใช้เห็นตัวเลขและกดยืนยันมาแล้วจากหน้า preview → ห้ามบวกเผื่อปลาย
+        # ไม่งั้นไฟล์ที่ได้จะยาวกว่าที่หน้าจอบอก 0.2 วิ ต่อหนึ่งช่วง
         _render(video_path, clean_segs, transcript or [], final_output, job_dir,
                 output_mode, target_length, burn_subtitle, edited_phrases=final_phrases,
-                denoise=denoise)
+                denoise=denoise, tail_pad=0.0)
 
         total_keep = sum(s["end"] - s["start"] for s in clean_segs)
         return {
@@ -496,16 +498,20 @@ def _fill_missing_phrases(edited_phrases: list[dict], transcript: list[dict],
 
 def _render(video_path, segments, transcript, final_output, job_dir,
             output_mode, target_length, burn_subtitle, edited_phrases=None,
-            denoise=False):
+            denoise=False, tail_pad: float = 0.2):
+    """
+    tail_pad: เผื่อปลายช่วงกันเสียงขาด (Whisper มักให้ end เร็วกว่าเสียงจริง)
+    ต้องเป็น 0 เมื่อขอบมาจากผู้ใช้ผ่านหน้า preview — ดู _seg_bounds
+    """
     if output_mode == "tiktok":
         render_tiktok_video(
             video_path, segments, transcript, final_output, job_dir,
             target_length=target_length, burn_subtitle=burn_subtitle,
-            edited_phrases=edited_phrases, denoise=denoise,
+            edited_phrases=edited_phrases, denoise=denoise, tail_pad=tail_pad,
         )
     else:
         edit_and_merge_video(
             video_path, segments, final_output, job_dir,
             transcript=transcript, burn_subtitle=burn_subtitle,
-            edited_phrases=edited_phrases, denoise=denoise,
+            edited_phrases=edited_phrases, denoise=denoise, tail_pad=tail_pad,
         )

@@ -126,7 +126,13 @@ def _has_audio(path: str) -> bool:
 def _seg_bounds(segments, max_duration: float = 0.0,
                 tail_pad: float = 0.2) -> list[tuple[float, float]]:
     """clean + clamp segment list → [(start, end)] ที่ใช้ได้จริง เรียงตามเวลา
-    tail_pad: Whisper end timestamp มักจบก่อนเสียงจริง → เผื่อปลายไว้เล็กน้อย"""
+
+    tail_pad: Whisper end timestamp มักจบก่อนเสียงจริง → เผื่อปลายไว้เล็กน้อย
+
+    ⚠️ ต้องส่ง tail_pad=0 เมื่อขอบมาจากผู้ใช้ (ผ่านหน้า preview) เพราะเป็นตำแหน่ง
+    ที่ตั้งใจเลือก ไม่ใช่ค่าประมาณจาก Whisper — ถ้ายังบวกอยู่ ไฟล์ที่ได้จะยาวกว่า
+    ตัวเลขที่หน้าจอบอก 0.2 วิ ต่อหนึ่งช่วง (วัดจริง: 2 ช่วง → +0.38s, 1 ช่วง → +0.23s)
+    """
     out = []
     for s in segments:
         st = round(max(0.0, float(s.get("start", 0) or 0)), 3)
@@ -220,7 +226,7 @@ def _write_subs(temp_dir, highlights, transcript, edited_phrases):
 
 def edit_and_merge_video(video_path, highlights_json, output_path, job_dir,
                           transcript=None, burn_subtitle=False, edited_phrases=None,
-                          denoise=False):
+                          denoise=False, tail_pad: float = 0.2):
     """
     หัวใจหลัก: ตัดวิดีโอตามช่วงที่เลือก + รวมเป็นไฟล์เดียว (มาตรฐาน 16:9)
     burn_subtitle=True → เผา subtitle ลงไปด้วย
@@ -237,7 +243,8 @@ def edit_and_merge_video(video_path, highlights_json, output_path, job_dir,
     temp_dir = os.path.abspath(os.path.join(job_dir, "temp_segments"))
     os.makedirs(temp_dir, exist_ok=True)
 
-    bounds = _seg_bounds(highlights_json, max_duration=_probe_duration(video_path))
+    bounds = _seg_bounds(highlights_json, max_duration=_probe_duration(video_path),
+                         tail_pad=tail_pad)
     if not bounds:
         print("❌ No valid segments after cleanup.")
         return None
@@ -370,7 +377,7 @@ def verify_output_dimensions(video_path: str) -> tuple[int, int, str]:
 
 def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_dir,
                         target_length=60, burn_subtitle=True, edited_phrases=None,
-                        denoise=False):
+                        denoise=False, tail_pad: float = 0.2):
     """
     TikTok render: ตัดช่วงที่เลือก → center-crop 9:16 (1080x1920) → burn subtitle
     ทำใน filter_complex pass เดียว (frame/sample-accurate, subtitle ตรง timeline output)
@@ -386,7 +393,8 @@ def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_
     temp_dir = os.path.abspath(os.path.join(job_dir, "tiktok_temp"))
     os.makedirs(temp_dir, exist_ok=True)
 
-    bounds = _seg_bounds(keep_segments, max_duration=_probe_duration(video_path))
+    bounds = _seg_bounds(keep_segments, max_duration=_probe_duration(video_path),
+                         tail_pad=tail_pad)
     if not bounds:
         print("❌ No valid segments after cleanup.")
         return None
