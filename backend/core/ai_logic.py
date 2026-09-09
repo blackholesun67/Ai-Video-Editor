@@ -975,6 +975,31 @@ def _format_silence_hint(gaps: list[dict], limit: int = 15) -> str:
     )
 
 
+def _slim_for_gemini(transcript: list[dict]) -> list[dict]:
+    """
+    เหลือเฉพาะฟิลด์ที่ Gemini ต้องใช้จริง — start / end / text
+
+    ทำไมสำคัญมาก: transcript แต่ละ segment พก words[] (timestamp ระดับคำ) มาด้วย
+    ซึ่งกินพื้นที่ราว 96% ของ payload ทั้งก้อน แต่พรอมป์ไม่เคยอ้างถึงมันเลย
+    วัดจริงจากงานใน storage:
+        คลิป 11 นาที  321,311 → 11,798 ตัวอักษร  (-96.3%)
+        คลิป  7 นาที  210,037 →  9,229 ตัวอักษร  (-95.6%)
+    payload ที่ใหญ่เกินจำเป็นทำให้ Gemini ตอบช้ามาก (เคยวัดได้ 160 วินาทีต่อ 1 คำขอ)
+    และเพิ่มโอกาสโดน 503 เพราะคำขอใหญ่ถูก throttle ง่ายกว่า
+
+    ⚠️ ห้ามส่ง transcript ดิบเข้าไปตรง ๆ อีก — ฟิลด์ที่เพิ่มทีหลัง (words, avg_logprob,
+    no_speech_prob) จะไหลไปกับ payload โดยไม่มีใครสังเกต
+    """
+    return [
+        {
+            "start": round(float(s.get("start", 0) or 0), 2),
+            "end": round(float(s.get("end", 0) or 0), 2),
+            "text": (s.get("text") or "").strip(),
+        }
+        for s in transcript
+    ]
+
+
 def invert_segments(keep_segments: list[dict], total_duration: float) -> list[dict]:
     """
     แปลง "ช่วงที่ควรลบ" → "ช่วงที่ควรเก็บ"
@@ -1959,7 +1984,7 @@ def analyze_video_content(
     )
 
     # ── Step 3: Gemini วิเคราะห์ transcript ──────────────────────────────────
-    ai_json_data = json.dumps(filtered_transcript, ensure_ascii=False)
+    ai_json_data = json.dumps(_slim_for_gemini(filtered_transcript), ensure_ascii=False)
 
     # Size guard — ปิดโดย default (MAX_TRANSCRIPT_CHARS=0). เปิดได้ผ่าน env ถ้าต้องการ
     if MAX_TRANSCRIPT_CHARS and len(ai_json_data) > MAX_TRANSCRIPT_CHARS:
@@ -1970,7 +1995,9 @@ def analyze_video_content(
 
     # Debug log — พิมพ์เนื้อหา transcript เฉพาะเมื่อ DEBUG=1 (กันเนื้อหาผู้ใช้รั่วลง production log)
     if DEBUG:
-        debug_json = json.dumps(filtered_transcript, ensure_ascii=False, indent=2)
+        # ใช้ตัวที่ส่งจริง ไม่ใช่ transcript ดิบ — debug ต้องสะท้อนสิ่งที่ Gemini เห็นจริง
+        debug_json = json.dumps(_slim_for_gemini(filtered_transcript),
+                                ensure_ascii=False, indent=2)
         print(f"\n--- [DEBUG] Filtered Transcript ({len(filtered_transcript)} segments) ---")
         print(debug_json[:2000] + ("..." if len(debug_json) > 2000 else ""))
         print("----------------------------------------------------------------------\n")
