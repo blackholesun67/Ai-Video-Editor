@@ -2,7 +2,7 @@
 
 # 🎬 AI Video Smart Editor
 
-**Automated video editor powered by Whisper + Gemini · GPU-accelerated · Thai/English bilingual**
+**Automated video editor powered by Whisper + Gemini · วิเคราะห์ทั้งภาพและเสียง · GPU-accelerated · Thai/English bilingual**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
@@ -11,7 +11,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.4-76B900.svg)](https://developer.nvidia.com/cuda-zone)
 
-อัปโหลดวิดีโอ → AI ฟัง+เข้าใจเนื้อหา → ตัดเฉพาะส่วนสำคัญ → ได้วิดีโอที่กระชับขึ้น พร้อม subtitle อัตโนมัติ
+อัปโหลดวิดีโอ → AI **ฟังเสียงและดูภาพ** → ตัดเฉพาะส่วนสำคัญ → ตรวจ/แก้เองได้ก่อนตัดจริง → ได้วิดีโอที่กระชับขึ้น พร้อม subtitle อัตโนมัติ
 
 </div>
 
@@ -20,20 +20,25 @@
 ## ✨ Features
 
 ### Core
-- 🎯 **9 Preset modes** — ตัดความเงียบ / สาระสำคัญ / Podcast / Tutorial / Meeting / Gaming / TikTok / Custom
-- 🎬 **2 Output formats** — Standard 16:9 และ TikTok/Reels 9:16 vertical
+- 🎯 **2 โหมดตัด** — `full` (คลีนนิ่ง ไม่ตัดเนื้อหา) / `summary` (สรุปให้เข้าใจครบ)
+- 🎬 **2 Output formats** — Standard 16:9 และ TikTok/Reels 9:16 (เลือกได้ว่าจะ **เห็นครบ** หรือ **เต็มจอ**)
+- 👁️ **วิเคราะห์ภาพ** — ตรวจฉากเปลี่ยน/จอดำ/ภาพค้าง + **ส่งคีย์เฟรมให้ Gemini ดู** ตอนตัดสินใจตัด
 - 📝 **Subtitle อัตโนมัติ** — PyThaiNLP word tokenizer + smart sentence boundary
 - 🇹🇭 **Bilingual support** — Thai-native + English embedded → auto-translate
 - ⚡ **GPU Acceleration** — CUDA + Whisper float16 + BatchedInferencePipeline
 - 🛡️ **Multi API Key fallback** — auto-switch เมื่อ quota หมด
 
 ### Advanced
-- 👁️ **Preview Mode** — ดู AI วิเคราะห์ + เลือก/ยกเลิก segments ก่อน render
-- ✏️ **Subtitle Editor** — แก้ subtitle ทีละบรรทัดในเบราว์เซอร์ก่อน burn-in
+- 🎛️ **Preview แบบแก้ได้จริง** — เห็นช่วงที่ AI ตัดออกและกดเอากลับได้ · ขยับขอบทีละ 1 วิ–1 นาที ·
+  **แยก/รวมช่วง** เองเพื่อทำไฮไลต์ · แถบไทม์ไลน์พร้อมขีดจุดฉากเปลี่ยน
+- ✏️ **Subtitle Editor** — แก้ subtitle ทีละบรรทัด **เฉพาะช่วงที่เลือกไว้จริง** ก่อน burn-in
+- 🩹 **ซ่อมท่อนที่ Whisper หลอน** — Pass 3 ตรวจ repetition loop แล้วถอดเสียงใหม่ กู้เนื้อหาที่หายกลับมา
 - 🤖 **AI Post-correction** — Gemini แก้ชื่อเฉพาะ + แปลประโยค English ↔ Thai
 - 🎙️ **Topic-aware Whisper** — initial_prompt ตาม preset ช่วยให้ accuracy +10-15%
 - 🔧 **Whisper Gap-fill** — Pass 2 รับฟัง English embedded ที่ Pass 1 ข้าม
 - 💾 **Audio hash cache** — re-upload วิดีโอเดิม = instant result (<10s)
+- 🛠️ **Guard เชิงโครงสร้าง** — ตรวจว่าประเด็นหลักไม่หาย / ขอบตัดจบประโยค / คลิปไม่จบห้วน
+  (ไม่พึ่งคำสั่งในพรอมป์อย่างเดียว — ดู [CLAUDE.md](CLAUDE.md))
 
 ---
 
@@ -71,11 +76,15 @@
 │  ┌───────────────────────────────────────────────┐  │
 │  │ 1. extract_clean_audio (FFmpeg + loudnorm)    │  │
 │  │ 2. VAD (Silero) — detect voice activity       │  │
+│  │ 2b. Visual signals (ฉากเปลี่ยน/จอดำ/ภาพค้าง)   │  │
 │  │ 3. Whisper Pass 1 (BatchedInferencePipeline)  │  │
 │  │ 4. Whisper Pass 2 (gap-fill English embed)    │  │
+│  │ 4b. Whisper Pass 3 (ซ่อมท่อนที่หลอน)          │  │
 │  │ 5. AI Correction + Deletion (parallel)        │  │
-│  │ 6. Phrase generation (sentence-aware)         │  │
-│  │ 7. FFmpeg render (cut + concat + burn-in SRT) │  │
+│  │    Deletion เห็นทั้ง transcript และคีย์เฟรม    │  │
+│  │ 6. Guard 4 ชั้น (outline/outro/snap/จบประโยค) │  │
+│  │ 7. Phrase generation (sentence-aware)         │  │
+│  │ 8. FFmpeg render (cut + concat + burn-in SRT) │  │
 │  └───────────────────────────────────────────────┘  │
 └─────┬───────────────────────────────┬───────────────┘
       │                               │
@@ -95,6 +104,7 @@
 | **Transcription** | faster-whisper 1.2 (BatchedInference) |
 | **AI Analysis** | Google Gemini 2.5/2.0/3-flash |
 | **Audio** | Silero VAD + FFmpeg afftdn + loudnorm |
+| **Visual** | FFmpeg scdet / blackdetect / freezedetect + คีย์เฟรมส่งเข้า Gemini |
 | **Video** | FFmpeg libx264 + ASS subtitle burn-in |
 | **Thai NLP** | PyThaiNLP newmm tokenizer |
 | **GPU** | NVIDIA CUDA 12.4 + PyTorch + float16 |
@@ -165,25 +175,25 @@ docker compose up -d --build
 
 ## 📖 Usage
 
-### Standard Cut Mode
-
-1. Upload วิดีโอ (.mp4, .mov, .mkv) ขนาด ≤ 2GB
-2. กรอก prompt เช่น `"เก็บประเด็นสำคัญ ตัด filler"`
-3. เลือก preset (Podcast / Tutorial / Meeting / etc.)
-4. ☑ **Preview Mode** (แนะนำ — ตรวจก่อน render)
-5. ☑ **ใส่ subtitle อัตโนมัติ**
-6. กด **Submit**
-7. รอ ~5-7 นาที (วิดีโอ 10-20 นาที)
-8. **Preview** → เลือก segments
-9. **Edit Subtitle** → แก้คำที่ผิด (optional)
+1. **Upload** วิดีโอ (.mp4, .mov, .mkv) ขนาด ≤ 2GB
+2. **เลือกโหมดตัด** — `เก็บเนื้อหาครบ` (คลีนนิ่ง) หรือ `สรุปให้เข้าใจครบ`
+3. **เลือกสัดส่วน** — แนวนอน 16:9 หรือ แนวตั้ง 9:16
+   (ถ้าเลือกแนวตั้ง จะมีให้เลือกอีกว่า **เห็นครบ** หรือ **เต็มจอ** — ดู [`tiktok_fit`](#การแปลงเป็น-916-tiktok_fit))
+4. **เลือกหัวข้อคลิป** (ไม่บังคับ) — ไพรม์คำศัพท์ให้ Whisper ถอดเสียงแม่นขึ้น
+   `วิดีโอสอน` / `พอดแคสต์` / `รีวิวสินค้า` / `Vlog`
+5. **บอก AI เพิ่ม** ในช่องข้อความได้ เช่น `"เก็บช่วงที่พูดถึงราคา"` (ไม่บังคับ)
+6. ☑ **Preview Mode** (แนะนำมาก — ตรวจและแก้เองก่อน render) · ☑ **ใส่ subtitle อัตโนมัติ**
+7. กด **Submit** → รอ ~5-7 นาที (วิดีโอ 10-20 นาที)
+8. **หน้า Preview** — ตรงนี้คือหัวใจ
+   - ติ๊ก/ติ๊กออกทีละช่วง · ช่วงที่ AI ตัดออกก็กดเอากลับมาได้
+   - **ขยับขอบ** ทีละ 1 วิ / 5 วิ / 15 วิ / 1 นาที พร้อมเล่นให้ฟังรอยตัด
+   - **แยกช่วง** ตรงตำแหน่งที่เล่นอยู่ แล้ว **รวมกลับ** ได้ถ้าเปลี่ยนใจ
+   - แถบไทม์ไลน์มีขีดบอกจุดฉากเปลี่ยน กดปุ่ม `‹ ฉาก ›` กระโดดไปให้ตรงจุด
+9. **Edit Subtitle** — แก้คำที่ผิด (เห็นเฉพาะบรรทัดของช่วงที่เลือกไว้จริง)
 10. **Render** → ดาวน์โหลด
 
-### TikTok / Reels Mode
-
-1. เลือก preset **🔥 TikTok/Reels**
-2. กำหนด `target_length` (30s / 60s / 90s)
-3. AI จะเลือก best moments + crop 9:16
-4. Subtitle ขนาดใหญ่ TikTok-style
+> **ทำไฮไลต์สั้น ๆ:** ที่หน้า Preview กด `ล้าง` → เลื่อนวิดีโอไปจุดที่ชอบ → `แยกตรงนี้` สองครั้ง
+> → ติ๊กเฉพาะช่วงตรงกลาง
 
 ---
 
@@ -215,15 +225,51 @@ docker compose up -d --build
 | `OUTRO_MAX_RESTORE` | `90.0` | เพดานความยาวที่ยอมคืนกลับตอนท้าย (วินาที) |
 | `SENTENCE_PAUSE` | `0.45` | ช่องว่างระหว่างท่อนถอดเสียงที่ยังถือว่า "พูดต่อเนื่อง" — ใช้ยืดขอบตัดให้จบประโยคจริง (↑ = ยืดไกลขึ้น, เสี่ยงเก็บเกิน) |
 | `SNAP_MAX_EXTEND` | `6.0` | เพดานการยืดขอบตัดต่อด้าน (วินาที) กันกรณีพูดรัวไม่หยุด |
-| `SNAP_MAX_SENTENCE` | `25.0` | ท่อนถอดเสียงที่ยาวเกินค่านี้ ไม่กลืนทั้งก้อน แต่ใช้ขอบคำแทน (Whisper บางทีให้ท่อนยาวเป็นนาที) |
+| `SNAP_MAX_SENTENCE` | เท่ากับ `SNAP_MAX_EXTEND` (`6.0`) | เพดานการ "กลืนท่อนถอดเสียงให้จบ" — เกินกว่านี้ใช้ขอบคำแทน ; เดิมตั้ง 25 บนสมมติฐานว่า 1 ท่อน ≈ 1 ประโยค แต่วัดจริงแล้วไม่จริง (p75 = 11.3 วิ) จนลาก filler กลับมา 14.5 วิ |
 | `SNAP_MAX_THOUGHT` | `12.0` | เพดานการยืดต่อเมื่อท่อนลงท้ายด้วยคำเชื่อมที่ยังไม่เฉลย ("...ปรากฏว่า") — ข้ามการเว้นจังหวะก่อนเฉลยได้ |
 | `THOUGHT_GRACE` | `0` (ปิด) | ยืดเพิ่ม 1 ท่อนเมื่อท่อนถัดไปเริ่มเร็วกว่าค่านี้ แม้ไม่มีคำเชื่อมให้จับ — **ปิดไว้โดยตั้งใจ** เพราะเปิดแล้วมันยิงที่เกือบทุกรอยตัด แล้วดึงประโยคแรกของช่วงที่ถูกลบเข้ามา ทำให้เนื้อหากระโดดทั้งคลิป |
 | `LAST_SENTENCE_MAX_EXTEND` | `20.0` | เพดานการยืด **ช่วงสุดท้ายของคลิป** ให้พูดจบประโยค (กว้างกว่าจุดอื่นโดยตั้งใจ — คลิปจบกลางประโยคดูเหมือนไฟล์เสีย) |
 | `HOOK_LENGTH_TOLERANCE` | `0.3` | โหมด `hook`: ยอมให้ผลรวมเกิน `target_length` ได้กี่เท่า (`0.3` = +30% ; hard cap = +60% เฉพาะตอนเติมให้ครบ 2 ช่วง) |
 | `HOOK_MAX_SEGMENTS` | `5` | โหมด `hook`: จำนวนช่วงสูงสุด |
-| `SENTENCE_END_MIN_GAP` | `0.55` | โหมด `hook`: ช่องว่างระหว่างท่อนถอดเสียง ≥ ค่านี้ = จุดจบประโยค (ใช้ snap ขอบช่วง) |
+| `SENTENCE_END_MIN_GAP` | `0.35` | โหมด `hook`: ช่องว่างระหว่างท่อนถอดเสียง ≥ ค่านี้ = จุดจบประโยค (ใช้ snap ขอบช่วง) |
 | `SENTENCE_SNAP_FWD` | `10.0` | โหมด `hook`: มองไปข้างหน้าจากขอบที่ AI เลือกกี่วินาที เพื่อหาจุดจบประโยคจริง (กันประโยคขาด) |
-| `TRANSCRIPT_CACHE_DIR` | `/app/transcript_cache` | Audio hash → transcript cache |
+| `TRANSCRIPT_CACHE_DIR` | `/app/transcript_cache` | Audio hash → transcript cache (ชื่อไฟล์มี version — bump เมื่อแก้ตรรกะที่กระทบ transcript) |
+
+#### ซ่อมท่อนที่ Whisper หลอน (Pass 3)
+
+Whisper ติด repetition loop ได้เมื่อเสียงฟังยาก — พ่นคำเดิมซ้ำเป็นร้อยรอบแล้วเนื้อหาจริงหาย
+เกณฑ์ทั้งหมดวัดจาก transcript จริง 3,073 segment
+
+| Variable | Default | Description |
+|---|---|---|
+| `HALLUC_LOOP_RATIO` | `0.70` | สัดส่วนที่หน่วยเดิมซ้ำติดกัน ≥ 3 รอบ เกินค่านี้ = วนลูป (เนื้อหาจริงสูงสุดที่วัดได้ 0.61) |
+| `HALLUC_MAX_CPS` | `2.0` | ตัวอักษร/วินาที ต่ำกว่านี้บนท่อนยาว = ผิดปกติ (ค่ากลางของจริง 13.7) |
+| `HALLUC_MIN_DUR` | `5.0` | ท่อนสั้นกว่านี้ไม่ตัดสินด้วย cps (คนเว้นจังหวะกลางประโยคเป็นเรื่องปกติ) |
+| `HALLUC_MIN_LOGPROB` | `-2.0` | `avg_logprob` ของผลถอดใหม่ต่ำกว่านี้ = เดามั่ว ไม่รับ (อ่านไม่ออก -2.5 / ได้ใจความ -1.4) |
+
+#### วิเคราะห์ภาพ
+
+| Variable | Default | Description |
+|---|---|---|
+| `VISUAL_CONTEXT` | `1` | ส่งคีย์เฟรมให้ Gemini ดูตอนตัดสินใจตัด — `0` = ปิด กลับไปวิเคราะห์จากเสียงล้วน |
+| `VISUAL_SCENE_THRESHOLD` | `15.0` | เกณฑ์ `scdet` สำหรับจุดฉากเปลี่ยน (score ของ scdet เทียบข้ามคลิปไม่ได้ แต่จำนวนจุดที่ 10–20 เทียบได้) |
+| `VISUAL_SCENE_MIN_GAP` | `0.5` | จุดที่ห่างกันน้อยกว่านี้นับเป็นจุดเดียว (fade/dissolve ยิงติดกันหลายเฟรม) |
+| `VISUAL_BLACK_MIN_DUR` | `0.3` | ความยาวขั้นต่ำของช่วงจอดำ (กรองแฟลชสั้น ๆ ทิ้ง) |
+| `VISUAL_FREEZE_MIN_DUR` | `2.0` | ความยาวขั้นต่ำของภาพค้าง — ค่ายอดนิยม 0.5 หลวมเกิน (คลิปพูดหน้ากล้องได้ 29 ครั้งใน 7 นาที) |
+| `VISUAL_WIDTH` | `320` | ย่อภาพก่อนวิเคราะห์ (คลิป 7–11 นาทีใช้ ~14 วินาที) |
+| `VISUAL_TIMEOUT` | `900` | เกินนี้ยอมไม่มีสัญญาณภาพ ดีกว่าให้ทั้งงานค้าง |
+| `KEYFRAME_MAX` | `20` | จำนวนภาพสูงสุดที่ส่งให้ Gemini ต่อคลิป (~258 โทเคน/ภาพ) |
+| `KEYFRAME_WIDTH` | `512` | ความกว้างของภาพที่ส่ง |
+| `KEYFRAME_QUALITY` | `7` | คุณภาพ mjpeg (2 ดีสุด – 31 แย่สุด) |
+| `KEYFRAME_LEAD` | `0.5` | ขยับออกจากรอยต่อฉากกี่วินาที (เฟรมตรงรอยต่อมักเป็นภาพกลาง transition) |
+| `KEYFRAME_MIN_GAP` | `3.0` | จุดที่ห่างกันน้อยกว่านี้ถือว่าเป็นภาพเดียวกัน |
+
+#### Render 9:16
+
+| Variable | Default | Description |
+|---|---|---|
+| `TIKTOK_BLUR_RADIUS` | `40` | ความแรงการเบลอพื้นหลังในโหมด "เห็นครบ" |
+| `TIKTOK_BLUR_PASSES` | `4` | จำนวนรอบการเบลอ |
 
 ### Tuning Performance
 
@@ -242,6 +288,18 @@ docker compose up -d --build
 |---|---|---|
 | `full` เก็บเนื้อหาครบ | คลีนนิ่ง — ตัดแค่ช่วงเงียบ / ติดขัด / ปัญหาเทคนิค **ไม่ตัดเนื้อหา** (การตัดสินใจเชิงเนื้อหาเป็นงานของคนตัดต่อ) | ≈ ต้นฉบับ − ส่วนน้ำ |
 | `summary` สรุปให้เข้าใจครบ | Deletion แบบตัดหนัก — เก็บทุกประเด็นหลัก + context ให้ดูแทนคลิปเต็มได้ **AI ประเมินความยาวเอง** | ปกติ 10–40% ของต้นฉบับ ตามความแน่นของเนื้อหา |
+
+### การแปลงเป็น 9:16 (`tiktok_fit`)
+
+เลือกที่หน้าอัปโหลด มีผลเฉพาะเมื่อ**ต้นฉบับกว้างกว่า 9:16** (ต้นฉบับที่เป็นแนวตั้งอยู่แล้วสองโหมดให้ผลเท่ากัน)
+
+| โหมด | ทำอะไร | เหมาะกับ |
+|---|---|---|
+| `blur` **เห็นครบ** (ค่าตั้งต้น) | ย่อทั้งเฟรมให้เห็นครบ แล้วเติมขอบด้วยภาพเดิมที่เบลอ | คลิปที่มีข้อความบนจอ ภาพเทียบซ้าย-ขวา กริดคลิปย่อย |
+| `crop` **เต็มจอ** | ขยายจนเต็มจอแล้วตัดส่วนล้นทิ้ง | คลิปที่ subject อยู่กลางเฟรมตลอด |
+
+วัดจากคลิปจริง 2.35:1 (1280×544): `crop` เก็บความกว้างต้นฉบับไว้แค่ **24%** — สุ่มดู 12 เฟรม
+เสียหาย 10 (ข้อความเต็มบรรทัด 5 · ภาพเทียบซ้าย-ขวา 3 · กริด/b-roll 2) จึงตั้ง `blur` เป็นค่าตั้งต้น
 
 `aspect` (16:9 / 9:16) แยกจาก `edit_mode` — ใช้กับโหมดไหนก็ได้
 client เก่าที่ส่ง `edit_mode=short` หรือ `hook` → map เป็น `summary`
@@ -281,7 +339,8 @@ ai-video-editor/
 │   │   ├── ai_logic.py        # Whisper + Gemini + cache + parallel calls
 │   │   ├── ffmpeg_utils.py    # Audio extract + cut + concat + burn subtitle
 │   │   ├── srt_utils.py       # SRT generation + phrase splitting + lead time
-│   │   └── vad_logic.py       # Silero VAD wrapper
+│   │   ├── vad_logic.py       # Silero VAD wrapper
+│   │   └── visual_logic.py    # สัญญาณจากภาพ + ดึงคีย์เฟรมให้ Gemini
 │   ├── main.py                # FastAPI app (endpoints)
 │   ├── tasks.py               # Celery tasks (process_video + render_only)
 │   ├── requirements.txt
@@ -294,11 +353,16 @@ ai-video-editor/
 │   │   │   ├── UploadScreen.jsx
 │   │   │   ├── Processing.jsx
 │   │   │   ├── PreviewScreen.jsx
+│   │   │   ├── SegmentRow.jsx        # แถวช่วง (ติ๊ก/ขยับขอบ/แยก/รวม)
+│   │   │   ├── TimelineStrip.jsx     # แถบไทม์ไลน์ + ขีดฉากเปลี่ยน
+│   │   │   ├── useTimelineRows.js    # โมเดลแถวทั้งหมด (pure, เทสต์ได้)
+│   │   │   ├── time.js               # formatter เวลาที่ใช้ร่วมกัน
 │   │   │   └── SubtitleEditScreen.jsx
 │   │   └── config.js
 │   ├── package.json
 │   └── Dockerfile
-└── docker-compose.yml          # 4 services (frontend / backend / worker / redis)
+├── docker-compose.yml          # 4 services (frontend / backend / worker / redis)
+└── CLAUDE.md                   # กฎที่ห้ามพัง + กับดักที่เคยเจอ (อ่านก่อนแก้โค้ด)
 ```
 
 ---
@@ -310,7 +374,17 @@ ai-video-editor/
 - **BatchedInferencePipeline** → 3-4x faster (parallel chunks)
 - **Topic-aware initial_prompt** → +10-15% accuracy
 - **Pass 2 gap-fill** → catch English embedded ที่ Pass 1 ข้าม
+- **Pass 3 ซ่อมท่อนที่หลอน** → ตรวจ repetition loop (คำเดิมซ้ำติดกัน / ตัวอักษรต่อวินาทีต่ำผิดปกติ)
+  แล้วถอดเสียงช่วงนั้นใหม่ด้วยค่าที่ทนกว่า — รับผลใหม่เมื่อ `avg_logprob` ผ่านเกณฑ์ ไม่งั้นทิ้งท่อนนั้น
+  (ไม่มีข้อมูลดีกว่ามีข้อมูลผิด เพราะข้อความหลอนจะไปหลอกทั้ง Gemini และการสร้างซับ)
 - **Audio hash cache** → instant repeat for same audio
+
+### Visual Analysis
+- **ffmpeg pass เดียว** ย่อ 320px → จุดฉากเปลี่ยน (`scdet`) / จอดำ (`blackdetect`) / ภาพค้าง (`freezedetect`)
+- จุดฉากเปลี่ยนแสดงเป็นขีดบนไทม์ไลน์หน้า preview + ปุ่ม `‹ ฉาก ›` กระโดดไปให้ตรงจุด
+  (**ไม่ทำเป็น guard อัตโนมัติ** — มันจะยิงที่เกือบทุกรอยตัดแล้วทำให้เนื้อหากระโดด)
+- คีย์เฟรมจาก `scene_cuts` + จุดกระจายทั่วคลิป ส่งเข้า Gemini พร้อม transcript ตอนตัดสินใจตัด
+  → เห็นการ์ดปิดท้าย / สไลด์ที่กำลังอธิบาย / ภาพเสีย ซึ่ง transcript บอกไม่ได้
 
 ### AI Correction (Gemini)
 - แก้ชื่อเฉพาะ (Andrew Huberman, Python, React)
@@ -318,6 +392,8 @@ ai-video-editor/
 - คงชื่อเฉพาะเป็นอังกฤษ
 - Parallel chunks ระหว่าง API keys (2x speedup)
 - Auto-skip ถ้า transcript เป็นไทยล้วน
+- payload ที่ส่งเหลือแค่ `start`/`end`/`text` — เดิมพก `words[]` ไปด้วยซึ่งกิน **96%** ของขนาด
+  (คลิป 11 นาที 321,311 → 11,798 ตัวอักษร) ทำให้ Gemini ตอบช้าและโดน 503 บ่อย
 
 ### Sentence Boundary
 - PyThaiNLP word tokenization (Thai)
@@ -361,15 +437,24 @@ docker compose down -v
 ## 🧪 Testing
 
 ```bash
-# Inside worker container — run core integration test
+# Backend — integration test (เป็นสคริปต์ ไม่ใช่ pytest)
+# ⚠️ ใช้ Gemini API จริงและ render จริง ช้าและเปลืองโควตา ไม่เหมาะกับการรันบ่อย
 docker compose exec worker python test_core.py
+
+# Frontend — ตรรกะไทม์ไลน์เป็น pure function ทั้งหมด เช็ก compile ด้วย esbuild ได้
+cd frontend && npx esbuild src/components/<file>.jsx --loader:.jsx=jsx --bundle --outfile=/dev/null
 ```
+
+**ตั้งค่า threshold ใหม่ให้วัดจากข้อมูลจริงก่อนเสมอ** — `backend/storage/*/preview.json`
+มี transcript จริงหลายพัน segment ให้หาค่า percentile (ดู [CLAUDE.md](CLAUDE.md) กฎข้อ 3)
 
 ---
 
 ## 🛣️ Roadmap
 
 ### Planned
+- [ ] **Face-aware crop** สำหรับ 9:16 — เป็นตัวเลือกที่ 3 เพิ่มจาก เห็นครบ/เต็มจอ
+      (วัดแล้วยังไม่คุ้มเป็นตัวหลัก เหมาะเฉพาะคลิปพูดหน้ากล้องที่ถ่ายไวด์ — แผนละเอียดใน [CLAUDE.md](CLAUDE.md) §6.1)
 - [ ] Multi-language subtitle (Thai-only / English-only / Bilingual)
 - [ ] Subtitle-only mode (ไม่ตัด — แค่ใส่ subtitle)
 - [ ] Custom dictionary (user-provided proper nouns)
@@ -379,14 +464,17 @@ docker compose exec worker python test_core.py
 ### Done ✅
 - [x] BatchedInferencePipeline (Whisper 3-4x)
 - [x] Audio hash cache
-- [x] Parallel Gemini calls
+- [x] Parallel Gemini calls · payload เล็กลง 96% (เลิกส่ง `words[]`)
 - [x] Pipeline parallelism
 - [x] Whisper gap-fill Pass 2
+- [x] **Whisper Pass 3** — ตรวจ repetition loop แล้วถอดเสียงใหม่
 - [x] AI auto-translate English embedded
-- [x] Subtitle editor UI
+- [x] Subtitle editor UI — อิงช่วงที่เลือกจริง
 - [x] Sentence boundary improvements
 - [x] Subtitle lead time
-- [x] Preview mode
+- [x] Preview mode — เอาช่วงที่ AI ตัดกลับมา / ขยับขอบ / **แยก-รวมช่วง**
+- [x] **วิเคราะห์ภาพ** — ฉากเปลี่ยน/จอดำ/ภาพค้าง + ส่งคีย์เฟรมให้ Gemini
+- [x] **9:16 เลือกได้** — เห็นครบ (เบลอขอบ) / เต็มจอ (crop)
 
 ---
 
