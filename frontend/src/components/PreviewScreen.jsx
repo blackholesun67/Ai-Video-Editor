@@ -241,6 +241,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         rows={rows}
         duration={duration}
         onSplit={handleSplit}
+        visual={preview?.visual}
       />
 
       {/* แถบเดียว: สรุป + ตัวกรอง + ปุ่มจัดการ (เดิมเป็น 3 กล่องซ้อนกัน) */}

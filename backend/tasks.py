@@ -9,6 +9,7 @@ from celery.exceptions import Ignore
 from core.ffmpeg_utils import extract_clean_audio, edit_and_merge_video, render_tiktok_video
 from core.ai_logic import analyze_video_content
 from core.vad_logic import get_voice_activity
+from core.visual_logic import get_visual_signals
 from core.srt_utils import generate_phrases_from_transcript, remap_edited_phrases
 from observability import init_sentry
 from celery.signals import worker_init
@@ -224,6 +225,16 @@ def process_video_task(self, job_id, video_path, user_prompt,
             print(f"⚠️ VAD failed ({vad_err}), falling back")
             voice_segments = None
 
+        # ── Step 2b: สัญญาณจากภาพ ─────────────────────────────────────────────
+        # อ่านจากไฟล์วิดีโอ (ไม่ใช่ไฟล์เสียง) — เป็นข้อมูลที่หาจากเสียงไม่ได้เลย
+        # คลิป 7-11 นาทีใช้ราว 14 วินาที ; get_visual_signals ไม่โยน exception อยู่แล้ว
+        # แต่ครอบไว้อีกชั้นเพราะสัญญาณภาพเป็นของเสริม ห้ามทำให้ทั้งงานล้ม
+        try:
+            visual = get_visual_signals(video_path)
+        except Exception as vis_err:
+            print(f"⚠️ วิเคราะห์ภาพไม่สำเร็จ ({vis_err}) — ทำงานต่อโดยไม่มีสัญญาณภาพ")
+            visual = {"scene_cuts": [], "black": [], "freeze": []}
+
         # ── Step 3: Whisper + Gemini ──────────────────────────────────────────
         _ckpt(job_id)
         self.update_state(state='PROGRESS', meta={
@@ -276,6 +287,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
             "transcript": transcript,           # ← reuse ตอน render / re-edit (ไม่ถอดเสียงซ้ำ)
             "subtitle_phrases": phrases,        # ← phrases ที่ user แก้ได้
             "selected_segments": ai_result,     # ← selection เริ่มต้น = ช่วงที่ AI เลือก
+            "visual": visual,                   # ← ขีดฉากเปลี่ยน/เฟรมดำ ให้หน้า preview วาด
             "total_keep_seconds": round(total_keep, 1),
         })
 
