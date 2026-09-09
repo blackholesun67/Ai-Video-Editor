@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Check, X, Play, Scissors, Minus, Plus, SplitSquareHorizontal, SlidersHorizontal,
+  Check, X, Play, Scissors, Minus, Plus, SplitSquareHorizontal, SlidersHorizontal, RotateCcw,
 } from 'lucide-react';
 import { formatClock, formatLength, formatStep } from './time';
 
@@ -46,6 +46,7 @@ function NudgeGroup({ label, step, onNudge }) {
  */
 export default function SegmentRow({
   row, isActive, isNew, canPreview, step, onStepChange, onToggle, onPreview, onNudge,
+  canMerge, onMerge,
 }) {
   const [open, setOpen] = useState(false);
   const { kind, start, end, on, text, role, reason, origStart, origEnd, split } = row;
@@ -96,9 +97,11 @@ export default function SegmentRow({
             {!isCut && role && (
               <span className={`${CHIP} bg-indigo-50 text-indigo-600`}>{ROLE_LABEL[role] || role}</span>
             )}
+            {/* ครอบทั้งการแยกและการรวม — ทั้งคู่คือการแก้โครงของช่วงด้วยมือ
+                ถ้าเขียนว่า "แยกเอง" อย่างเดียว ชิปจะค้างผิดหลังผู้ใช้รวมกลับ */}
             {split && (
               <span className={`${CHIP} inline-flex items-center gap-1 bg-slate-100 text-slate-600`}>
-                <SplitSquareHorizontal className="h-2.5 w-2.5" /> แยกเอง
+                <SplitSquareHorizontal className="h-2.5 w-2.5" /> แก้ช่วงเอง
               </span>
             )}
             {edited && <span className={`${CHIP} bg-amber-100 text-amber-700`}>ปรับเวลาแล้ว</span>}
@@ -108,6 +111,15 @@ export default function SegmentRow({
                 <button type="button" title="เล่นเฉพาะช่วงนี้" className={iconBtn(isActive)}
                         onClick={(e) => { e.stopPropagation(); onPreview(); }}>
                   <Play className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {/* ใช้ RotateCcw ไม่ใช่ไอคอนชื่อ Merge เพราะ lucide เวอร์ชันที่ pin ไว้ยังไม่ยืนยันว่ามี
+                  และความหมาย "ย้อนการแยก" ก็ตรงกับสิ่งที่ปุ่มนี้ทำจริงมากกว่า */}
+              {canMerge && (
+                <button type="button" title="รวมกับช่วงถัดไป (ยกเลิกการแยก)"
+                        className={iconBtn(false)}
+                        onClick={(e) => { e.stopPropagation(); onMerge(); }}>
+                  <RotateCcw className="h-3.5 w-3.5" />
                 </button>
               )}
               <button type="button" title="ปรับเวลาหัว-ท้ายช่วงนี้" className={iconBtn(open)}

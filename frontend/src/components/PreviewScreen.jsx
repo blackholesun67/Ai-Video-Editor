@@ -4,7 +4,7 @@ import {
   X, Eye, Play, Loader2, AlertTriangle, RotateCcw,
 } from 'lucide-react';
 import { API_URL, PREVIEW_ROWS_KEY } from '../config';
-import useTimelineRows, { toRenderSegments } from './useTimelineRows';
+import useTimelineRows, { toRenderSegments, describeMerge } from './useTimelineRows';
 import SegmentRow from './SegmentRow';
 import TimelineStrip from './TimelineStrip';
 import { formatLength } from './time';
@@ -34,7 +34,8 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   const flashRef = useRef(null);
 
   const {
-    rows, duration, stats, dirty, toggle, setAll, resetToAI, nudge, splitAt, applyVideoDuration,
+    rows, duration, stats, dirty, toggle, setAll, resetToAI, nudge, splitAt, mergeWithNext,
+    applyVideoDuration,
   } = useTimelineRows(preview, jobId, PREVIEW_ROWS_KEY);
 
   // Load preview data
@@ -136,6 +137,20 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         v.play().catch(() => {});
       } catch { /* ignore */ }
     }, 400);
+  };
+
+  /**
+   * รวมแถวกับแถวถัดไป — ตัวกลับของการแยก
+   * ถ้ากำลังเล่นแถวขวาที่ถูกกลืนหายไป ให้ย้าย activeId มาที่แถวผลลัพธ์
+   * ไม่งั้นไฮไลต์ค้างบนแถวที่ไม่มีอยู่แล้ว และ playEndRef จะไม่ถูกอัปเดตตาม
+   */
+  const handleMerge = (row) => {
+    const res = mergeWithNext(row.id);
+    if (!res.ok) return;
+    if (activeId === res.next.id) setActiveId(row.id);
+    setFlashIds([row.id]);
+    clearTimeout(flashRef.current);
+    flashRef.current = setTimeout(() => setFlashIds([]), 1500);
   };
 
   /** แยกช่วงตรงตำแหน่งที่เล่นอยู่ แล้วเลื่อนไปหาครึ่งขวาให้เห็น */
@@ -312,6 +327,8 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             onToggle={() => toggle(row.id)}
             onPreview={() => previewRow(row)}
             onNudge={(edge, d) => handleNudge(row, edge, d)}
+            canMerge={describeMerge(rows, row.id).ok}
+            onMerge={() => handleMerge(row)}
           />
         ))}
         {visibleRows.length === 0 && (

@@ -271,6 +271,59 @@ export function applySplit(rows, time, sortedTranscript) {
   return next;
 }
 
+/**
+ * ตรวจว่ารวมแถวนี้กับแถวถัดไปได้ไหม — pure ใช้ทั้งตอน disable ปุ่มและตอนรวมจริง
+ *
+ * รวมได้เฉพาะแถวชนิดเดียวกัน เพราะ kind คุมทั้งตัวกรองและการคิด dirty
+ * (`r.on !== (r.kind === 'ai')`) ; การเอาช่วงที่ AI ตัดกลับมาใช้วิธีติ๊กแถวนั้นอยู่แล้ว
+ */
+export function describeMerge(rows, id) {
+  const index = rows.findIndex((r) => r.id === id);
+  if (index === -1) return { ok: false, reason: 'no-row' };
+  if (index === rows.length - 1) return { ok: false, reason: 'last-row' };
+  const row = rows[index];
+  const next = rows[index + 1];
+  if (row.kind !== next.kind) return { ok: false, reason: 'different-kind', index, row, next };
+  return { ok: true, index, row, next };
+}
+
+/**
+ * รวมแถวกับแถวถัดไป — ตัวกลับของ applySplit
+ *
+ * แถวปูเต็มไทม์ไลน์อยู่แล้ว แถวที่ติดกันจึงมีขอบร่วมกันเสมอ การรวมจึงเป็นแค่
+ * "ยืดขอบท้ายของแถวซ้ายไปเป็นขอบท้ายของแถวขวา" ไม่มีทางเกิดช่องโหว่
+ *
+ * on = row.on || next.on โดยตั้งใจ — ถ้าครึ่งใดครึ่งหนึ่งถูกเก็บไว้ การรวมต้องไม่
+ * ทำให้เนื้อหานั้นหายไปเงียบ ๆ (ผู้ใช้กดติ๊กออกเองได้ทีหลัง แต่กู้ของที่หายไม่ได้)
+ *
+ * origStart/origEnd สืบจากขอบนอกสุดของทั้งคู่ → ถ้ารวมกลับพอดีกับที่เคยแยกไว้
+ * ค่าจะเท่ากับ start/end ทำให้ชิป "ปรับเวลาแล้ว" ไม่ค้าง
+ */
+export function applyMerge(rows, id, sortedTranscript) {
+  const chk = describeMerge(rows, id);
+  if (!chk.ok) return rows;
+  const { index, row, next } = chk;
+  const merged = {
+    ...row,
+    start: row.start,
+    end: next.end,
+    origStart: row.origStart,
+    origEnd: next.origEnd,
+    on: row.on || next.on,
+    split: true,          // การรวมก็เป็นการแก้โครงเอง — ต้องให้ dirty มองเห็น
+    text: textBetween(sortedTranscript, row.start, next.end),
+  };
+  const out = [...rows];
+  out.splice(index, 2, merged);
+  return out;
+}
+
+export const MERGE_REASON = {
+  'no-row': 'ไม่พบช่วงนี้',
+  'last-row': 'ช่วงสุดท้ายแล้ว ไม่มีช่วงถัดไปให้รวม',
+  'different-kind': 'รวมได้เฉพาะช่วงชนิดเดียวกัน',
+};
+
 export default function useTimelineRows(preview, jobId, storageKey) {
   const [rows, setRows] = useState([]);
   const [duration, setDuration] = useState(0);
@@ -363,6 +416,14 @@ export default function useTimelineRows(preview, jobId, storageKey) {
     return { ...chk, ids: [chk.row.id, rightId] };
   }, [sortedTranscript]);
 
+  /** รวมแถวกับแถวถัดไป (ตัวกลับของ splitAt) — คืนผลทันทีให้ UI ใช้ feedback */
+  const mergeWithNext = useCallback((id) => {
+    const chk = describeMerge(rowsRef.current, id);
+    if (!chk.ok) return chk;
+    setRows((rs) => applyMerge(rs, id, sortedTranscript));   // ตรวจซ้ำใน updater กัน snapshot เก่า
+    return { ...chk, id: chk.row.id };
+  }, [sortedTranscript]);
+
   /**
    * ขยับขอบ — เพราะแถวปูเต็มไทม์ไลน์ ขอบหนึ่งถูกแชร์กับเพื่อนบ้านเสมอ
    * จึงต้องขยับทั้งคู่ ไม่งั้นจะเกิดช่องโหว่/ทับซ้อน
@@ -390,5 +451,5 @@ export default function useTimelineRows(preview, jobId, storageKey) {
   );
 
   return { rows, duration, stats, dirty, toggle, setAll, resetToAI, nudge, splitAt,
-           patchRow, applyVideoDuration };
+           mergeWithNext, patchRow, applyVideoDuration };
 }
