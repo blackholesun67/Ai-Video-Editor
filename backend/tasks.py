@@ -259,6 +259,8 @@ def process_video_task(self, job_id, video_path, user_prompt,
             target_length=target_length,
             preset_id=preset_id,
             progress_cb=_progress,
+            video_path=video_path,      # ← ให้ Gemini ดูภาพจากคลิปด้วย
+            visual=visual,              # ← ใช้ scene_cuts เลือกจุดดึงภาพ
         )
         if not ai_result:
             raise Exception("AI ไม่สามารถระบุช่วงที่ควรเก็บได้ — กรุณาลองใหม่")

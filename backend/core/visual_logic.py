@@ -86,6 +86,74 @@ def _pair_freezes(starts: list[float], ends: list[float]) -> list[dict]:
     return out
 
 
+# ── คีย์เฟรมสำหรับส่งให้ Gemini ดู ───────────────────────────────────────────
+# ความกว้างของภาพที่ส่ง — Gemini คิดโทเคนเป็นไทล์ ภาพ ~512px กินราว 258 โทเคน
+KEYFRAME_WIDTH = _env_num("KEYFRAME_WIDTH", 512, int)
+KEYFRAME_QUALITY = _env_num("KEYFRAME_QUALITY", 7, int)     # mjpeg -q:v (2 ดีสุด 31 แย่สุด)
+KEYFRAME_MAX = _env_num("KEYFRAME_MAX", 20, int)            # เพดานจำนวนภาพต่อคลิป
+# ขยับออกจากรอยต่อฉากเล็กน้อย — เฟรมตรงรอยต่อพอดีมักเป็นภาพกลาง transition/เฟรมดำ
+KEYFRAME_LEAD = _env_num("KEYFRAME_LEAD", 0.5, float)
+# จุดที่ห่างกันน้อยกว่านี้ถือว่าเป็นภาพเดียวกัน ไม่ต้องดึงซ้ำ
+KEYFRAME_MIN_GAP = _env_num("KEYFRAME_MIN_GAP", 3.0, float)
+
+
+def pick_keyframe_times(scene_cuts: list[float], duration: float,
+                        max_frames: int = KEYFRAME_MAX) -> list[float]:
+    """
+    เลือกเวลาที่จะดึงภาพ = จุดฉากเปลี่ยน + จุดกระจายทั่วคลิป
+
+    ทำไมต้องมีจุดกระจายด้วย: คลิปพูดหน้ากล้องช็อตเดียวมีฉากเปลี่ยน 0 จุด
+    ถ้าใช้แต่ scene_cuts จะไม่ได้ภาพเลย ทั้งที่เป็นคลิปที่ควรได้ประโยชน์เหมือนกัน
+    """
+    if duration <= 0:
+        return []
+    pts = [c + KEYFRAME_LEAD for c in (scene_cuts or [])
+           if 0 < c + KEYFRAME_LEAD < duration]
+    n_even = min(8, max_frames)
+    pts += [duration * (i + 0.5) / n_even for i in range(n_even)]
+
+    out: list[float] = []
+    for t in sorted(pts):
+        if not out or t - out[-1] >= KEYFRAME_MIN_GAP:
+            out.append(round(t, 2))
+    if len(out) > max_frames:
+        # สุ่มลงอย่างสม่ำเสมอ ไม่ตัดท้ายทิ้ง — ต้องยังครอบคลุมทั้งคลิป
+        step = len(out) / max_frames
+        out = [out[int(i * step)] for i in range(max_frames)]
+    return out
+
+
+def extract_keyframes(video_path: str, times: list[float]) -> list[dict]:
+    """
+    ดึงภาพนิ่งที่เวลาที่ระบุ → [{"t": วินาที, "jpeg": bytes}]
+
+    ใช้ -ss ก่อน -i (input seeking) ซึ่งเร็วมากเพราะกระโดดไป keyframe ใกล้ ๆ เลย
+    ไม่ต้อง decode ตั้งแต่ต้นคลิป ; ความคลาดเคลื่อนระดับ keyframe ยอมรับได้
+    เพราะเราต้องการ "ภาพช่วงนั้นหน้าตาประมาณไหน" ไม่ได้ต้องการเฟรมเป๊ะ ๆ
+
+    ภาพไหนดึงไม่ได้ก็ข้ามไป — ไม่โยน exception
+    """
+    if not video_path or not os.path.exists(video_path) or not times:
+        return []
+    out: list[dict] = []
+    src = os.path.abspath(video_path)
+    for t in times:
+        cmd = ["ffmpeg", "-hide_banner", "-nostats", "-loglevel", "error",
+               "-ss", f"{max(0.0, t):.2f}", "-i", src,
+               "-frames:v", "1", "-vf", f"scale={KEYFRAME_WIDTH}:-2",
+               "-q:v", str(KEYFRAME_QUALITY), "-f", "mjpeg", "-"]
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=30)
+            if r.returncode == 0 and r.stdout:
+                out.append({"t": round(float(t), 2), "jpeg": r.stdout})
+        except Exception:
+            continue
+    if out:
+        kb = sum(len(f["jpeg"]) for f in out) / 1024
+        print(f"🖼️ [Keyframe] ดึงภาพ {len(out)}/{len(times)} ภาพ ({kb:.0f} KB)")
+    return out
+
+
 def get_visual_signals(video_path: str) -> dict:
     """
     คืน {"scene_cuts": [t...], "black": [{"start","end"}...], "freeze": [...]}

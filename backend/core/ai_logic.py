@@ -7,6 +7,7 @@ import time
 import re
 import hashlib
 from faster_whisper import WhisperModel, BatchedInferencePipeline
+from core.visual_logic import pick_keyframe_times, extract_keyframes
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -975,6 +976,48 @@ def _format_silence_hint(gaps: list[dict], limit: int = 15) -> str:
     )
 
 
+# ── ส่งภาพให้ Gemini ดูควบคู่กับ transcript ──────────────────────────────────
+# ตั้ง VISUAL_CONTEXT=0 เพื่อปิด (ถอยกลับเป็นวิเคราะห์จากเสียงล้วนโดยไม่ต้อง revert)
+VISUAL_CONTEXT = os.getenv("VISUAL_CONTEXT", "1").strip().lower() not in ("0", "false", "no", "off")
+
+_VISUAL_BLOCK = """
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🖼️ ภาพจากคลิป (เรียงตามเวลา) — ใช้ประกอบการตัดสินใจ
+
+ภาพช่วยเห็นสิ่งที่ transcript บอกไม่ได้:
+  - การ์ดปิดท้าย / เครดิต / จอดำ / ภาพค้างนิ่ง → ถ้าไม่มีเนื้อหาก็ตัดได้
+  - สไลด์ กราฟ ตาราง ข้อความบนจอ ที่กำลังถูกอธิบายอยู่ → **ห้ามตัด** แม้เสียงช่วงนั้น
+    จะฟังดูไม่สำคัญ เพราะคนดูกำลังอ่านภาพอยู่
+  - ภาพเดิมต่อเนื่องยาว ๆ = ยังเป็นเรื่องเดียวกัน ตัดกลางแล้วจะขาดตอน
+
+⚠️ ภาพคือ "หลักฐานเพิ่ม" ไม่ใช่เหตุผลให้ตัดมากขึ้น
+   ถ้าภาพไม่ได้บอกอะไรชัดเจน ให้ตัดสินจาก transcript ตามเดิม
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+
+def _fmt_ts(t: float) -> str:
+    m, sec = divmod(max(0.0, float(t)), 60)
+    return f"{int(m)}:{sec:04.1f}"
+
+
+def _with_keyframes(prompt: str, frames: list[dict]):
+    """
+    ต่อภาพเข้ากับพรอมป์ → contents ที่ SDK รับได้ (ข้อความสลับภาพ)
+
+    ใส่ป้ายเวลากำกับทุกภาพ เพราะ Gemini ต้องผูกภาพเข้ากับช่วงเวลาใน transcript ให้ได้
+    ถ้าไม่มีป้าย มันจะรู้แค่ว่า "มีภาพพวกนี้อยู่ในคลิป" แต่ไม่รู้ว่าภาพไหนคือช่วงไหน
+    ไม่มีภาพ → คืนสตริงเดิม เพื่อให้เส้นทางเดิมไม่เปลี่ยนพฤติกรรมเลย
+    """
+    if not frames:
+        return prompt
+    parts = [prompt, _VISUAL_BLOCK]
+    for f in frames:
+        parts.append(f"[ภาพเวลา {_fmt_ts(f['t'])}]")
+        parts.append(genai_types.Part.from_bytes(data=f["jpeg"], mime_type="image/jpeg"))
+    return parts
+
+
 def _slim_for_gemini(transcript: list[dict]) -> list[dict]:
     """
     เหลือเฉพาะฟิลด์ที่ Gemini ต้องใช้จริง — start / end / text
@@ -1816,7 +1859,7 @@ def _verify_outline_coverage(keep_segments: list[dict], outline: list[dict],
     return merge_close_segments(keep_segments + restored, gap_threshold=2.0)
 
 
-def call_gemini_with_retry(full_prompt: str, max_attempts_per_model: int = 2,
+def call_gemini_with_retry(full_prompt, max_attempts_per_model: int = 2,
                            json_mode: bool = False) -> str:
     """
     เรียก Gemini พร้อม fallback chain:
@@ -1824,6 +1867,9 @@ def call_gemini_with_retry(full_prompt: str, max_attempts_per_model: int = 2,
     2. วน MODEL (middle) — ตาม FALLBACK_MODELS (env GEMINI_MODELS); ข้าม model ที่ 404/ถูกปิด
     3. วน ATTEMPT (inner) — retry ถ้า 503 server overload
     json_mode=True → บังคับ output เป็น JSON (structured) กัน parse พัง
+
+    full_prompt รับได้ทั้ง str และ list ของ part (ข้อความสลับภาพ) — SDK รับ contents
+    เป็น list อยู่แล้ว จึงส่งต่อตรง ๆ ได้ กลไก retry/สลับ key/สลับ model ใช้ร่วมกันทั้งคู่
     """
     _config = _gen_config(json_mode)
     last_error = None
@@ -1928,6 +1974,8 @@ def analyze_video_content(
     preset_id: str | None = None,        # ← topic-aware initial_prompt
     ai_correct: bool = True,             # ← AI post-correction toggle
     progress_cb=None,                    # ← progress_cb(pct:int, msg:str) — optional
+    video_path: str | None = None,       # ← ไฟล์วิดีโอ (ใช้ดึงคีย์เฟรมให้ Gemini ดู)
+    visual: dict | None = None,          # ← ผลจาก get_visual_signals (เลือกจุดดึงภาพ)
 ) -> tuple[list[dict], list[dict]]:
     """
     Pipeline:
@@ -2110,9 +2158,23 @@ confidence: "high" = มั่นใจว่าลบได้เลย | "medi
         print(f"🔧 [AI-Correct] mode={'แก้+แปลเป็นไทย' if translate_to_thai else 'แก้อย่างเดียว (คงภาษาเดิม)'}")
         return correct_transcript_with_ai_parallel(transcript, user_prompt, translate_to_thai)
 
+    # ── คีย์เฟรม: ให้ Gemini "เห็น" คลิป ไม่ใช่แค่ได้ยิน ──────────────────────
+    # เลือกจุดจาก scene_cuts ที่วิเคราะห์ไว้แล้ว + จุดกระจายทั่วคลิป (คลิปช็อตเดียว
+    # มี scene_cuts = 0 จุด แต่ก็ควรได้ภาพเหมือนกัน)
+    keyframes: list[dict] = []
+    if VISUAL_CONTEXT and video_path:
+        try:
+            times = pick_keyframe_times((visual or {}).get("scene_cuts") or [],
+                                        total_duration)
+            keyframes = extract_keyframes(video_path, times)
+        except Exception as kf_err:
+            print(f"⚠️ ดึงคีย์เฟรมไม่สำเร็จ ({kf_err}) — วิเคราะห์จากเสียงอย่างเดียว")
+            keyframes = []
+
     def _run_deletion(prompt: str):
-        print("Sending filtered transcript to Gemini (Deletion mode)...")
-        return call_gemini_with_retry(prompt, json_mode=True)
+        print(f"Sending filtered transcript to Gemini (Deletion mode)"
+              f"{f' + {len(keyframes)} ภาพ' if keyframes else ''}...")
+        return call_gemini_with_retry(_with_keyframes(prompt, keyframes), json_mode=True)
 
     print(f"⚡ [Pipeline] Running AI Correction + Deletion in parallel...")
     outline: list[dict] = []
