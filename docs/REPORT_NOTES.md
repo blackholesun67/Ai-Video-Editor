@@ -14,7 +14,7 @@
 ### 1.1 ชื่อโครงงาน
 
 **ระบบตัดต่ออัตโนมัติ ด้วยปัญญาประดิษฐ์วิเคราะห์ภาพและเสียง**
-(AI Video Smart Editor — Automated video editing with AI analysis of image and audio)
+(Automated Video Editing System based on Multimodal AI Analysis)
 
 ### 1.2 ที่มาและความสำคัญ
 
