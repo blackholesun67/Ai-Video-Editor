@@ -11,6 +11,24 @@ services:
     networks:
       - app-network
 
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      POSTGRES_USER: aive
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-aivepass}
+      POSTGRES_DB: aivideo
+    volumes:
+      - pgdata:/var/lib/postgresql/data   # ข้อมูลถาวร ไม่หายเมื่อ down
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aive -d aivideo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
   backend:
     build:
       context: ./backend
@@ -25,12 +43,17 @@ services:
       - transcript-cache:/app/transcript_cache
     env_file:
       - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://aive:${DB_PASSWORD:-aivepass}@postgres:5432/aivideo
+      - JWT_SECRET=${JWT_SECRET:-change-me-dev-secret}
     dns:
       - 8.8.8.8
       - 1.1.1.1
     depends_on:
       redis:
         condition: service_healthy      # รอ Redis พร้อมจริงก่อน start (ไม่ใช่แค่ลำดับ)
+      postgres:
+        condition: service_healthy      # รอ DB พร้อมก่อน (สร้างตาราง users/jobs)
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s
@@ -60,11 +83,15 @@ services:
       - ./backend/.env
     environment:
       - WHISPER_BATCH_SIZE=4
+      - DATABASE_URL=postgresql+psycopg2://aive:${DB_PASSWORD:-aivepass}@postgres:5432/aivideo
+      - JWT_SECRET=${JWT_SECRET:-change-me-dev-secret}
     dns:
       - 8.8.8.8
       - 1.1.1.1
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks:
       - app-network
@@ -87,6 +114,7 @@ services:
 volumes:
   whisper-cache:
   transcript-cache:
+  pgdata:
 
 networks:
   app-network:

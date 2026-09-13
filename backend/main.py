@@ -22,6 +22,12 @@ from tasks import (
 )
 from observability import init_sentry
 
+# ── Auth + Database ──
+from core.database import Base, engine
+from core import models  # noqa: F401  (ต้อง import เพื่อลงทะเบียนตาราง User/Job)
+from core.auth import get_current_user
+from routes.auth import router as auth_router
+
 init_sentry("backend")   # เปิดเฉพาะเมื่อมี SENTRY_DSN
 
 # ── Constants / Limits ───────────────────────────────────────────────────────
@@ -100,6 +106,7 @@ async def require_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
 async def lifespan(app: FastAPI):
     # startup
     os.makedirs(STORAGE_DIR, exist_ok=True)
+    Base.metadata.create_all(bind=engine)   # สร้างตาราง users/jobs ถ้ายังไม่มี
     cleanup_old_jobs()
     yield
     # shutdown — no-op
@@ -110,6 +117,9 @@ app = FastAPI(lifespan=lifespan)
 # ── Rate limiter (slowapi + Redis) ───────────────────────────────────────────
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ── Auth routes (/auth/register, /auth/login, /auth/me) ──
+app.include_router(auth_router)
 
 # ── CORS: ตั้งจาก env (ALLOWED_ORIGINS) — deploy โดเมนจริงได้ ไม่ hardcode ──────
 app.add_middleware(

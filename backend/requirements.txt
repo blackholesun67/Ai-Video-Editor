@@ -11,3 +11,9 @@ python-multipart
 pythainlp>=5.0.0
 slowapi>=0.1.9
 sentry-sdk>=2.0
+# ── Auth + Database (Login/Register) ──
+sqlalchemy>=2.0
+psycopg2-binary>=2.9      # driver PostgreSQL
+passlib[bcrypt]>=1.7      # hash password
+PyJWT>=2.8               # JWT
+pydantic[email]>=2.0     # ตรวจรูปแบบ email
