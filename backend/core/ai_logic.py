@@ -979,6 +979,8 @@ def _format_silence_hint(gaps: list[dict], limit: int = 15) -> str:
 # ── ส่งภาพให้ Gemini ดูควบคู่กับ transcript ──────────────────────────────────
 # ตั้ง VISUAL_CONTEXT=0 เพื่อปิด (ถอยกลับเป็นวิเคราะห์จากเสียงล้วนโดยไม่ต้อง revert)
 VISUAL_CONTEXT = os.getenv("VISUAL_CONTEXT", "1").strip().lower() not in ("0", "false", "no", "off")
+# ตั้ง AI_CORRECT=0 เพื่อปิด AI post-correction ทั้งระบบ (สำหรับทดลอง A/B ตัดตัวแปร E-025/E-026)
+AI_CORRECT_ENV = os.getenv("AI_CORRECT", "1").strip().lower() not in ("0", "false", "no", "off")
 
 _VISUAL_BLOCK = """
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2160,7 +2162,7 @@ confidence: "high" = มั่นใจว่าลบได้เลย | "medi
     import concurrent.futures as _futures
 
     def _run_correction():
-        if not ai_correct:
+        if not ai_correct or not AI_CORRECT_ENV:
             return transcript
         if not needs_ai_correction(transcript):
             print("⚡ [AI-Correct] Skipped — no Latin chars (ไม่มีอะไรต้องแก้/แปล)")
