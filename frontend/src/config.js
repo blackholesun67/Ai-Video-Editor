@@ -34,3 +34,62 @@ const API_KEY = import.meta.env?.VITE_API_KEY;
 if (API_KEY) {
   axios.defaults.headers.common["X-API-Key"] = API_KEY;
 }
+
+// ── Auth token (JWT) ─────────────────────────────────────────────────────────
+// เก็บ token ใน localStorage + แนบ header Authorization: Bearer ให้ทุก request
+// อัตโนมัติ (axios default header) — endpoint ที่ต้อง login จึงผ่าน guard ฝั่ง backend
+export const AUTH_TOKEN_KEY = "aive_token";
+// event ที่ยิงเมื่อ token หมดอายุ/ถูกปฏิเสธ (401) → App ฟังเพื่อเด้งกลับหน้า login
+export const AUTH_LOGOUT_EVENT = "aive:auth-logout";
+
+export function getAuthToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;   // private mode / storage ปิด
+  }
+}
+
+export function setAuthToken(token) {
+  if (token) {
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    try {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } catch {
+      /* เขียน storage ไม่ได้ (private mode) — header ยังทำงานในเซสชันนี้ */
+    }
+  } else {
+    delete axios.defaults.headers.common["Authorization"];
+    try {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+// คืนค่า token ที่เก็บไว้ตอนโหลดหน้าใหม่ (refresh แล้วยัง login อยู่ ไม่ต้องกรอกซ้ำ)
+const _savedToken = getAuthToken();
+if (_savedToken) {
+  axios.defaults.headers.common["Authorization"] = `Bearer ${_savedToken}`;
+}
+
+// เมื่อ token หมดอายุ/ไม่ถูกต้อง → backend ตอบ 401 → เคลียร์ token + แจ้ง App
+// (ยกเว้น request ของ /auth/login|register เอง — 401 ที่นั่น = รหัสผิด ให้ฟอร์มโชว์ error เอง
+//  ไม่ใช่ session หมดอายุ จึงไม่ต้องยิง logout)
+axios.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const url = error?.config?.url || "";
+    const isAuthEndpoint = url.includes("/auth/login") || url.includes("/auth/register");
+    if (error?.response?.status === 401 && !isAuthEndpoint) {
+      setAuthToken(null);
+      try {
+        window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
+      } catch {
+        /* ignore */
+      }
+    }
+    return Promise.reject(error);
+  }
+);
