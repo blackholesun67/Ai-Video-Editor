@@ -15,6 +15,10 @@ from observability import init_sentry
 from celery.signals import worker_init
 from dotenv import load_dotenv
 
+# DB — เขียนสถานะงาน (best-effort ; ห้ามให้ DB ล้มทำงานตัดต่อพัง)
+from core.database import SessionLocal
+from core.models import Job
+
 load_dotenv()
 
 
@@ -113,6 +117,41 @@ def _ckpt(job_id: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DB status — อัปเดตสถานะงานในตาราง jobs (ให้หน้า "งานของฉัน" เห็นสถานะจริง)
+# ─────────────────────────────────────────────────────────────────────────────
+def set_job_status(job_id: str, status: str, result_path: str = None) -> None:
+    """อัปเดตสถานะงานใน DB — best-effort เท่านั้น
+
+    ครอบ try/except ทั้งก้อน: ถ้า DB ล้ม ห้ามให้งานตัดต่อ (ที่ทำเสร็จแล้ว) พังตาม
+    แค่ log warning พอ · เปิด session ของตัวเอง (worker รัน --pool=solo thread เดียว ปลอดภัย)
+    ถ้าไม่พบแถว (งานเก่าก่อนมีระบบ auth) → ข้ามเงียบ ๆ
+    """
+    db = None
+    try:
+        db = SessionLocal()
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if job is None:
+            return
+        job.status = status
+        if result_path is not None:
+            job.result_path = result_path
+        db.commit()
+    except Exception as e:
+        print(f"⚠️ set_job_status({job_id}, {status}) failed: {e}")
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Cleanup — ลบ job dir เก่า (เรียกทั้งตอน API startup [main.py] และ periodic [beat])
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -151,6 +190,7 @@ def cleanup_old_jobs() -> None:
                 print(f"⏭️ cleanup skipped active job: {path}")
                 continue
             shutil.rmtree(path, ignore_errors=True)
+            set_job_status(entry, "expired")   # ไฟล์ถูกลบแล้ว — mark row ให้ตรงความจริง
             removed += 1
         except Exception as e:
             print(f"⚠️ cleanup failed for {path}: {e}")
@@ -296,6 +336,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
         })
 
         if preview_mode:
+            set_job_status(job_id, "ready")   # วิเคราะห์เสร็จ รอผู้ใช้เลือกช่วง+render
             return {
                 "status": "SUCCESS",
                 "progress": 100,
@@ -317,6 +358,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
                 output_mode, target_length, burn_subtitle, denoise=denoise,
                 tiktok_fit=tiktok_fit)
 
+        set_job_status(job_id, "done", result_path=f"{job_id}/{FINAL_VIDEO_NAME}")
         return {
             "status": "SUCCESS",
             "progress": 100,
@@ -332,6 +374,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
 
     except TaskCancelled:
         print(f"🛑 [CANCELLED] job {job_id} — abort ตาม request ของผู้ใช้")
+        set_job_status(job_id, "cancelled")
         self.update_state(state='REVOKED', meta={'status': 'ยกเลิกแล้ว', 'progress': 0})
         raise Ignore()
 
@@ -341,9 +384,10 @@ def process_video_task(self, job_id, video_path, user_prompt,
         if is_503 and self.request.retries < self.max_retries:
             wait_seconds = 30 * (2 ** self.request.retries)
             print(f"[RETRY {self.request.retries + 1}] Gemini 503 — wait {wait_seconds}s")
-            raise self.retry(exc=e, countdown=wait_seconds)
+            raise self.retry(exc=e, countdown=wait_seconds)   # ยัง retry อยู่ ยังไม่ mark failed
 
         print(f"[FAILURE] {error_msg}")
+        set_job_status(job_id, "failed")
         self.update_state(state='FAILURE', meta={
             'status': f'Error: {error_msg}', 'progress': 0,
             'exc_type': type(e).__name__, 'exc_message': error_msg,
@@ -430,6 +474,7 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
                 tiktok_fit=preview.get("tiktok_fit") or "blur")
 
         total_keep = sum(s["end"] - s["start"] for s in clean_segs)
+        set_job_status(job_id, "done", result_path=f"{job_id}/{FINAL_VIDEO_NAME}")
         return {
             "status": "SUCCESS",
             "progress": 100,
@@ -445,12 +490,14 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
 
     except TaskCancelled:
         print(f"🛑 [RENDER CANCELLED] job {job_id}")
+        set_job_status(job_id, "cancelled")
         self.update_state(state='REVOKED', meta={'status': 'ยกเลิกแล้ว', 'progress': 0})
         raise Ignore()
 
     except Exception as e:
         error_msg = str(e)
         print(f"[RENDER FAILURE] {error_msg}")
+        set_job_status(job_id, "failed")
         self.update_state(state='FAILURE', meta={
             'status': f'Error: {error_msg}', 'progress': 0,
             'exc_type': type(e).__name__, 'exc_message': error_msg,

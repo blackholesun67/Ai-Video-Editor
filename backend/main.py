@@ -6,12 +6,10 @@ import shutil
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from celery.result import AsyncResult
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from pydantic import BaseModel
@@ -23,9 +21,13 @@ from tasks import (
 from observability import init_sentry
 
 # ── Auth + Database ──
-from core.database import Base, engine
+from sqlalchemy.orm import Session
+from core.database import Base, engine, get_db
 from core import models  # noqa: F401  (ต้อง import เพื่อลงทะเบียนตาราง User/Job)
-from core.auth import get_current_user
+from core.models import Job, User
+from core.schemas import JobOut
+from core.auth import get_current_user, create_media_token, verify_media_token
+from core.ratelimit import limiter   # limiter กลาง ใช้ร่วมกับ routes/auth.py
 from routes.auth import router as auth_router
 
 init_sentry("backend")   # เปิดเฉพาะเมื่อมี SENTRY_DSN
@@ -80,26 +82,38 @@ UPLOAD_RATE_LIMIT = os.getenv("UPLOAD_RATE_LIMIT", "20/hour")
 RENDER_RATE_LIMIT = os.getenv("RENDER_RATE_LIMIT", "60/hour")
 
 
-def _client_ip(request: Request) -> str:
-    """ดึง IP จริง — รองรับหลัง reverse proxy (Caddy ใส่ X-Forwarded-For)"""
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    return get_remote_address(request)
-
-
-limiter = Limiter(
-    key_func=_client_ip,
-    storage_uri=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-)
-
-
 async def require_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
     """บังคับ API key เฉพาะเมื่อ API_KEYS ถูกตั้งค่า (ไม่งั้น no-op สำหรับ dev)"""
     if not API_KEYS:
         return
     if not x_api_key or x_api_key not in API_KEYS:
         raise HTTPException(status_code=401, detail="ต้องมี X-API-Key ที่ถูกต้อง")
+
+
+# ── Ownership guard — งานของใครก็ของคนนั้น ────────────────────────────────────
+def owned_job_or_404(job_id: str, user: User, db: Session) -> Job:
+    """คืนแถว Job ถ้า user เป็นเจ้าของจริง ไม่งั้น 404
+
+    ตอบ 404 (ไม่ใช่ 403) โดยตั้งใจ — กันคนเดา job_id ว่ามีอยู่จริงในระบบไหม
+    (403 = 'มีอยู่แต่ห้ามดู' รั่วข้อมูลว่างานนั้นมีจริง)
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job or job.user_id != user.id:
+        raise HTTPException(status_code=404, detail="ไม่พบงาน")
+    return job
+
+
+def require_job_owner(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Job:
+    """FastAPI dependency — ตรวจ token + รูปแบบ job_id + ความเป็นเจ้าของในตัวเดียว
+    ใช้กับ route ที่ path param ชื่อ job_id และเป็น UUID ล้วน (ไม่มี suffix -render)
+    """
+    if not UUID_PATTERN.match(job_id):
+        raise HTTPException(status_code=400, detail="job_id ผิดรูปแบบ")
+    return owned_job_or_404(job_id, current_user, db)
 
 
 @asynccontextmanager
@@ -130,7 +144,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
+# NOTE: /storage static mount ถูกลบออก (เคยเปิดสาธารณะ ใครรู้ job_id ก็โหลดไฟล์คนอื่นได้)
+# ไฟล์วิดีโอเสิร์ฟผ่าน /media/{job_id}/{file}?token=... (media token) แทน
 
 
 @app.post("/upload", dependencies=[Depends(require_api_key)])
@@ -147,6 +162,8 @@ async def upload_video(
     preset_id: str = Form(""),
     denoise: bool = Form(False),
     tiktok_fit: str = Form("blur"),
+    current_user: User = Depends(get_current_user),   # ไม่มี token = 401 (บังคับ login)
+    db: Session = Depends(get_db),
 ):
     # ── Input validation ────────────────────────────────────────────────────
     prompt = (prompt or "").strip()
@@ -207,6 +224,23 @@ async def upload_video(
 
         print(f"✅ File saved: {video_path} ({written / 1024 / 1024:.1f} MB)")
 
+        # ── ผูกงานกับเจ้าของใน DB (ก่อน enqueue) ─────────────────────────────
+        # ถ้าเขียน DB ล้ม → ลบไฟล์ทิ้ง + 500 ไม่ปล่อยงานค้างที่ไม่มีเจ้าของ
+        try:
+            db.add(Job(
+                id=job_id,
+                user_id=current_user.id,
+                status="processing",
+                prompt=prompt,
+                original_filename=fname,
+            ))
+            db.commit()
+        except Exception as db_err:
+            db.rollback()
+            shutil.rmtree(job_dir, ignore_errors=True)
+            print(f"❌ DB write failed for job {job_id}: {db_err}")
+            raise HTTPException(status_code=500, detail="บันทึกงานล้มเหลว กรุณาลองใหม่")
+
         process_video_task.apply_async(
             args=[job_id, video_path, prompt, output_mode, target_length, burn_subtitle,
                   preview_mode, preset_id, edit_mode, denoise, tiktok_fit],
@@ -223,11 +257,19 @@ async def upload_video(
 
 
 @app.get("/status/{job_id}")
-async def get_status(job_id: str):
+async def get_status(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     # ── Validate jobId format กัน frontend ติด PENDING บน id ไม่ถูกต้อง ─────
     # รองรับทั้ง UUID เดิม + "{uuid}-render" สำหรับ render task
     if not UUID_OR_TASK_PATTERN.match(job_id):
         raise HTTPException(status_code=400, detail="job_id ผิดรูปแบบ")
+
+    # ownership: strip suffix "-render" → ได้ job_id จริง แล้วเช็กเจ้าของ
+    real_job_id = job_id[:-7] if job_id.endswith("-render") else job_id
+    owned_job_or_404(real_job_id, current_user, db)
 
     try:
         result = AsyncResult(job_id)
@@ -276,9 +318,14 @@ async def get_status(job_id: str):
 
 
 @app.get("/download/{job_id}")
-async def download_output(job_id: str):
+async def download_output(job_id: str, token: str = ""):
+    """ดาวน์โหลดไฟล์ผลลัพธ์ — ต้องแนบ media token (?token=...) ที่ขอจาก /jobs/{id}/media-token
+    (ปุ่มดาวน์โหลดเป็น request ตรงของเบราว์เซอร์ แนบ Bearer header ไม่ได้)
+    """
     if not UUID_PATTERN.match(job_id):
         raise HTTPException(status_code=400, detail="job_id ผิดรูปแบบ")
+    if not verify_media_token(token, job_id):
+        raise HTTPException(status_code=403, detail="token ไม่ถูกต้องหรือหมดอายุ")
     target_file = "final_summary.mp4"
     file_path = os.path.join(STORAGE_DIR, job_id, target_file)
     if os.path.exists(file_path):
@@ -288,6 +335,45 @@ async def download_output(job_id: str):
             headers={"Cache-Control": "no-store"},
         )
     raise HTTPException(status_code=404, detail="ไม่พบไฟล์วิดีโอผลลัพธ์")
+
+
+@app.get("/jobs/{job_id}/media-token")
+def issue_media_token(job=Depends(require_job_owner)):
+    """คืน media token อายุสั้นผูกกับ job นี้ — ต้อง login + เป็นเจ้าของ (require_job_owner)
+    frontend เอา token ไปแนบ query ของ <video src>/<a download>/ /media
+    """
+    return {"token": create_media_token(job.id)}
+
+
+@app.get("/media/{job_id}/{filename}")
+async def serve_media(job_id: str, filename: str, token: str = ""):
+    """เสิร์ฟไฟล์วิดีโอผ่าน media token — แทน /storage static เดิมที่เปิดสาธารณะ
+
+    ป้องกัน: ตรวจ token ผูก job + กัน path traversal (basename + ต้องอยู่ใน job_dir)
+    + allowlist เฉพาะไฟล์วิดีโอ (กันหลุดไป preview.json/srt/เสียง)
+    """
+    if not UUID_PATTERN.match(job_id):
+        raise HTTPException(status_code=400, detail="job_id ผิดรูปแบบ")
+    if not verify_media_token(token, job_id):
+        raise HTTPException(status_code=403, detail="token ไม่ถูกต้องหรือหมดอายุ")
+
+    # กัน path traversal — รับเฉพาะ basename ที่ไม่มี path ปน และไม่ขึ้นต้นด้วยจุด
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or safe_name.startswith("."):
+        raise HTTPException(status_code=400, detail="ชื่อไฟล์ไม่ถูกต้อง")
+    # allowlist: เฉพาะไฟล์วิดีโอ (ต้นฉบับ + final_summary.mp4) — ไม่เปิดไฟล์อื่นในโฟลเดอร์
+    if os.path.splitext(safe_name)[1].lower() not in ALLOWED_VIDEO_EXTS:
+        raise HTTPException(status_code=403, detail="ไฟล์นี้เข้าถึงผ่าน media ไม่ได้")
+
+    job_dir = os.path.abspath(os.path.join(STORAGE_DIR, job_id))
+    file_path = os.path.abspath(os.path.join(job_dir, safe_name))
+    # กันหลุดออกนอก job_dir (เผื่อ symlink/edge case)
+    if os.path.commonpath([file_path, job_dir]) != job_dir:
+        raise HTTPException(status_code=400, detail="ชื่อไฟล์ไม่ถูกต้อง")
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="ไม่พบไฟล์")
+    # FileResponse รองรับ HTTP Range (206) → วิดีโอ seek ได้
+    return FileResponse(file_path, headers={"Cache-Control": "no-store"})
 
 
 MAX_SUBTITLE_PHRASES = 2000
@@ -359,7 +445,7 @@ def _validate_phrases(phrases: list[dict]) -> list[dict]:
     return out
 
 
-@app.post("/render/{job_id}", dependencies=[Depends(require_api_key)])
+@app.post("/render/{job_id}", dependencies=[Depends(require_api_key), Depends(require_job_owner)])
 @limiter.limit(RENDER_RATE_LIMIT)
 async def render_preview(request: Request, job_id: str, body: RenderRequest):
     """Render วิดีโอจาก preview ที่ user เลือก segments แล้ว"""
@@ -407,7 +493,7 @@ def _load_preview(job_id: str) -> dict:
         return json.load(f)
 
 
-@app.post("/subtitle/{job_id}", dependencies=[Depends(require_api_key)])
+@app.post("/subtitle/{job_id}", dependencies=[Depends(require_api_key), Depends(require_job_owner)])
 def build_subtitle(job_id: str, body: SubtitleRequest):
     """
     สร้างวรรคซับให้ตรงกับ "ช่วงที่ผู้ใช้เลือกอยู่ตอนนี้" แล้วเอาข้อความที่เคยแก้ไว้มาทับ
@@ -430,7 +516,7 @@ def build_subtitle(job_id: str, body: SubtitleRequest):
     return {"phrases": phrases}
 
 
-@app.get("/subtitle/{job_id}")
+@app.get("/subtitle/{job_id}", dependencies=[Depends(require_job_owner)])
 def get_subtitle(job_id: str):
     """
     เวอร์ชันไม่มี selection — ใช้ช่วงที่บันทึกไว้ล่าสุด (selected_segments) เป็นตัวตั้ง
@@ -446,14 +532,18 @@ def get_subtitle(job_id: str):
     return {"phrases": phrases}
 
 
-@app.get("/preview/{job_id}")
+@app.get("/preview/{job_id}", dependencies=[Depends(require_job_owner)])
 async def get_preview(job_id: str):
     """ดึงข้อมูล preview ที่ AI วิเคราะห์แล้ว"""
     return _load_preview(job_id)
 
 
 @app.post("/cancel/{task_id}")
-async def cancel_job(task_id: str):
+async def cancel_job(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     ยกเลิกงานจริง — กัน task ที่ยังไม่เริ่ม (revoke) + ตั้ง flag ให้ task ที่รันอยู่
     abort ที่ checkpoint ถัดไป (ไม่ปล่อยให้กิน GPU ต่อ)
@@ -462,6 +552,7 @@ async def cancel_job(task_id: str):
         raise HTTPException(status_code=400, detail="task_id ผิดรูปแบบ")
     # task_id ของ render = "{job_id}-render" แต่ flag/dir key ด้วย job_id
     job_id = task_id[:-7] if task_id.endswith("-render") else task_id
+    owned_job_or_404(job_id, current_user, db)   # เฉพาะเจ้าของงานยกเลิกได้
     try:
         celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
     except Exception as e:
@@ -469,6 +560,20 @@ async def cancel_job(task_id: str):
     set_cancel_flag(job_id)
     print(f"🛑 Cancel requested: {task_id}")
     return {"cancelled": True, "task_id": task_id}
+
+
+@app.get("/jobs", response_model=list[JobOut])
+def list_jobs(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """รายการงานของผู้ใช้คนนี้ (ใหม่สุดก่อน) — สำหรับหน้า 'งานของฉัน'"""
+    return (
+        db.query(Job)
+        .filter(Job.user_id == current_user.id)
+        .order_by(Job.created_at.desc())
+        .all()
+    )
 
 
 @app.get("/health")
