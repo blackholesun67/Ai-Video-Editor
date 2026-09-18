@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   Type, Check, Play, Loader2, AlertTriangle, RotateCcw, Sparkles, Scissors, X,
 } from 'lucide-react';
-import { API_URL } from '../config';
+import { API_URL, fetchMediaToken } from '../config';
 import { formatLength } from './time';
 
 const formatTime = (sec) => {
@@ -46,7 +46,9 @@ const SubtitleEditScreen = ({ jobId, selectedSegments, onRendering, onBack, back
         const p = pv.data?.video_path;
         if (p) {
           const rel = p.replace(/\\/g, '/').replace(/^storage\//, '');
-          setVideoSrc(`${API_URL}/storage/${rel}`);
+          const mToken = await fetchMediaToken(jobId);   // แนบ token เล่นวิดีโอต้นฉบับ (seek ได้)
+          if (cancelled) return;
+          if (mToken) setVideoSrc(`${API_URL}/media/${rel}?token=${mToken}`);
         }
         if (!segs?.length) {
           const fb = pv.data?.selected_segments || pv.data?.segments;

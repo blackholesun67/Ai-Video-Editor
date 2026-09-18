@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Download, RotateCcw, Type, LogOut } from 'lucide-react';
+import { Sparkles, Download, RotateCcw, Type, LogOut, FolderOpen } from 'lucide-react';
 import UploadScreen from './components/UploadScreen';
 import Processing from './components/Processing';
 import PreviewScreen from './components/PreviewScreen';
 import SubtitleEditScreen from './components/SubtitleEditScreen';
 import LoginScreen from './components/LoginScreen';
-import { API_URL, PREVIEW_ROWS_KEY, getAuthToken, setAuthToken, AUTH_LOGOUT_EVENT } from './config';
+import MyJobsScreen from './components/MyJobsScreen';
+import { API_URL, PREVIEW_ROWS_KEY, getAuthToken, setAuthToken, AUTH_LOGOUT_EVENT, fetchMediaToken } from './config';
 
 const STORAGE_KEYS = {
   JOB: 'aive_job_id',
@@ -35,6 +36,10 @@ function App() {
   });
   // true = ย้อนกลับมาแก้ซับหลัง render เสร็จแล้ว (กลับหน้า "เสร็จแล้ว" เมื่อกด "กลับ")
   const [reediting, setReediting] = useState(false);
+  // media token สำหรับเล่น/ดาวน์โหลดวิดีโอผลลัพธ์ (หน้า "เสร็จแล้ว")
+  const [mediaToken, setMediaToken] = useState(null);
+  // true = กำลังดูหน้า "งานของฉัน"
+  const [showJobs, setShowJobs] = useState(false);
 
   useEffect(() => {
     if (jobId) localStorage.setItem(STORAGE_KEYS.JOB, jobId);
@@ -65,6 +70,15 @@ function App() {
     if (selectedSegs) localStorage.setItem(STORAGE_KEYS.SELECTED_SEGS, JSON.stringify(selectedSegs));
     else localStorage.removeItem(STORAGE_KEYS.SELECTED_SEGS);
   }, [selectedSegs]);
+
+  // ขอ media token เมื่อมีวิดีโอผลลัพธ์ (หน้า "เสร็จแล้ว") — ใช้เล่น + ดาวน์โหลด
+  useEffect(() => {
+    if (!videoUrl) { setMediaToken(null); return; }
+    const jid = videoUrl.split('/')[0];
+    let cancelled = false;
+    fetchMediaToken(jid).then((t) => { if (!cancelled) setMediaToken(t); });
+    return () => { cancelled = true; };
+  }, [videoUrl]);
 
   // output_url ของ backend คงที่ ("{job}/final_summary.mp4") — เติม ?v= กัน browser
   // เล่นไฟล์เก่าจาก cache หลัง render ใหม่ (โดยเฉพาะตอนย้อนกลับไปแก้ซับ)
@@ -156,8 +170,6 @@ function App() {
   const activeTaskId = phase === 'rendering' ? renderTaskId : jobId;
 
   const jobIdShort = videoUrl ? videoUrl.split('/')[0] : '';
-  // query string จาก videoUrl (?v=...) — ใช้ bust cache ของลิงก์ดาวน์โหลดด้วย
-  const cacheQuery = videoUrl && videoUrl.includes('?') ? videoUrl.slice(videoUrl.indexOf('?')) : '';
 
   // ── Auth gate — ไม่มี token → โชว์หน้า Login เท่านั้น (บังคับ login ก่อนใช้) ──
   if (!token) {
@@ -189,6 +201,14 @@ function App() {
               </button>
             )}
             <button
+              onClick={() => setShowJobs((v) => !v)}
+              title="งานของฉัน"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
+            >
+              <FolderOpen className="h-4 w-4" />
+              งานของฉัน
+            </button>
+            <button
               onClick={handleLogout}
               title="ออกจากระบบ"
               className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
@@ -202,6 +222,10 @@ function App() {
 
       {/* ── Main ───────────────────────────────────────── */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 sm:py-12">
+        {showJobs ? (
+          <MyJobsScreen onClose={() => setShowJobs(false)} />
+        ) : (
+         <>
         {!jobId && !videoUrl && (
           <UploadScreen onUploadSuccess={(id, mode) => {
             setJobId(id);
@@ -247,7 +271,7 @@ function App() {
             <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-200">
               <div className="flex justify-center max-h-[70vh]">
                 <video
-                  src={`${API_URL}/storage/${videoUrl}`}
+                  src={mediaToken ? `${API_URL}/media/${jobIdShort}/final_summary.mp4?token=${mediaToken}` : undefined}
                   controls
                   autoPlay
                   className="max-h-[70vh] max-w-full object-contain"
@@ -267,11 +291,11 @@ function App() {
                 </button>
               )}
               <a
-                href={`${API_URL}/download/${jobIdShort}${cacheQuery}`}
+                href={mediaToken ? `${API_URL}/download/${jobIdShort}?token=${mediaToken}` : undefined}
                 download="ai_edited_video.mp4"
                 className={`flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors active:scale-[0.98] ${
                   editSummary?.burn_subtitle ? '' : 'sm:col-span-2'
-                }`}
+                } ${mediaToken ? '' : 'pointer-events-none opacity-60'}`}
               >
                 <Download className="h-5 w-5" />
                 ดาวน์โหลดวิดีโอ
@@ -283,6 +307,8 @@ function App() {
               </p>
             )}
           </div>
+        )}
+         </>
         )}
       </main>
     </div>

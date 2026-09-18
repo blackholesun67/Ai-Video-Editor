@@ -50,6 +50,19 @@ export function getAuthToken() {
   }
 }
 
+// ── Media token ──────────────────────────────────────────────────────────────
+// ขอ token อายุสั้นผูกกับ job (Bearer แนบให้อัตโนมัติ) สำหรับใช้กับ <video src> และ
+// <a download> ที่เป็น request ตรงของเบราว์เซอร์ — แนบ header Authorization ไม่ได้
+// จึงต้องส่ง token ใน query string แทน (?token=...)
+export async function fetchMediaToken(jobId) {
+  try {
+    const res = await axios.get(`${API_URL}/jobs/${jobId}/media-token`);
+    return res.data?.token || null;
+  } catch {
+    return null;
+  }
+}
+
 export function setAuthToken(token) {
   if (token) {
     axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;

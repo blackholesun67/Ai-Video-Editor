@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   X, Eye, Play, Loader2, AlertTriangle, RotateCcw,
 } from 'lucide-react';
-import { API_URL, PREVIEW_ROWS_KEY } from '../config';
+import { API_URL, PREVIEW_ROWS_KEY, fetchMediaToken } from '../config';
 import useTimelineRows, { toRenderSegments, describeMerge } from './useTimelineRows';
 import SegmentRow from './SegmentRow';
 import TimelineStrip from './TimelineStrip';
@@ -38,7 +38,10 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
     applyVideoDuration,
   } = useTimelineRows(preview, jobId, PREVIEW_ROWS_KEY);
 
-  // Load preview data
+  // media token สำหรับเล่นวิดีโอต้นฉบับ (แนบใน query ของ <video src>)
+  const [mediaToken, setMediaToken] = useState(null);
+
+  // Load preview data + media token
   useEffect(() => {
     let cancelled = false;
     axios.get(`${API_URL}/preview/${jobId}`)
@@ -52,16 +55,18 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         setError(err.response?.data?.detail || 'โหลดตัวอย่างไม่สำเร็จ');
         setLoading(false);
       });
+    fetchMediaToken(jobId).then((t) => { if (!cancelled) setMediaToken(t); });
     return () => { cancelled = true; };
   }, [jobId]);
 
-  // URL วิดีโอต้นฉบับ (preview.video_path = "storage/{job_id}/{file}") — /storage เสิร์ฟแบบ seek ได้
+  // URL วิดีโอต้นฉบับ (preview.video_path = "storage/{job_id}/{file}") ผ่าน /media + media token
+  // FileResponse ฝั่ง backend รองรับ HTTP Range → เพลเยอร์ seek ได้
   const videoSrc = useMemo(() => {
     const p = preview?.video_path;
-    if (!p) return null;
+    if (!p || !mediaToken) return null;
     const rel = p.replace(/\\/g, '/').replace(/^storage\//, '');
-    return `${API_URL}/storage/${rel}`;
-  }, [preview]);
+    return `${API_URL}/media/${rel}?token=${mediaToken}`;
+  }, [preview, mediaToken]);
 
   const visibleRows = useMemo(() => {
     if (filter === 'ai') return rows.filter((r) => r.kind === 'ai');
