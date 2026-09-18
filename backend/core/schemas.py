@@ -1,22 +1,21 @@
 """Pydantic schemas — รับ/ส่งข้อมูล auth และ job"""
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
-class RegisterIn(BaseModel):
-    email: EmailStr
-    username: str
-    password: str
-
-
-class LoginIn(BaseModel):
-    email: EmailStr
-    password: str
+class GoogleAuthIn(BaseModel):
+    # credential = Google ID token (JWT) ที่ frontend ได้จาก Google Identity Services
+    credential: str
 
 
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class AuthConfigOut(BaseModel):
+    # ส่ง Google Client ID ให้ frontend ตอนโหลดหน้า (เป็นค่า public ไม่ใช่ความลับ)
+    google_client_id: str
 
 
 class UserOut(BaseModel):

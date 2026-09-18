@@ -34,7 +34,7 @@ const TOPICS = [
 // จำกัดขนาดไฟล์ฝั่ง client — ตรงกับ MAX_FILE_SIZE_MB ของ backend
 const MAX_FILE_MB = 2048;
 
-const UploadScreen = ({ onUploadSuccess }) => {
+const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [cutMode, setCutMode] = useState('full');
@@ -130,6 +130,13 @@ const UploadScreen = ({ onUploadSuccess }) => {
 
   const handleUpload = async () => {
     if (!file) return setError('กรุณาเลือกไฟล์วิดีโอก่อน');
+
+    // Gate: ต้อง login ก่อนถึงจะอัปโหลดได้ — ยังไม่ login → เปิด modal แล้วรอผล
+    // (ไฟล์+ตั้งค่าที่เลือกไว้ยังอยู่ครบ เพราะ component นี้ไม่ถูก unmount ระหว่างนี้)
+    if (!isAuthed && requestLogin) {
+      const ok = await requestLogin();
+      if (!ok) return;   // ผู้ใช้ปิด modal ไม่ได้ login → ไม่อัปโหลด
+    }
 
     setError('');
     setUploadProgress(0);

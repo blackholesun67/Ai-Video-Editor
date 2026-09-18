@@ -11,10 +11,9 @@ python-multipart
 pythainlp>=5.0.0
 slowapi>=0.1.9
 sentry-sdk>=2.0
-# ── Auth + Database (Login/Register) ──
+# ── Auth + Database (Login ด้วย Google OAuth) ──
 sqlalchemy>=2.0
 psycopg2-binary>=2.9      # driver PostgreSQL
-passlib[bcrypt]>=1.7      # hash password
-bcrypt>=4.0,<4.1         # pin: bcrypt 4.1+ โยน error ตอน passlib self-test (>72 bytes) → login/register พัง
-PyJWT>=2.8               # JWT
-pydantic[email]>=2.0     # ตรวจรูปแบบ email
+PyJWT>=2.8               # JWT (session token ของเรา)
+google-auth>=2.0         # ตรวจ Google ID token ตอน login
+pydantic>=2.0

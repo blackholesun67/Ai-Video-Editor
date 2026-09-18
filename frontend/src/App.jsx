@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Download, RotateCcw, Type, LogOut, FolderOpen } from 'lucide-react';
 import UploadScreen from './components/UploadScreen';
 import Processing from './components/Processing';
@@ -20,8 +20,11 @@ const STORAGE_KEYS = {
 
 function App() {
   // ── Auth ──────────────────────────────────────────────────────
-  // ไม่มี token → โชว์ LoginScreen เท่านั้น (บังคับ login ก่อนใช้)
+  // เห็นหน้าโปรแกรมได้เลย — บังคับ login ตอนกด "เริ่มตัดต่อ" (modal) แทน hard gate
   const [token, setToken] = useState(() => getAuthToken());
+  const [loginOpen, setLoginOpen] = useState(false);
+  // resolve ของ requestLogin() ที่ค้างอยู่ — เรียกเมื่อ login สำเร็จ/ปิด modal
+  const loginResolveRef = useRef(null);
   const [jobId, setJobId] = useState(() => localStorage.getItem(STORAGE_KEYS.JOB));
   const [videoUrl, setVideoUrl] = useState(() => localStorage.getItem(STORAGE_KEYS.VIDEO));
   const [phase, setPhase] = useState(() => localStorage.getItem(STORAGE_KEYS.PHASE) || null);
@@ -140,19 +143,49 @@ function App() {
     try { localStorage.removeItem(STORAGE_KEYS.PREVIEW_ROWS); } catch { /* ignore */ }
   };
 
+  // ── Login modal ──────────────────────────────────────────────
+  // เปิด modal แล้วคืน Promise<boolean> — true = login สำเร็จ, false = ปิด/ยกเลิก
+  // ให้ที่เรียก (เช่น ปุ่มอัปโหลด) await รอผลแล้วทำงานต่อได้
+  const requestLogin = () => new Promise((resolve) => {
+    loginResolveRef.current = resolve;
+    setLoginOpen(true);
+  });
+
+  const handleLoginSuccess = (tok) => {
+    setToken(tok);
+    setLoginOpen(false);
+    if (loginResolveRef.current) { loginResolveRef.current(true); loginResolveRef.current = null; }
+  };
+
+  const handleLoginClose = () => {
+    setLoginOpen(false);
+    if (loginResolveRef.current) { loginResolveRef.current(false); loginResolveRef.current = null; }
+  };
+
+  // กด "งานของฉัน" — ต้อง login ก่อน ไม่งั้นเปิด modal
+  const openMyJobs = async () => {
+    if (!token) {
+      const ok = await requestLogin();
+      if (!ok) return;
+    }
+    setShowJobs(true);
+  };
+
   // ── Logout — ล้าง token + งานทั้งหมด (กันงานคนก่อนค้างข้ามบัญชี) ──
   const handleLogout = () => {
     if (!window.confirm('ออกจากระบบ? งานที่ยังไม่เสร็จในเครื่องนี้จะถูกล้าง')) return;
     setAuthToken(null);      // ลบ token + header Authorization
     setToken(null);
+    setShowJobs(false);
     handleReset();           // ล้าง state + localStorage งานทั้งหมด
   };
 
   // token หมดอายุระหว่างใช้งาน (backend ตอบ 401) → config.js ยิง event นี้
-  // → เด้งกลับหน้า login อัตโนมัติ แทนที่จะค้างหน้าพัง
+  // → เคลียร์สถานะ กลับหน้า landing อัตโนมัติ แทนที่จะค้างหน้าพัง
   useEffect(() => {
     const onAuthLogout = () => {
       setToken(null);
+      setShowJobs(false);
       handleReset();
     };
     window.addEventListener(AUTH_LOGOUT_EVENT, onAuthLogout);
@@ -171,11 +204,6 @@ function App() {
 
   const jobIdShort = videoUrl ? videoUrl.split('/')[0] : '';
 
-  // ── Auth gate — ไม่มี token → โชว์หน้า Login เท่านั้น (บังคับ login ก่อนใช้) ──
-  if (!token) {
-    return <LoginScreen onLogin={setToken} />;
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* ── Header ─────────────────────────────────────── */}
@@ -190,54 +218,74 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {(jobId || videoUrl) && (
+            {token ? (
+              <>
+                {(jobId || videoUrl) && !showJobs && (
+                  <button
+                    onClick={handleResetConfirm}
+                    title="เริ่มทำวิดีโอใหม่ — ล้างงานทั้งหมด กลับหน้าอัปโหลด"
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 bg-white border border-red-200 px-3.5 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    เริ่มทำวิดีโอใหม่
+                  </button>
+                )}
+                {!showJobs && (
+                  <button
+                    onClick={openMyJobs}
+                    title="งานของฉัน"
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    งานของฉัน
+                  </button>
+                )}
+                <button
+                  onClick={handleLogout}
+                  title="ออกจากระบบ"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  ออกจากระบบ
+                </button>
+              </>
+            ) : (
               <button
-                onClick={handleResetConfirm}
-                title="เริ่มทำวิดีโอใหม่ — ล้างงานทั้งหมด กลับหน้าอัปโหลด"
-                className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 bg-white border border-red-200 px-3.5 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
+                onClick={requestLogin}
+                title="เข้าสู่ระบบ"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-white bg-indigo-600 px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
               >
-                <RotateCcw className="h-4 w-4" />
-                เริ่มทำวิดีโอใหม่
+                เข้าสู่ระบบ
               </button>
             )}
-            <button
-              onClick={() => setShowJobs((v) => !v)}
-              title="งานของฉัน"
-              className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
-            >
-              <FolderOpen className="h-4 w-4" />
-              งานของฉัน
-            </button>
-            <button
-              onClick={handleLogout}
-              title="ออกจากระบบ"
-              className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-              ออกจากระบบ
-            </button>
           </div>
         </div>
       </header>
 
       {/* ── Main ───────────────────────────────────────── */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 sm:py-12">
-        {showJobs ? (
+        {showJobs && token ? (
           <MyJobsScreen onClose={() => setShowJobs(false)} />
         ) : (
          <>
-        {!jobId && !videoUrl && (
-          <UploadScreen onUploadSuccess={(id, mode) => {
-            setJobId(id);
-            setPhase(mode === 'preview' ? 'processing' : 'processing');
-          }} />
+        {/* landing (upload) — เห็นได้แม้ยังไม่ login · component เดียวคงอยู่ตลอดตอน gate login
+            (ไฟล์+ตั้งค่าไม่หายระหว่างเปิด modal) */}
+        {(!token || (!jobId && !videoUrl)) && (
+          <UploadScreen
+            isAuthed={!!token}
+            requestLogin={requestLogin}
+            onUploadSuccess={(id, mode) => {
+              setJobId(id);
+              setPhase(mode === 'preview' ? 'processing' : 'processing');
+            }}
+          />
         )}
 
-        {jobId && !videoUrl && (phase === 'processing' || phase === 'rendering') && (
+        {token && jobId && !videoUrl && (phase === 'processing' || phase === 'rendering') && (
           <Processing jobId={activeTaskId} onComplete={handleComplete} onCancel={handleReset} />
         )}
 
-        {jobId && !videoUrl && phase === 'preview' && (
+        {token && jobId && !videoUrl && phase === 'preview' && (
           <PreviewScreen
             jobId={jobId}
             onRendering={handleRendering}
@@ -246,7 +294,7 @@ function App() {
           />
         )}
 
-        {jobId && !videoUrl && phase === 'editing' && (
+        {token && jobId && !videoUrl && phase === 'editing' && (
           <SubtitleEditScreen
             jobId={jobId}
             selectedSegments={selectedSegs}
@@ -256,7 +304,7 @@ function App() {
           />
         )}
 
-        {videoUrl && (
+        {token && videoUrl && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Success badge */}
             <div className="text-center">
@@ -311,6 +359,11 @@ function App() {
          </>
         )}
       </main>
+
+      {/* Login modal — เปิดตอนกดเริ่มอัปโหลด/งานของฉัน ขณะยังไม่ login */}
+      {loginOpen && (
+        <LoginScreen onLogin={handleLoginSuccess} onClose={handleLoginClose} />
+      )}
     </div>
   );
 }

@@ -1,49 +1,64 @@
-"""Endpoint สมัคร/ล็อกอิน/ดูข้อมูลตัวเอง"""
+"""Endpoint auth — ล็อกอินด้วย Google OAuth
+
+flow: frontend ให้ผู้ใช้ login Google → ได้ ID token (credential) → ส่งมาที่ /auth/google
+      backend ตรวจ token กับ Google → เอาอีเมล+ชื่อ → หา/สร้าง user → คืน JWT ของเรา
+ที่เหลือ (JWT, ownership, media token) ใช้เหมือนเดิมทุกอย่าง
+"""
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 from core.database import get_db
 from core.models import User
-from core.schemas import RegisterIn, LoginIn, TokenOut, UserOut
-from core.auth import hash_password, verify_password, create_token, get_current_user
-from core.ratelimit import limiter, LOGIN_RATE_LIMIT
+from core.schemas import GoogleAuthIn, TokenOut, UserOut, AuthConfigOut
+from core.auth import create_token, get_current_user
+from core.ratelimit import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-
-def _norm_email(email: str) -> str:
-    """normalize email ก่อนเก็บ/เทียบ — กัน A@Gmail.com กับ a@gmail.com ถือเป็นคนละคน
-    (สมัครซ้ำได้ / login ไม่เจอ)"""
-    return str(email).strip().lower()
-
-
-@router.post("/register", response_model=TokenOut, status_code=201)
-def register(body: RegisterIn, db: Session = Depends(get_db)):
-    if len(body.password) < 6:
-        raise HTTPException(status_code=400, detail="รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร")
-    if not body.username.strip():
-        raise HTTPException(status_code=400, detail="กรุณากรอกชื่อผู้ใช้")
-    email = _norm_email(body.email)
-    if db.query(User).filter(User.email == email).first():
-        raise HTTPException(status_code=409, detail="อีเมลนี้ถูกใช้แล้ว")
-    user = User(
-        email=email,
-        username=body.username.strip(),
-        password_hash=hash_password(body.password),
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return TokenOut(access_token=create_token(user.id))
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+# user ที่มาจาก Google ไม่มีรหัสผ่าน — เก็บ placeholder ในคอลัมน์ password_hash (NOT NULL)
+# ค่านี้ไม่ใช่ bcrypt hash จริง จึงไม่มีทาง login ด้วยรหัสผ่านได้ (ปลอดภัย)
+GOOGLE_PLACEHOLDER_HASH = "google-oauth"
+LOGIN_RATE = "20/minute"
 
 
-@router.post("/login", response_model=TokenOut)
-@limiter.limit(LOGIN_RATE_LIMIT)
-def login(request: Request, body: LoginIn, db: Session = Depends(get_db)):
-    email = _norm_email(body.email)
+@router.get("/config", response_model=AuthConfigOut)
+def auth_config():
+    """ส่ง Google Client ID ให้ frontend (public) — frontend ใช้ init ปุ่ม Sign in with Google"""
+    return AuthConfigOut(google_client_id=GOOGLE_CLIENT_ID)
+
+
+@router.post("/google", response_model=TokenOut)
+@limiter.limit(LOGIN_RATE)
+def google_login(request: Request, body: GoogleAuthIn, db: Session = Depends(get_db)):
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="ยังไม่ได้ตั้งค่า GOOGLE_CLIENT_ID ฝั่งเซิร์ฟเวอร์")
+
+    # ── ตรวจ ID token กับ Google (เช็กลายเซ็น + หมดอายุ + audience == client id ของเรา) ──
+    try:
+        info = id_token.verify_oauth2_token(
+            body.credential, google_requests.Request(), GOOGLE_CLIENT_ID
+        )
+    except ValueError:
+        raise HTTPException(status_code=401, detail="ยืนยันตัวตนกับ Google ไม่สำเร็จ")
+
+    email = str(info.get("email", "")).strip().lower()
+    if not email or not info.get("email_verified"):
+        raise HTTPException(status_code=401, detail="อีเมล Google ยังไม่ได้ยืนยัน")
+
+    # หา user จากอีเมล (Google การันตีว่าจริง+เป็นเจ้าของ) — ไม่มี = สร้างใหม่
     user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="อีเมลหรือรหัสผ่านไม่ถูกต้อง")
+    if not user:
+        username = (info.get("name") or email.split("@")[0]).strip()[:100]
+        user = User(email=email, username=username, password_hash=GOOGLE_PLACEHOLDER_HASH)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
     return TokenOut(access_token=create_token(user.id))
 
 

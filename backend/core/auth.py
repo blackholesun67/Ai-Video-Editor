@@ -1,15 +1,13 @@
-"""ระบบยืนยันตัวตน — hash password (bcrypt) + JWT + dependency get_current_user"""
+"""ระบบยืนยันตัวตน — JWT (session token ของเรา) + media token + dependency get_current_user
+   การล็อกอินใช้ Google OAuth (ดู routes/auth.py) — ไม่มีรหัสผ่านให้ hash เองแล้ว"""
 import os
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, Header
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 import jwt
 
 from core.database import get_db
 from core.models import User
-
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ค่า default อ่อน ๆ ที่ห้ามใช้จริงบน production (เดาง่าย → ปลอม token ได้)
 _WEAK_SECRETS = {"dev-secret-change-me-in-production", "change-me-dev-secret", ""}
@@ -29,17 +27,6 @@ if JWT_SECRET in _WEAK_SECRETS:
             "JWT_SECRET ยังเป็นค่า default ที่ไม่ปลอดภัย — ตั้ง env JWT_SECRET ให้เป็นค่าสุ่มยาว ๆ ก่อน deploy production"
         )
     print("⚠️  [auth] JWT_SECRET ยังเป็นค่า default (dev) — อย่าใช้ค่านี้บน production")
-
-
-def hash_password(plain: str) -> str:
-    return _pwd.hash(plain)
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    try:
-        return _pwd.verify(plain, hashed)
-    except Exception:
-        return False
 
 
 def create_token(user_id: str) -> str:
