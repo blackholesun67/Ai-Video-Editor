@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Download, RotateCcw, Type } from 'lucide-react';
+import { Sparkles, Download, RotateCcw, Type, LogOut } from 'lucide-react';
 import UploadScreen from './components/UploadScreen';
 import Processing from './components/Processing';
 import PreviewScreen from './components/PreviewScreen';
 import SubtitleEditScreen from './components/SubtitleEditScreen';
-import { API_URL, PREVIEW_ROWS_KEY } from './config';
+import LoginScreen from './components/LoginScreen';
+import { API_URL, PREVIEW_ROWS_KEY, getAuthToken, setAuthToken, AUTH_LOGOUT_EVENT } from './config';
 
 const STORAGE_KEYS = {
   JOB: 'aive_job_id',
@@ -17,6 +18,9 @@ const STORAGE_KEYS = {
 };
 
 function App() {
+  // ── Auth ──────────────────────────────────────────────────────
+  // ไม่มี token → โชว์ LoginScreen เท่านั้น (บังคับ login ก่อนใช้)
+  const [token, setToken] = useState(() => getAuthToken());
   const [jobId, setJobId] = useState(() => localStorage.getItem(STORAGE_KEYS.JOB));
   const [videoUrl, setVideoUrl] = useState(() => localStorage.getItem(STORAGE_KEYS.VIDEO));
   const [phase, setPhase] = useState(() => localStorage.getItem(STORAGE_KEYS.PHASE) || null);
@@ -122,6 +126,25 @@ function App() {
     try { localStorage.removeItem(STORAGE_KEYS.PREVIEW_ROWS); } catch { /* ignore */ }
   };
 
+  // ── Logout — ล้าง token + งานทั้งหมด (กันงานคนก่อนค้างข้ามบัญชี) ──
+  const handleLogout = () => {
+    if (!window.confirm('ออกจากระบบ? งานที่ยังไม่เสร็จในเครื่องนี้จะถูกล้าง')) return;
+    setAuthToken(null);      // ลบ token + header Authorization
+    setToken(null);
+    handleReset();           // ล้าง state + localStorage งานทั้งหมด
+  };
+
+  // token หมดอายุระหว่างใช้งาน (backend ตอบ 401) → config.js ยิง event นี้
+  // → เด้งกลับหน้า login อัตโนมัติ แทนที่จะค้างหน้าพัง
+  useEffect(() => {
+    const onAuthLogout = () => {
+      setToken(null);
+      handleReset();
+    };
+    window.addEventListener(AUTH_LOGOUT_EVENT, onAuthLogout);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, onAuthLogout);
+  }, []);
+
   // ปุ่มมุมขวาบน — ล้างงานทั้งหมด กลับหน้าอัปโหลด (ถามยืนยันกันกดพลาด)
   const handleResetConfirm = () => {
     if (window.confirm('เริ่มทำวิดีโอใหม่? งานปัจจุบันและวิดีโอที่ตัดไว้จะถูกล้างทั้งหมด')) {
@@ -136,6 +159,11 @@ function App() {
   // query string จาก videoUrl (?v=...) — ใช้ bust cache ของลิงก์ดาวน์โหลดด้วย
   const cacheQuery = videoUrl && videoUrl.includes('?') ? videoUrl.slice(videoUrl.indexOf('?')) : '';
 
+  // ── Auth gate — ไม่มี token → โชว์หน้า Login เท่านั้น (บังคับ login ก่อนใช้) ──
+  if (!token) {
+    return <LoginScreen onLogin={setToken} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* ── Header ─────────────────────────────────────── */}
@@ -149,16 +177,26 @@ function App() {
               <h1 className="text-base font-semibold text-slate-900 leading-tight">AI Video Smart Editor</h1>
             </div>
           </div>
-          {(jobId || videoUrl) && (
+          <div className="flex items-center gap-2">
+            {(jobId || videoUrl) && (
+              <button
+                onClick={handleResetConfirm}
+                title="เริ่มทำวิดีโอใหม่ — ล้างงานทั้งหมด กลับหน้าอัปโหลด"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 bg-white border border-red-200 px-3.5 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
+              >
+                <RotateCcw className="h-4 w-4" />
+                เริ่มทำวิดีโอใหม่
+              </button>
+            )}
             <button
-              onClick={handleResetConfirm}
-              title="เริ่มทำวิดีโอใหม่ — ล้างงานทั้งหมด กลับหน้าอัปโหลด"
-              className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 bg-white border border-red-200 px-3.5 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
+              onClick={handleLogout}
+              title="ออกจากระบบ"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
             >
-              <RotateCcw className="h-4 w-4" />
-              เริ่มทำวิดีโอใหม่
+              <LogOut className="h-4 w-4" />
+              ออกจากระบบ
             </button>
-          )}
+          </div>
         </div>
       </header>
 
