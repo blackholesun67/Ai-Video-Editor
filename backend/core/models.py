@@ -2,7 +2,7 @@
 ใช้ String(36) เก็บ UUID เพื่อให้พกพาข้ามได้ทั้ง PostgreSQL และ sqlite"""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 from core.database import Base
 
@@ -17,7 +17,9 @@ class User(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     email = Column(String(255), unique=True, nullable=False, index=True)
     username = Column(String(100), nullable=False)
-    password_hash = Column(String(255), nullable=False)   # เก็บ bcrypt hash เท่านั้น
+    password_hash = Column(String(255), nullable=False)   # placeholder สำหรับ user Google (ไม่ได้ใช้)
+    # เพิ่มทีละ 1 เมื่อ logout/เพิกถอน → token เก่าที่ tv ไม่ตรงจะใช้ไม่ได้ทันที (ทุกอุปกรณ์)
+    token_version = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     jobs = relationship("Job", back_populates="user", cascade="all, delete-orphan")

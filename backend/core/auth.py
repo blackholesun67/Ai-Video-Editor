@@ -29,9 +29,10 @@ if JWT_SECRET in _WEAK_SECRETS:
     print("⚠️  [auth] JWT_SECRET ยังเป็นค่า default (dev) — อย่าใช้ค่านี้บน production")
 
 
-def create_token(user_id: str) -> str:
+def create_token(user_id: str, token_version: int = 0) -> str:
     payload = {
         "sub": user_id,
+        "tv": token_version,   # ผูกกับ users.token_version → เพิกถอนได้ตอน logout
         "exp": datetime.utcnow() + timedelta(hours=JWT_TTL_HOURS),
         "iat": datetime.utcnow(),
     }
@@ -55,6 +56,10 @@ def get_current_user(
     user = db.query(User).filter(User.id == payload.get("sub")).first()
     if not user:
         raise HTTPException(status_code=401, detail="ไม่พบผู้ใช้")
+    # เพิกถอน: token ที่ tv ไม่ตรงกับ users.token_version = ถูก logout/แบนไปแล้ว
+    # (token เก่าก่อนมีฟีเจอร์นี้ไม่มี tv → get(0) เทียบกับ 0 ผ่าน / ถ้าเคย logout จะไม่ผ่าน)
+    if payload.get("tv", 0) != user.token_version:
+        raise HTTPException(status_code=401, detail="token ถูกเพิกถอน กรุณาล็อกอินใหม่")
     return user
 
 

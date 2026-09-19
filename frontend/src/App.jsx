@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { Sparkles, Download, RotateCcw, Type, LogOut, FolderOpen } from 'lucide-react';
 import UploadScreen from './components/UploadScreen';
 import Processing from './components/Processing';
@@ -23,6 +24,7 @@ function App() {
   // เห็นหน้าโปรแกรมได้เลย — บังคับ login ตอนกด "เริ่มตัดต่อ" (modal) แทน hard gate
   const [token, setToken] = useState(() => getAuthToken());
   const [loginOpen, setLoginOpen] = useState(false);
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   // resolve ของ requestLogin() ที่ค้างอยู่ — เรียกเมื่อ login สำเร็จ/ปิด modal
   const loginResolveRef = useRef(null);
   const [jobId, setJobId] = useState(() => localStorage.getItem(STORAGE_KEYS.JOB));
@@ -172,12 +174,25 @@ function App() {
   };
 
   // ── Logout — ล้าง token + งานทั้งหมด (กันงานคนก่อนค้างข้ามบัญชี) ──
-  const handleLogout = () => {
-    if (!window.confirm('ออกจากระบบ? งานที่ยังไม่เสร็จในเครื่องนี้จะถูกล้าง')) return;
+  const doLogout = async () => {
+    // เพิกถอน token ฝั่ง server ก่อน (best-effort) — ต้องเรียกตอน header ยังแนบ token อยู่
+    // เน็ตล่ม/หมดอายุ ก็ลบ local ต่อไป (ไม่บล็อกการ logout)
+    try { await axios.post(`${API_URL}/auth/logout`); } catch { /* ignore */ }
     setAuthToken(null);      // ลบ token + header Authorization
     setToken(null);
     setShowJobs(false);
+    setConfirmLogoutOpen(false);
     handleReset();           // ล้าง state + localStorage งานทั้งหมด
+  };
+
+  const handleLogout = () => {
+    // เตือนเฉพาะตอนมีงานกำลังทำค้าง (ยังไม่ render เสร็จ) — งานที่เสร็จแล้วอยู่ใน DB ไม่หาย
+    const hasUnsavedWork = !!jobId && !videoUrl;
+    if (hasUnsavedWork) {
+      setConfirmLogoutOpen(true);   // → เด้ง modal ยืนยัน
+    } else {
+      doLogout();                   // ไม่มีงานค้าง → ออกเลย ไม่กวน
+    }
   };
 
   // token หมดอายุระหว่างใช้งาน (backend ตอบ 401) → config.js ยิง event นี้
@@ -363,6 +378,42 @@ function App() {
       {/* Login modal — เปิดตอนกดเริ่มอัปโหลด/งานของฉัน ขณะยังไม่ login */}
       {loginOpen && (
         <LoginScreen onLogin={handleLoginSuccess} onClose={handleLoginClose} />
+      )}
+
+      {/* Confirm logout modal — เด้งเฉพาะตอนมีงานกำลังทำค้าง */}
+      {confirmLogoutOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setConfirmLogoutOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-xl p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-11 w-11 rounded-full bg-red-50 flex items-center justify-center mx-auto">
+              <LogOut className="h-5 w-5 text-red-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mt-3">ออกจากระบบ?</h3>
+            <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+              งานที่กำลังแก้ไขอยู่ (ยังไม่ได้เรนเดอร์) จะหาย —
+              งานที่เสร็จแล้วยังอยู่ใน "งานของฉัน"
+            </p>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setConfirmLogoutOpen(false)}
+                className="flex-1 py-2.5 rounded-lg font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={doLogout}
+                className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                ออกจากระบบ
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

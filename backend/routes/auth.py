@@ -13,7 +13,7 @@ from google.auth.transport import requests as google_requests
 
 from core.database import get_db
 from core.models import User
-from core.schemas import GoogleAuthIn, TokenOut, UserOut, AuthConfigOut
+from core.schemas import GoogleAuthIn, TokenOut, UserOut, AuthConfigOut, MessageOut
 from core.auth import create_token, get_current_user
 from core.ratelimit import limiter
 
@@ -59,7 +59,17 @@ def google_login(request: Request, body: GoogleAuthIn, db: Session = Depends(get
         db.commit()
         db.refresh(user)
 
-    return TokenOut(access_token=create_token(user.id))
+    return TokenOut(access_token=create_token(user.id, user.token_version))
+
+
+@router.post("/logout", response_model=MessageOut)
+def logout(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """เพิกถอน token ทั้งหมดของ user นี้ — บวก token_version → JWT เก่าทุกใบใช้ไม่ได้ทันที
+    (logout ฝั่ง server จริง — ครอบทุกอุปกรณ์ ไม่ใช่แค่ลบใน browser)
+    """
+    user.token_version = (user.token_version or 0) + 1
+    db.commit()
+    return MessageOut(message="ออกจากระบบแล้ว")
 
 
 @router.get("/me", response_model=UserOut)

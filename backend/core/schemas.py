@@ -18,6 +18,10 @@ class AuthConfigOut(BaseModel):
     google_client_id: str
 
 
+class MessageOut(BaseModel):
+    message: str
+
+
 class UserOut(BaseModel):
     id: str
     email: str
