@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Sparkles, Loader2, X } from 'lucide-react';
+import { Sparkles, Loader2, X, Scissors, ShieldCheck, Zap } from 'lucide-react';
 import { API_URL, setAuthToken } from '../config';
 
 /**
@@ -57,10 +57,18 @@ export default function LoginScreen({ onLogin, onClose }) {
         if (!clientId) { setError('ระบบยังไม่ได้ตั้งค่า Google Client ID'); return; }
         await loadGis();
         if (cancelled || !btnRef.current) return;
-        window.google.accounts.id.initialize({ client_id: clientId, callback: handleCredential });
-        window.google.accounts.id.renderButton(btnRef.current, {
-          theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', width: 300,
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleCredential,
+          auto_select: false,          // ไม่ auto login เงียบ ๆ — ให้ผู้ใช้กดยืนยันก่อน
+          cancel_on_tap_outside: true, // แตะนอก One Tap = ปิด (ไม่บังคับ)
         });
+        window.google.accounts.id.renderButton(btnRef.current, {
+          theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', width: 300,
+        });
+        // One Tap — ผู้ใช้เก่าที่มี Google session ค้างในเบราว์เซอร์
+        // จะเห็นการ์ด "ดำเนินการต่อในชื่อ ..." (มีรูป+อีเมล) เด้งขึ้นเอง แบบ Canva
+        window.google.accounts.id.prompt();
         setReady(true);
       } catch {
         if (!cancelled) setError('เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่');
@@ -89,47 +97,64 @@ export default function LoginScreen({ onLogin, onClose }) {
       )}
 
       <div
-        className="relative w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8"
+        className="relative w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-900/5 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {isModal && (
           <button type="button" onClick={onClose} aria-label="ปิด"
-            className="absolute top-3 right-3 text-slate-400 hover:text-slate-700 rounded-lg p-1 hover:bg-slate-100">
+            className="absolute top-3 right-3 z-10 text-white/80 hover:text-white rounded-lg p-1 hover:bg-white/15">
             <X className="h-5 w-5" />
           </button>
         )}
 
-        {isModal && (
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
+        {/* หัวการ์ด — แถบ gradient indigo + โลโก้ */}
+        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 px-6 pt-7 pb-6 text-center">
+          <div className="h-12 w-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center mx-auto ring-1 ring-white/25">
+            <Sparkles className="h-6 w-6 text-white" />
           </div>
-        )}
-
-        <h2 className="text-xl font-semibold text-slate-900 text-center">เข้าสู่ระบบ</h2>
-        <p className="text-sm text-slate-500 text-center mt-1">เข้าสู่ระบบด้วยบัญชี Google เพื่อเริ่มใช้งาน</p>
-
-        <div className="mt-6 flex flex-col items-center gap-3 min-h-[46px]">
-          {/* GIS จะ render ปุ่ม Sign in with Google ในกล่องนี้ */}
-          <div ref={btnRef} />
-          {!ready && !error && <Loader2 className="h-5 w-5 animate-spin text-slate-400" />}
-          {loading && (
-            <p className="text-sm text-slate-500 flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> กำลังเข้าสู่ระบบ...
-            </p>
-          )}
+          <h2 className="text-lg font-semibold text-white mt-3">ยินดีต้อนรับ</h2>
+          <p className="text-sm text-indigo-100 mt-0.5">เข้าสู่ระบบเพื่อเริ่มตัดวิดีโอด้วย AI</p>
         </div>
 
-        {error && (
-          <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-center">
-            {error}
-          </div>
-        )}
+        {/* เนื้อการ์ด */}
+        <div className="px-6 sm:px-8 py-6">
+          {/* จุดขาย 3 ข้อ */}
+          <ul className="space-y-2.5 mb-6">
+            {[
+              { icon: Scissors, text: 'ตัดวิดีโออัตโนมัติด้วย AI' },
+              { icon: ShieldCheck, text: 'ปลอดภัยด้วยบัญชี Google' },
+              { icon: Zap, text: 'ไม่ต้องจำรหัสผ่าน เข้าใช้ได้ทันที' },
+            ].map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-3 text-sm text-slate-600">
+                <span className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <Icon className="h-4 w-4" />
+                </span>
+                {text}
+              </li>
+            ))}
+          </ul>
 
-        <p className="text-xs text-slate-400 text-center mt-6">
-          การเข้าสู่ระบบถือว่ายอมรับเงื่อนไขการใช้งาน
-        </p>
+          <div className="flex flex-col items-center gap-3 min-h-[46px]">
+            {/* GIS จะ render ปุ่ม Sign in with Google ในกล่องนี้ */}
+            <div ref={btnRef} />
+            {!ready && !error && <Loader2 className="h-5 w-5 animate-spin text-slate-400" />}
+            {loading && (
+              <p className="text-sm text-slate-500 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> กำลังเข้าสู่ระบบ...
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-center">
+              {error}
+            </div>
+          )}
+
+          <p className="text-xs text-slate-400 text-center mt-6">
+            การเข้าสู่ระบบถือว่ายอมรับเงื่อนไขการใช้งาน
+          </p>
+        </div>
       </div>
     </div>
   );
