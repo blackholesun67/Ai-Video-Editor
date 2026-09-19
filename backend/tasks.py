@@ -2,6 +2,7 @@ import os
 import json
 import time
 import shutil
+import subprocess
 import redis as _redis
 from celery import Celery
 from celery.schedules import crontab
@@ -48,6 +49,22 @@ celery_app.conf.update(
 STORAGE_DIR = "storage"
 PREVIEW_FILENAME = "preview.json"
 FINAL_VIDEO_NAME = "final_summary.mp4"
+THUMBNAIL_NAME = "thumbnail.jpg"
+
+
+def _make_thumbnail(final_output: str, job_dir: str) -> None:
+    """ดึง 1 เฟรมจากวิดีโอผลลัพธ์เป็นภาพปก (best-effort) — สำหรับหน้า "งานของฉัน"
+    ล้มเหลวห้ามทำให้งาน render พัง (แค่ log) · เฟรมที่ ~1 วิ กว้าง 480px
+    """
+    try:
+        thumb = os.path.join(job_dir, THUMBNAIL_NAME)
+        subprocess.run(
+            ["ffmpeg", "-y", "-ss", "1", "-i", final_output,
+             "-vframes", "1", "-vf", "scale=480:-1", thumb],
+            check=True, capture_output=True, timeout=30,
+        )
+    except Exception as e:
+        print(f"⚠️ สร้าง thumbnail ไม่สำเร็จ (ข้ามไป): {e}")
 # marker บอกว่า job dir นี้กำลังถูกประมวลผล — cleanup จะข้าม dir ที่มี marker สด
 # (กัน race ที่ cleanup ลบ dir กลางคันขณะ worker ทำงาน)
 PROCESSING_MARKER = ".processing"
@@ -151,6 +168,32 @@ def set_job_status(job_id: str, status: str, result_path: str = None) -> None:
                 pass
 
 
+def delete_job_row(job_id: str) -> None:
+    """ลบแถว job ออกจาก DB — best-effort (ใช้ตอน cleanup ครบ 7 วัน ให้ DB สะอาด)
+    ครอบ try/except: DB ล้มห้ามทำให้ cleanup พัง · ไม่พบแถว = ข้ามเงียบ ๆ
+    """
+    db = None
+    try:
+        db = SessionLocal()
+        deleted = db.query(Job).filter(Job.id == job_id).delete()
+        db.commit()
+        if deleted:
+            print(f"🗑️ ลบ job row {job_id} ออกจาก DB (หมดอายุ)")
+    except Exception as e:
+        print(f"⚠️ delete_job_row({job_id}) failed: {e}")
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Cleanup — ลบ job dir เก่า (เรียกทั้งตอน API startup [main.py] และ periodic [beat])
 # ─────────────────────────────────────────────────────────────────────────────
@@ -190,7 +233,7 @@ def cleanup_old_jobs() -> None:
                 print(f"⏭️ cleanup skipped active job: {path}")
                 continue
             shutil.rmtree(path, ignore_errors=True)
-            set_job_status(entry, "expired")   # ไฟล์ถูกลบแล้ว — mark row ให้ตรงความจริง
+            delete_job_row(entry)   # ลบทั้งไฟล์และ row ใน DB (ครบ 7 วัน) → DB สะอาด
             removed += 1
         except Exception as e:
             print(f"⚠️ cleanup failed for {path}: {e}")
@@ -358,6 +401,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
                 output_mode, target_length, burn_subtitle, denoise=denoise,
                 tiktok_fit=tiktok_fit)
 
+        _make_thumbnail(final_output, job_dir)   # ภาพปกสำหรับหน้า "งานของฉัน"
         set_job_status(job_id, "done", result_path=f"{job_id}/{FINAL_VIDEO_NAME}")
         return {
             "status": "SUCCESS",
@@ -474,6 +518,7 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
                 tiktok_fit=preview.get("tiktok_fit") or "blur")
 
         total_keep = sum(s["end"] - s["start"] for s in clean_segs)
+        _make_thumbnail(final_output, job_dir)   # ภาพปกสำหรับหน้า "งานของฉัน"
         set_job_status(job_id, "done", result_path=f"{job_id}/{FINAL_VIDEO_NAME}")
         return {
             "status": "SUCCESS",

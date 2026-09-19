@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ArrowLeft, Download, Loader2, FileVideo, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, FileVideo, RefreshCw, Play } from 'lucide-react';
 import { API_URL, fetchMediaToken } from '../config';
 
 // ป้ายสถานะ (ตรงกับค่าที่ worker เขียนลง DB) → ข้อความไทย + สี
@@ -10,7 +10,7 @@ const STATUS_META = {
   done:       { label: 'เสร็จแล้ว',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   failed:     { label: 'ล้มเหลว',        cls: 'bg-red-50 text-red-700 border-red-200' },
   cancelled:  { label: 'ยกเลิก',         cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-  expired:    { label: 'หมดอายุ',        cls: 'bg-slate-100 text-slate-400 border-slate-200' },
+  // งานที่หมดอายุ (ครบ 7 วัน) ถูกลบทั้ง row ออกจาก DB แล้ว → ไม่มี status นี้อีก
 };
 
 function fmtDate(iso) {
@@ -24,19 +24,31 @@ function fmtDate(iso) {
 }
 
 /**
- * หน้า "งานของฉัน" — ดึงรายการงานจาก GET /jobs (เฉพาะของ user ที่ login)
- * งานที่ done → ดาวน์โหลดผลลัพธ์ได้ (ผ่าน media token)
+ * หน้า "งานของฉัน" — gallery การ์ดวิดีโอ (GET /jobs)
+ * งาน done → มีภาพปก (thumbnail.jpg ผ่าน media token) + ดาวน์โหลดได้
+ * งานอื่น/หมดอายุ → placeholder + ปิดปุ่มดาวน์โหลด
  */
 export default function MyJobsScreen({ onClose }) {
   const [jobs, setJobs] = useState(null);   // null = ยังไม่โหลด
   const [error, setError] = useState('');
+  const [tokens, setTokens] = useState({}); // jobId → media token (สำหรับ thumbnail/download)
   const [downloading, setDownloading] = useState('');
 
   const load = () => {
     setError('');
     setJobs(null);
+    setTokens({});
     axios.get(`${API_URL}/jobs`)
-      .then((res) => setJobs(Array.isArray(res.data) ? res.data : []))
+      .then(async (res) => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        setJobs(list);
+        // ขอ media token ให้เฉพาะงาน done (ไว้โหลดภาพปก + ดาวน์โหลด)
+        const done = list.filter((j) => j.status === 'done');
+        const pairs = await Promise.all(
+          done.map(async (j) => [j.id, await fetchMediaToken(j.id)])
+        );
+        setTokens(Object.fromEntries(pairs.filter(([, t]) => t)));
+      })
       .catch((err) => {
         setError(err.response?.data?.detail || 'โหลดรายการงานไม่สำเร็จ');
         setJobs([]);
@@ -48,34 +60,28 @@ export default function MyJobsScreen({ onClose }) {
   const download = async (jobId) => {
     setDownloading(jobId);
     try {
-      const token = await fetchMediaToken(jobId);
-      if (token) {
-        // เปิดลิงก์ดาวน์โหลด (แนบ media token) — เบราว์เซอร์จัดการดาวน์โหลดเอง
-        window.location.href = `${API_URL}/download/${jobId}?token=${token}`;
-      }
+      const token = tokens[jobId] || await fetchMediaToken(jobId);
+      if (token) window.location.href = `${API_URL}/download/${jobId}?token=${token}`;
     } finally {
       setDownloading('');
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <button
-          onClick={onClose}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
-        >
+        <button onClick={onClose} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900">
           <ArrowLeft className="h-4 w-4" /> กลับ
         </button>
-        <button
-          onClick={load}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800"
-        >
+        <button onClick={load} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
           <RefreshCw className="h-4 w-4" /> รีเฟรช
         </button>
       </div>
 
-      <h2 className="text-2xl font-semibold text-slate-900">งานของฉัน</h2>
+      <div>
+        <h2 className="text-2xl font-semibold text-slate-900">งานของฉัน</h2>
+        <p className="text-sm text-slate-400 mt-0.5">ไฟล์ผลลัพธ์เก็บไว้ 7 วัน กรุณาดาวน์โหลดเก็บไว้</p>
+      </div>
 
       {jobs === null && (
         <div className="flex items-center justify-center py-16 text-slate-400">
@@ -84,9 +90,7 @@ export default function MyJobsScreen({ onClose }) {
       )}
 
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          {error}
-        </div>
+        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
       )}
 
       {jobs !== null && jobs.length === 0 && !error && (
@@ -96,42 +100,63 @@ export default function MyJobsScreen({ onClose }) {
         </div>
       )}
 
-      <div className="space-y-2.5">
-        {(jobs || []).map((job) => {
-          const meta = STATUS_META[job.status] || { label: job.status, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
-          return (
-            <div
-              key={job.id}
-              className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3"
-            >
-              <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                <FileVideo className="h-4.5 w-4.5 text-slate-500" />
+      {jobs !== null && jobs.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {jobs.map((job) => {
+            const meta = STATUS_META[job.status] || { label: job.status, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
+            const isDone = job.status === 'done';
+            const thumbUrl = isDone && tokens[job.id]
+              ? `${API_URL}/media/${job.id}/thumbnail.jpg?token=${tokens[job.id]}`
+              : null;
+            return (
+              <div key={job.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md hover:border-slate-300 transition">
+                {/* ภาพปก / placeholder */}
+                <div className="relative aspect-video bg-gradient-to-br from-slate-100 to-slate-200">
+                  {thumbUrl ? (
+                    <img
+                      src={thumbUrl}
+                      alt={job.original_filename}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {isDone
+                        ? <Play className="h-8 w-8 text-slate-300" />
+                        : <FileVideo className="h-8 w-8 text-slate-300" />}
+                    </div>
+                  )}
+                  <span className={`absolute top-2 right-2 text-xs font-medium px-2 py-0.5 rounded-full border ${meta.cls} whitespace-nowrap`}>
+                    {meta.label}
+                  </span>
+                </div>
+
+                {/* ข้อมูล */}
+                <div className="p-3">
+                  <p className="text-sm font-medium text-slate-900 truncate" title={job.original_filename}>
+                    {job.original_filename || 'ไม่มีชื่อไฟล์'}
+                  </p>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-xs text-slate-400">{fmtDate(job.created_at)}</span>
+                    {isDone && (
+                      <button
+                        onClick={() => download(job.id)}
+                        disabled={downloading === job.id}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg disabled:opacity-50"
+                      >
+                        {downloading === job.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Download className="h-3.5 w-3.5" />}
+                        ดาวน์โหลด
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-slate-900 truncate">
-                  {job.original_filename || 'ไม่มีชื่อไฟล์'}
-                </p>
-                <p className="text-xs text-slate-400">{fmtDate(job.created_at)}</p>
-              </div>
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${meta.cls} whitespace-nowrap`}>
-                {meta.label}
-              </span>
-              {job.status === 'done' && (
-                <button
-                  onClick={() => download(job.id)}
-                  disabled={downloading === job.id}
-                  title="ดาวน์โหลดผลลัพธ์"
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 shrink-0"
-                >
-                  {downloading === job.id
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : <Download className="h-4 w-4" />}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

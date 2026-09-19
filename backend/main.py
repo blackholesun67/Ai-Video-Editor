@@ -361,8 +361,10 @@ async def serve_media(job_id: str, filename: str, token: str = ""):
     safe_name = os.path.basename(filename)
     if safe_name != filename or safe_name.startswith("."):
         raise HTTPException(status_code=400, detail="ชื่อไฟล์ไม่ถูกต้อง")
-    # allowlist: เฉพาะไฟล์วิดีโอ (ต้นฉบับ + final_summary.mp4) — ไม่เปิดไฟล์อื่นในโฟลเดอร์
-    if os.path.splitext(safe_name)[1].lower() not in ALLOWED_VIDEO_EXTS:
+    # allowlist: ไฟล์วิดีโอ (ต้นฉบับ + final_summary.mp4) + ภาพปก thumbnail.jpg เท่านั้น
+    # — ไม่เปิดไฟล์อื่นในโฟลเดอร์ (preview.json/srt/เสียง)
+    is_thumbnail = safe_name == "thumbnail.jpg"
+    if not is_thumbnail and os.path.splitext(safe_name)[1].lower() not in ALLOWED_VIDEO_EXTS:
         raise HTTPException(status_code=403, detail="ไฟล์นี้เข้าถึงผ่าน media ไม่ได้")
 
     job_dir = os.path.abspath(os.path.join(STORAGE_DIR, job_id))
