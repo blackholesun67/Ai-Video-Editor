@@ -1,0 +1,82 @@
+diff --git a/backend/core/ai_logic.py b/backend/core/ai_logic.py
+index 29cca4d..27f8d0b 100644
+--- a/backend/core/ai_logic.py
++++ b/backend/core/ai_logic.py
+@@ -873,29 +873,64 @@ def correct_transcript_with_ai_parallel(transcript: list[dict],
+     return merged
+ 
+ 
++# สัดส่วนเสียงพูด (จาก VAD) ขั้นต่ำของ transcript segment ที่ยังส่งต่อให้ AI — 0 = ไม่กรองเลย
++#
++# ตรรกะเดิมเก็บ segment เมื่อ "จุดกึ่งกลาง" ตกในช่วงเสียงพูดของ VAD ซึ่งผิดกับ segment ยาวที่มีความเงียบ
++# อยู่กลางท่อน (Whisper segment ไม่ใช่ประโยค — ดู CLAUDE.md 3.2.1) ถ้าจุดกึ่งกลางบังเอิญตกในความเงียบ
++# ทั้งท่อนถูกทิ้งแม้ส่วนใหญ่เป็นเสียงพูด แล้ว AI เห็นช่องว่างยาวและสั่งตัดเนื้อหาจริงทิ้งต่อ
++# เคสจริงจากการทดสอบ baseline (replay ด้วย VAD ตัวเดิมได้ผลตรงกับ log ตอนรันจริงทุกคลิป):
++#   V02  34.4-65.4  จุดกึ่งกลาง 49.9 ตกในความเงียบ 47.4-51.6     เสียงพูดจริง 85% → ถูกทิ้ง
++#   V06  128.9-151.9 จุดกึ่งกลาง 140.4 ตกในความเงียบ 139.2-142.8  เสียงพูดจริง 81% → ถูกทิ้ง
++#   V07  ทั้ง 2 ท่อน (เสียงพูด 46% และ 45%)                        → เหลือ 0 ท่อนส่งให้ AI
++#
++# เกณฑ์ 0.20 มาจากการวัด: ทั้ง 72 ท่อนใน 7 คลิปไม่มีท่อนเสียงพูดจริงใดที่ overlap ต่ำกว่า 45%
++# และผลการตัดสินเหมือนกันทุกค่าเกณฑ์ในช่วง (0, 0.45] → 0.20 อยู่ห่างจากค่าต่ำสุดที่พบราว 2 เท่า
++# ⚠️ ข้อจำกัด: ชุดข้อมูลไม่มีท่อนที่เป็นความเงียบล้วน (overlap ≈ 0) เลย ด้านที่ต้อง "ทิ้ง" จึงยังไม่ได้
++#    วัดกับของจริง — เลือกแบบระวังไว้ก่อน เพราะทิ้งเสียงพูดผิด (เนื้อหาหาย) เสียหายกว่าเก็บความเงียบเกิน
++try:
++    VAD_PREFILTER_MIN_SPEECH = float(os.getenv("VAD_PREFILTER_MIN_SPEECH", "") or 0.20)
++except (TypeError, ValueError):
++    VAD_PREFILTER_MIN_SPEECH = 0.20
++
++
+ def filter_transcript_by_vad(transcript: list[dict], voice_segments: list[dict]) -> list[dict]:
+     """
+-    [PRE-FILTER] กรอง transcript ให้เหลือเฉพาะช่วงที่ VAD ยืนยันว่ามีเสียงพูดจริง
+-    ตัด silence / noise ออกก่อนส่งให้ AI — ประหยัด token + ลด hallucination
++    [PRE-FILTER] กรอง transcript ให้เหลือเฉพาะท่อนที่มีเสียงพูดจริง (ตาม VAD) มากพอ
++    ตัดท่อนที่เป็นความเงียบ/noise ออกก่อนส่งให้ AI — ประหยัด token + ลด hallucination
++
++    ตัดสินจาก "สัดส่วนของท่อนที่ VAD บอกว่าเป็นเสียงพูด" (>= VAD_PREFILTER_MIN_SPEECH → เก็บ)
++    ไม่ใช่จุดกึ่งกลางของท่อน — ท่อนที่มีความเงียบอยู่กลางท่อนจึงไม่ถูกทิ้งทั้งท่อนอีก
+ 
+     transcript    : output จาก Whisper
+     voice_segments: output จาก vad_logic.get_voice_activity()
++
++    log: ไม่พิมพ์ข้อความของผู้ใช้ — พิมพ์เฉพาะลำดับ/เวลา/สัดส่วน ; ท่อนที่ถูกทิ้งและท่อนที่เก็บแบบ
++    "บางส่วน" (< 90%) ถูกพิมพ์เสมอ ท่อนอื่นพิมพ์เมื่อ DEBUG=1
+     """
+     if not voice_segments:
+         print("⚠️ VAD returned no voice segments — using full transcript as fallback")
+         return transcript
+ 
+-    filtered = []
+-    for seg in transcript:
+-        seg_mid = (seg["start"] + seg["end"]) / 2
+-        # เก็บ segment ถ้า midpoint อยู่ในช่วงที่ VAD บอกว่ามีเสียงพูด
+-        for v in voice_segments:
+-            if v["start"] <= seg_mid <= v["end"]:
+-                filtered.append(seg)
+-                break
+-
+-    removed = len(transcript) - len(filtered)
+-    print(f"[VAD Pre-filter] Removed {removed} silent segments, kept {len(filtered)}/{len(transcript)}")
++    filtered: list[dict] = []
++    lines: list[str] = []
++    for i, seg in enumerate(transcript):
++        start, end = float(seg["start"]), float(seg["end"])
++        if end > start:
++            ratio = _voiced_ratio(start, end, voice_segments)
++        else:   # ท่อนไม่มีความยาว: ใช้ตำแหน่งจุดเดียวเหมือนตรรกะเดิม
++            ratio = 1.0 if any(float(v["start"]) <= start <= float(v["end"])
++                               for v in voice_segments) else 0.0
++        keep = ratio >= VAD_PREFILTER_MIN_SPEECH
++        if keep:
++            filtered.append(seg)
++        if (not keep) or ratio < 0.9 or DEBUG:
++            lines.append(f"  segment {i} {start:.1f}-{end:.1f} speech overlap = {ratio:.0%} "
++                         f"{'KEEP' if keep else 'DROP'}")
++
++    print(f"[VAD Pre-filter] original segments = {len(transcript)} | kept = {len(filtered)} | "
++          f"removed = {len(transcript) - len(filtered)} | min speech overlap = {VAD_PREFILTER_MIN_SPEECH:.0%}")
++    for line in lines:
++        print(line)
+     return filtered
+ 
+ 

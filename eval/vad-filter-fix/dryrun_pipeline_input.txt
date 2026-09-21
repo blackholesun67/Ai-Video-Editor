@@ -1,0 +1,43 @@
+### V02_full 0e4c606f-d1e1-42dd-a030-6be1cd904465
+    old: ok 0.0s
+    new: ok 0.0s
+### V06_full 0772b3c4-8449-48b6-bbb6-f2631a3aae3a
+    old: ok 0.0s
+    new: ok 0.0s
+### V06_summary 20692075-ce67-46ae-aea5-6b9672231db7
+    old: ok 0.0s
+    new: ok 0.0s
+### V07_full cc0db657-a323-4516-9f4c-3e8cf5a23685
+    old: ok 0.0s
+    new: ok 0.0s
+V02_full     โค้ดเดิม baseline-ch4  ok
+      [VAD Pre-filter] Removed 1 silent segments, kept 6/7
+      [Transcript] 6 segments, 983 chars → Gemini
+V02_full     โค้ดใหม่ (working tree) ok
+      [VAD Pre-filter] original segments = 7 | kept = 7 | removed = 0 | min speech overlap = 20%
+      segment 0 1.7-34.9 speech overlap = 86% KEEP
+      segment 1 34.4-65.4 speech overlap = 85% KEEP
+      segment 2 68.0-94.9 speech overlap = 66% KEEP
+      [Transcript] 7 segments, 1,294 chars → Gemini
+V06_full     โค้ดเดิม baseline-ch4  ok
+      [VAD Pre-filter] Removed 1 silent segments, kept 11/12
+      [Transcript] 11 segments, 2,110 chars → Gemini
+V06_full     โค้ดใหม่ (working tree) ok
+      [VAD Pre-filter] original segments = 12 | kept = 12 | removed = 0 | min speech overlap = 20%
+      segment 7 128.9-151.9 speech overlap = 81% KEEP
+      [Transcript] 12 segments, 2,421 chars → Gemini
+V06_summary  โค้ดเดิม baseline-ch4  ok
+      [VAD Pre-filter] Removed 1 silent segments, kept 11/12
+      [Transcript] 11 segments, 2,105 chars → Gemini
+V06_summary  โค้ดใหม่ (working tree) ok
+      [VAD Pre-filter] original segments = 12 | kept = 12 | removed = 0 | min speech overlap = 20%
+      segment 7 128.9-151.9 speech overlap = 81% KEEP
+      [Transcript] 12 segments, 2,415 chars → Gemini
+V07_full     โค้ดเดิม baseline-ch4  ok
+      [VAD Pre-filter] Removed 2 silent segments, kept 0/2
+      [Transcript] 0 segments, 2 chars → Gemini
+V07_full     โค้ดใหม่ (working tree) ok
+      [VAD Pre-filter] original segments = 2 | kept = 2 | removed = 0 | min speech overlap = 20%
+      segment 0 0.0-52.6 speech overlap = 46% KEEP
+      segment 1 55.1-94.9 speech overlap = 45% KEEP
+      [Transcript] 2 segments, 581 chars → Gemini

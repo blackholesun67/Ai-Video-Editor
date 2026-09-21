@@ -1,0 +1,4 @@
+# sha256 ของโค้ดที่ใช้ทดสอบ (คำนวณจากเนื้อหาแบบ LF — ตรงกับ blob ใน git ; ไฟล์บน Windows เป็น CRLF จึงต้อง normalize ก่อนเทียบ)
+aa7b4ccb117f2828c409a867f7fa45eaffe4b84aeda3e0ad44a37040260a6392  backend/core/ai_logic.py @ 5ad3d92 (tag vad-fix-v1, โค้ดใหม่)
+2632b324d1b1e8d44ef02ea9acda5d3619a46e70e80ae944117e2c256f64c4a0  backend/core/ai_logic.py @ 0f9cb7d (tag baseline-ch4, โค้ดเดิม/control)
+# ตรวจซ้ำ: git show vad-fix-v1:backend/core/ai_logic.py | sha256sum   และ   git show baseline-ch4:backend/core/ai_logic.py | sha256sum

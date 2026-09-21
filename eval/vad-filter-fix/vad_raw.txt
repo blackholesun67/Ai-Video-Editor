@@ -1,0 +1,29 @@
+[VAD] Audio loaded: storage/8e43cd1d-431d-4f98-9e78-0c72946988e1/full_audio.wav
+[VAD] Duration: 137.9s
+[VAD] Found 23 raw → 2 merged voice segments
+[VAD] Speech: 131.6s | Silence gaps to cut: 4.9s
+[VAD] Audio loaded: storage/0e4c606f-d1e1-42dd-a030-6be1cd904465/full_audio.wav
+[VAD] Duration: 112.8s
+[VAD] Found 22 raw → 5 merged voice segments
+[VAD] Speech: 90.8s | Silence gaps to cut: 18.4s
+[VAD] Audio loaded: storage/e30793df-0e40-4955-9b4f-c196f0574857/full_audio.wav
+[VAD] Duration: 107.8s
+[VAD] Found 11 raw → 1 merged voice segments
+[VAD] Speech: 105.5s | Silence gaps to cut: 0.0s
+[VAD] Audio loaded: storage/9590035b-7af5-4e7b-92b9-496ed863a3ba/full_audio.wav
+[VAD] Duration: 144.3s
+[VAD] Found 27 raw → 4 merged voice segments
+[VAD] Speech: 132.7s | Silence gaps to cut: 9.6s
+[VAD] Audio loaded: storage/4c4597f3-61a4-437d-a420-28d09f6f010b/full_audio.wav
+[VAD] Duration: 124.1s
+[VAD] Found 27 raw → 1 merged voice segments
+[VAD] Speech: 123.0s | Silence gaps to cut: 0.0s
+[VAD] Audio loaded: storage/0772b3c4-8449-48b6-bbb6-f2631a3aae3a/full_audio.wav
+[VAD] Duration: 178.5s
+[VAD] Found 32 raw → 3 merged voice segments
+[VAD] Speech: 169.6s | Silence gaps to cut: 7.1s
+[VAD] Audio loaded: storage/cc0db657-a323-4516-9f4c-3e8cf5a23685/full_audio.wav
+[VAD] Duration: 95.8s
+[VAD] Found 13 raw → 5 merged voice segments
+[VAD] Speech: 44.8s | Silence gaps to cut: 50.0s
+@@VAD_JSON@@{"V01": {"job": "8e43cd1d-431d-4f98-9e78-0c72946988e1", "voice_segments": [{"start": 1.44, "end": 83.33}, {"start": 88.19, "end": 137.91}]}, "V02": {"job": "0e4c606f-d1e1-42dd-a030-6be1cd904465", "voice_segments": [{"start": 1.73, "end": 29.09}, {"start": 33.67, "end": 46.72}, {"start": 51.52, "end": 77.76}, {"start": 80.32, "end": 83.81}, {"start": 90.27, "end": 110.88}]}, "V03": {"job": "e30793df-0e40-4955-9b4f-c196f0574857", "voice_segments": [{"start": 1.41, "end": 106.88}]}, "V04": {"job": "9590035b-7af5-4e7b-92b9-496ed863a3ba", "voice_segments": [{"start": 1.06, "end": 49.57}, {"start": 51.84, "end": 70.75}, {"start": 75.94, "end": 123.26}, {"start": 125.41, "end": 143.33}]}, "V05": {"job": "4c4597f3-61a4-437d-a420-28d09f6f010b", "voice_segments": [{"start": 0.16, "end": 123.17}]}, "V06": {"job": "0772b3c4-8449-48b6-bbb6-f2631a3aae3a", "voice_segments": [{"start": 0.13, "end": 39.2}, {"start": 42.02, "end": 138.43}, {"start": 142.72, "end": 176.89}]}, "V07": {"job": "cc0db657-a323-4516-9f4c-3e8cf5a23685", "voice_segments": [{"start": 0.13, "end": 16.06}, {"start": 31.49, "end": 37.12}, {"start": 50.02, "end": 59.04}, {"start": 61.06, "end": 62.97}, {"start": 82.66, "end": 94.94}]}}

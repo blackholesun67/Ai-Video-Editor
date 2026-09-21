@@ -1,0 +1,17 @@
+run          | mode    | recall ก่อน หลัง      | prec ก่อน หลัง      | นอกเฉลย ก่อน หลัง      | ทับKEEP ก่อน หลัง     
+V02 full     | full    | 45.5%      NOT TESTED | 15.1%     NOT TESTED | 28.1s        NOT TESTED | 0.0s         NOT TESTED
+V03 summary  | summary | 82.1%      NOT TESTED | 96.5%     NOT TESTED | 1.3s         NOT TESTED | 0.0s         NOT TESTED
+V04 full     | full    | 18.6%      NOT TESTED | 46.4%     NOT TESTED | 4.5s         NOT TESTED | 0.0s         NOT TESTED
+V05 full     | full    | N/A        NOT TESTED | N/A       NOT TESTED | 0.0s         NOT TESTED | 0.0s         NOT TESTED
+V06 full     | full    | 59.3%      NOT TESTED | 74.2%     NOT TESTED | 10.9s        NOT TESTED | 5.8s         NOT TESTED
+V06 summary  | summary | 32.9%      NOT TESTED | 36.1%     NOT TESTED | 39.6s        NOT TESTED | 5.1s         NOT TESTED
+V07 full     | full    | 0.0%       NOT TESTED | N/A       NOT TESTED | 0.0s         NOT TESTED | 0.0s         NOT TESTED
+
+ช่วงที่ระบบตัด (ก่อนแก้):
+  V02 full     [(34.9, 68.0)]
+  V03 summary  [(50.7, 87.3)]
+  V04 full     [(58.7, 61.9), (71.1, 76.3)]
+  V05 full     []
+  V06 full     [(25.9, 34.8), (82.6, 105.9), (111.2, 121.2)]
+  V06 summary  [(42.1, 48.0), (82.6, 105.9), (111.2, 116.3), (124.6, 152.3)]
+  V07 full     []

@@ -1,0 +1,8 @@
+Using cache found in /tmp/torch_hub/hub/snakers4_silero-vad_master
+### V01 8e43cd1d-431d-4f98-9e78-0c72946988e1
+### V02 0e4c606f-d1e1-42dd-a030-6be1cd904465
+### V03 e30793df-0e40-4955-9b4f-c196f0574857
+### V04 9590035b-7af5-4e7b-92b9-496ed863a3ba
+### V05 4c4597f3-61a4-437d-a420-28d09f6f010b
+### V06 0772b3c4-8449-48b6-bbb6-f2631a3aae3a
+### V07 cc0db657-a323-4516-9f4c-3e8cf5a23685
