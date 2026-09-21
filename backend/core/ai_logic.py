@@ -5,6 +5,7 @@ import json
 import os
 import time
 import re
+import difflib
 import hashlib
 from faster_whisper import WhisperModel, BatchedInferencePipeline
 from core.visual_logic import pick_keyframe_times, extract_keyframes
@@ -1332,12 +1333,16 @@ _FULL_BLOCK_CLEANING = """
 ✂️ ตัดได้ **เฉพาะ 3 อย่างนี้เท่านั้น**:
   1. ช่วงเงียบ / ไม่มีเสียงพูด ที่ยาวผิดปกติ
   2. ติดขัด พูดผิดแล้วพูดใหม่ทันที คำเติมล้วน ๆ ("เอ่อ…", "อืม…") ที่ยาวพอสมควร
+     รวมถึง **เทคซ้ำ**: ผู้พูดพูดประโยคเดิมซ้ำ (เกือบคำต่อคำ ติดกันภายในไม่กี่วินาที เพราะพูดผิด/ไม่พอใจเทคแรก)
+     → ตัดเทคก่อนหน้าทิ้ง **เก็บเทคสุดท้าย** ; และประโยคที่พูดถึงการพูดผิดเอง ("ขอโทษครับ",
+     "พูดผิด", "ขอพูดใหม่นะครับ") ตัดได้เช่นกัน
   3. ปัญหาเทคนิค — เสียงหาย, รอโหลด, จัดกล้อง, "ได้ยินไหมครับ", เทคเสีย
 
 ⛔ **ห้ามตัดเด็ดขาดในโหมดนี้** (ต่างจากโหมดอื่น):
   - **ห้ามตัด off-topic / tangent** — เรื่องเล่าที่ดูไม่เกี่ยวอาจเป็นสีสัน เป็นการเท้าความ
     หรือเป็นเนื้อเรื่องเอง (โดยเฉพาะคลิปเล่าเรื่อง/ประวัติศาสตร์) → ปล่อยให้คนตัดต่อตัดสิน
-  - **ห้ามตัด repetition** — การย้ำ/ทวนเป็นเทคนิคการเล่าเรื่องและการสอน
+  - **ห้ามตัดการย้ำ/ทวนเพื่อเน้น** — พูดอีกครั้งด้วยถ้อยคำต่างออกไปเพื่อสรุปหรือเน้นประเด็น
+    เป็นเทคนิคการเล่าเรื่องและการสอน (ต่างจาก "เทคซ้ำ" ข้างบน ที่เป็นประโยคเดิมพูดซ้ำเพราะพูดผิด)
   - ห้ามตัดเพราะ "น่าจะไม่สำคัญ" หรือ "อยากให้สั้นลง" — **โหมดนี้ไม่มีเป้าความยาว**
 
 📌 กฎด้านบนที่บอกให้ตัด "Off-topic tangent" กับ "Filler / วนซ้ำ (พูดซ้ำความคิดเดิม)"
@@ -1378,6 +1383,10 @@ _EXAMPLES_CLEANING = """
 ตัวอย่างที่ 4b — ติดขัด/พูดผิดแล้วพูดใหม่ (โหมดนี้ **ตัด**):
   Transcript: "แล้วเขาก็เดินทางไปที่... เอ่อ... เดี๋ยวนะ... อืม... แล้วเขาก็เดินทางไปที่เมืองหลวง"
   Output: [{"start": 88.0, "end": 94.0, "reason": "ติดขัด พูดผิดแล้วเริ่มประโยคใหม่", "confidence": "high"}]
+
+ตัวอย่างที่ 4c — เทคซ้ำ: ประโยคเดิมพูดซ้ำเพราะพูดผิด (โหมดนี้ **ตัด** เก็บเทคสุดท้าย):
+  Transcript: "...ราคาหุ้นขึ้นลงได้ตามหลายปัจจัยครับ ราคาหุ้นใช่ครับ ราคาหุ้นขึ้นลงได้ตามหลายปัจจัย ขอโทษครับ พูดผิด ราคาหุ้นขึ้นลงได้ตามหลายปัจจัยของตลาด"
+  Output: [{"start": 70.9, "end": 78.7, "reason": "เทคซ้ำ พูดประโยคเดิมซ้ำหลายครั้ง เก็บเทคสุดท้าย", "confidence": "high"}]
 """
 
 
@@ -1827,6 +1836,241 @@ def _snap_segments_to_sentences(segments: list[dict], transcript: list[dict],
     return merged
 
 
+# ── ตัดเทคซ้ำ (retake) — พูดผิดแล้วพูดประโยคเดิมซ้ำทันที ─────────────────────
+#
+# ทำไมต้องมี guard ในโค้ด ไม่พึ่งพรอมป์อย่างเดียว (กฎข้อ 1):
+#   1. Gemini เห็นแค่ timestamp ระดับ "ท่อน" (_slim_for_gemini) แต่ท่อนถอดเสียงยาวได้ถึง 20 วิ
+#      เทคที่พูดผิดมักฝังอยู่กลางท่อน จึงชี้ตำแหน่งตัดไม่ได้
+#   2. ช่วงตัดสั้นกว่า 5 วิถูกทิ้งก่อนถึงขั้น invert (Step 5) — เทคซ้ำส่วนใหญ่สั้นกว่านั้น
+#   3. พรอมป์โหมด full เคยห้ามตัด repetition ทั้งหมด (ตอนนี้แยก "เทคซ้ำ" ออกจาก "การย้ำ")
+#
+# ตรวจด้วยข้อความ ไม่ใช่ช่องว่างระหว่างคำ: ผู้พูดที่พูดผิดมักพูดต่อทันทีไม่หยุด
+# (เคสจริง: "…ปัดใจครับราคาฮุนใช่ครมันขึ้นลงได้…" ติดกันหมด) จึงหาจุดหยุดไม่เจอ
+#
+# วัดกับ transcript จริงก่อนตั้งเกณฑ์ (กฎข้อ 3) — เทียบ 3 งานใน storage:
+#   ตัววัด "อักษรที่ตรงกันรวมทั้งสาย"      → คลิป 7 นาทีที่ไม่มีเทคซ้ำได้ 18 hits (เกือบทั้งหมดผิด)
+#   ตัววัด "สายที่ตรงกันต่อเนื่องยาวสุด"   → คลิปเดียวกัน 0 hits ; คลิปทดสอบเจอคู่จริง 2 คู่
+# token ไทยเป็นเศษพยางค์ซ้ำกันเป็นปกติ จึงต้องวัด "ต่อเนื่อง" ไม่ใช่ "ซ้ำบ่อย"
+RETAKE_GUARD = os.getenv("RETAKE_GUARD", "1").strip().lower() not in ("0", "false", "no", "off")
+try:
+    RETAKE_MIN_COVER = float(os.getenv("RETAKE_MIN_COVER", "") or 0.75)
+except (TypeError, ValueError):
+    RETAKE_MIN_COVER = 0.75
+try:
+    RETAKE_HORIZON = float(os.getenv("RETAKE_HORIZON", "") or 20.0)
+except (TypeError, ValueError):
+    RETAKE_HORIZON = 20.0
+
+RETAKE_UNIT_GAP = 0.3       # ช่องว่างระหว่างคำที่แยก "วรรค" (วัดแล้ว 0.3 ให้ 0 false positive)
+RETAKE_MIN_CHARS = 10       # วรรคสั้นกว่านี้ไม่นำมาเทียบ (พยางค์ไทยซ้ำกันเองเป็นปกติ)
+RETAKE_MIN_BLOCK = 10       # สายที่ตรงกันต่อเนื่องต้องยาวอย่างน้อยเท่านี้ (และครอบ RETAKE_MIN_COVER)
+# ทางผ่านที่สอง: สายตรงกันต่อเนื่องยาวถึงเท่านี้ไม่ต้องดูสัดส่วน — Whisper ถอดเพี้ยนจน
+# พยางค์นำหน้า/ท้ายวรรคไม่ตรงกัน สัดส่วนจึงต่ำทั้งที่เป็นประโยคเดียวกัน
+# (เคสจริงที่หลุดด้วยเกณฑ์สัดส่วน: ตรงกัน 16-17 ตัวแต่ครอบแค่ 43-47% ของวรรค ; เคสก่อนหน้าได้ 21)
+# ตัวที่เคยเป็น false positive ในคลิป 7 นาที ("ไม่ว่าจะเป็นขา") ยาวราว 12-14 → 15 จึงอยู่เหนือขึ้นมา
+# ⚠️ ชุดวัดเดิมถูก cleanup ไปแล้ว ค่า 15 นี้จึงมาจากเหตุผลข้างต้น ไม่ใช่การวัดซ้ำ —
+#    log "🔁 [Retake]" พิมพ์ข้อความที่ตรงกันไว้ให้ตรวจ ถ้าพบ false positive ให้เก็บ transcript ไว้วัดใหม่
+RETAKE_LONG_BLOCK = 15
+RETAKE_LOOKBACK = 6.0       # ถอยหาต้นประโยคที่ถูกพูดซ้ำได้ไกลสุด (วินาที)
+RETAKE_MIN_CUT = 1.5        # ช่วงตัดที่สั้นกว่านี้ไม่คุ้มกับรอยต่อที่เกิด
+RETAKE_MAX_CUT = 45.0       # เกินนี้ไม่น่าใช่เทคซ้ำ — ไม่ตัดเอง
+
+_RETAKE_CLEAN = re.compile(r"[\s.,!?\"'“”‘’()\[\]{}:;…\-–—/\\ๆฯ]+")
+_RETAKE_SENT_END = re.compile(r"ครับ|ค่ะ|นะคะ")
+
+
+def _retake_units(transcript: list[dict]) -> list[dict]:
+    """
+    แตกท่อนถอดเสียงเป็น "วรรค" (ตัดที่ช่องว่างระหว่างคำ >= RETAKE_UNIT_GAP) พร้อมเวลาของทุกตัวอักษร
+
+    ท่อนที่ไม่มี words (เช่นจากแคชเก่า) ใช้ทั้งท่อนเป็นวรรคเดียวและใช้เวลาต้นท่อนแทน
+    """
+    units: list[dict] = []
+
+    def _flush(words: list[dict]) -> None:
+        chars: list[str] = []
+        times: list[float] = []
+        for w in words:
+            piece = _RETAKE_CLEAN.sub("", w.get("text") or "")
+            chars.extend(piece)
+            times.extend([float(w["start"])] * len(piece))
+        if chars:
+            units.append({"text": "".join(chars), "times": times,
+                          "start": float(words[0]["start"]), "end": float(words[-1]["end"])})
+
+    for seg in sorted((t for t in transcript
+                       if t.get("start") is not None and t.get("end") is not None),
+                      key=lambda t: t["start"]):
+        words = [w for w in (seg.get("words") or [])
+                 if w.get("start") is not None and w.get("end") is not None]
+        if not words:
+            text = _RETAKE_CLEAN.sub("", seg.get("text") or "")
+            if text:
+                units.append({"text": text, "times": [float(seg["start"])] * len(text),
+                              "start": float(seg["start"]), "end": float(seg["end"])})
+            continue
+        cur: list[dict] = []
+        prev_end = 0.0
+        for w in words:
+            if cur and float(w["start"]) - prev_end >= RETAKE_UNIT_GAP:
+                _flush(cur)
+                cur = []
+            cur.append(w)
+            prev_end = float(w["end"])
+        _flush(cur)
+    return units
+
+
+def _retake_start(unit: dict, block_idx: int) -> float:
+    """
+    จุดเริ่มตัดของเทคที่ถูกพูดซ้ำ — ถอยจากตำแหน่งที่ข้อความเริ่มตรงกันไปหาท้ายประโยคก่อนหน้า
+    (ครับ/ค่ะ) ในวรรคเดียวกัน ไม่งั้นจะเหลือหัวประโยคลอย ๆ ("ราคาฮุนสามารถ") ค้างก่อนรอยตัด
+    """
+    times = unit["times"]
+    block_time = times[block_idx]
+    last_end = -1
+    for m in _RETAKE_SENT_END.finditer(unit["text"][:block_idx]):
+        last_end = m.end()
+    if last_end >= 0:
+        cand = times[last_end]           # last_end <= block_idx เสมอ (ตัดสายที่ block_idx)
+    else:
+        cand = times[0]                  # ไม่มีท้ายประโยคก่อนหน้า → ต้นวรรคคือต้นประโยค
+    return cand if block_time - cand <= RETAKE_LOOKBACK else block_time
+
+
+def _find_retake_cuts(transcript: list[dict]) -> list[dict]:
+    """
+    หาช่วงที่ผู้พูด "พูดผิดแล้วพูดประโยคเดิมซ้ำ" — คืนช่วงที่ควรตัด (เก็บเทคสุดท้าย)
+
+    วรรค A เหมือนวรรค B ที่ตามมาภายใน RETAKE_HORIZON วินาที (สายตรงกันต่อเนื่อง >= RETAKE_MIN_BLOCK
+    ตัวอักษร และครอบ >= RETAKE_MIN_COVER ของวรรคที่สั้นกว่า) = A คือเทคก่อนหน้า
+    → ตัดจากต้นประโยคของ A ถึงต้น B ; B คือเทคที่เก็บ (ตัวสุดท้ายในหน้าต่างที่เหมือน A)
+    เทคที่ซ้อนกันเป็นทอด (A~B, B~C) ถูกรวมเป็นช่วงเดียว
+
+    ผลลัพธ์เป็น "ข้อเสนอ" ที่ผู้ใช้ยังปรับได้ในหน้า preview ; ปิดได้ด้วย RETAKE_GUARD=0
+    """
+    if not RETAKE_GUARD or not transcript:
+        return []
+
+    units = _retake_units(transcript)
+    spans: list[list[float]] = []
+    for i, a in enumerate(units):
+        if len(a["text"]) < RETAKE_MIN_CHARS:
+            continue
+        best = None
+        for b in units[i + 1:]:
+            if b["start"] - a["end"] > RETAKE_HORIZON:
+                break
+            if len(b["text"]) < RETAKE_MIN_CHARS:
+                continue
+            m = difflib.SequenceMatcher(None, a["text"], b["text"], autojunk=False) \
+                .find_longest_match(0, len(a["text"]), 0, len(b["text"]))
+            cover = m.size / min(len(a["text"]), len(b["text"]))
+            if (m.size >= RETAKE_LONG_BLOCK
+                    or (m.size >= RETAKE_MIN_BLOCK and cover >= RETAKE_MIN_COVER)):
+                best = (b, m)            # เก็บตัวหลังสุดที่ซ้ำ = เทคสุดท้ายที่จะเก็บ
+        if not best:
+            continue
+        b, m = best
+        start, end = _retake_start(a, m.a), b["start"]
+        if RETAKE_MIN_CUT <= end - start <= RETAKE_MAX_CUT:
+            spans.append([start, end])
+            print(f"🔁 [Retake] คู่ที่ซ้ำ: {a['start']:.1f}s ~ {b['start']:.1f}s "
+                  f"ตรงกัน {m.size} ตัว «{a['text'][m.a:m.a + m.size]}»")
+
+    spans.sort()
+    merged: list[list[float]] = []
+    for s, e in spans:
+        if merged and s <= merged[-1][1] + 0.05:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+
+    return [{"start": round(s, 2), "end": round(e, 2), "reason": "RETAKE พูดประโยคเดิมซ้ำ (เก็บเทคสุดท้าย)"}
+            for s, e in merged]
+
+
+def _subtract_spans(segments: list[dict], spans: list[dict], min_piece: float = 0.3) -> list[dict]:
+    """หักช่วง spans ออกจาก segments (คงฟิลด์อื่นของ segment) ; เศษที่สั้นกว่า min_piece ทิ้ง"""
+    if not spans:
+        return segments
+    out: list[dict] = []
+    for seg in segments:
+        pieces = [(float(seg["start"]), float(seg["end"]))]
+        for sp in spans:
+            cs, ce = float(sp["start"]), float(sp["end"])
+            nxt = []
+            for ps, pe in pieces:
+                if ce <= ps or cs >= pe:
+                    nxt.append((ps, pe))
+                    continue
+                if cs > ps:
+                    nxt.append((ps, cs))
+                if ce < pe:
+                    nxt.append((ce, pe))
+            pieces = nxt
+        out.extend({**seg, "start": round(ps, 2), "end": round(pe, 2)}
+                   for ps, pe in pieces if pe - ps >= min_piece)
+    return out
+
+
+# ── เสียงพูดที่ Whisper "ถอดไม่ออก" ไม่ใช่เสียงรบกวน — ห้ามตัดในโหมด full ──────────
+#
+# เคสจริง: ผู้พูดอธิบายเรื่องเงินปันผลตามปกติ (เสียง -19 ถึง -21 dB เท่าช่วงที่ถอดได้ดี) แต่ Whisper
+# ถอดได้ขยะ "คุณนะครับ пр้ Priv / ประตูidelractor / importance" (avg_logprob -2.68) → Gemini เห็น
+# ข้อความขยะแล้วเข้าใจว่าเป็นเสียงรบกวน สั่งตัดทิ้ง เนื้อหากระโดด (อีก 2 ช่วงที่ -1.50 ก็โดนเหมือนกัน)
+#
+# ข้อความขยะเป็นหลักฐานว่า "ถอดไม่ได้" ไม่ใช่หลักฐานว่า "ไม่มีเนื้อหา" — โหมด full ตัดได้แค่
+# ช่วงเงียบ/ติดขัด/ปัญหาเทคนิค และยกการตัดสินเนื้อหาให้คนตัดต่อ จึงเก็บช่วงนี้ไว้ให้เขาฟังเอง
+# ความเสียหายถ้าพลาด = คลีนน้อยลง (ผู้ใช้ตัดเองในหน้า preview) ไม่ใช่เนื้อหาหาย
+#
+# เกณฑ์อิงค่าที่วัดไว้แล้ว (ดู 3.2): ชัดเจน ≈ -0.25 · ได้ใจความ ≈ -1.4 · อ่านไม่ออก ≈ -2.5
+# ตั้ง -1.0 คั่นระหว่าง "ชัดเจน" กับ "ได้ใจความ" ; ช่วงที่ถอดดีในเคสจริงอยู่ที่ -0.18 ถึง -0.36
+# หมายเหตุ: avg_logprob เป็นค่าระดับหน้าต่าง (ท่อนติดกันได้ค่าเท่ากัน) ไม่ใช่ระดับประโยค
+UNREADABLE_LOGPROB = -1.0
+
+
+def _voiced_ratio(start: float, end: float, voice_segments: list[dict] | None) -> float:
+    """สัดส่วนของ [start, end] ที่ VAD บอกว่าเป็นเสียงพูด — ไม่มีข้อมูล VAD ถือว่าเป็นเสียงพูด"""
+    if not voice_segments:
+        return 1.0
+    span = end - start
+    if span <= 0:
+        return 0.0
+    covered = sum(max(0.0, min(end, float(v["end"])) - max(start, float(v["start"])))
+                  for v in voice_segments)
+    return min(1.0, covered / span)
+
+
+def _spare_unreadable_speech(deletes: list[dict], transcript: list[dict],
+                             voice_segments: list[dict] | None = None) -> list[dict]:
+    """
+    หักช่วง "เสียงพูดที่ถอดไม่ออก" ออกจากช่วงที่ AI สั่งลบ (ใช้เฉพาะโหมด full)
+
+    ท่อนที่ avg_logprob < UNREADABLE_LOGPROB และ VAD ยืนยันว่าเป็นเสียงพูด (>= 50%)
+    เศษที่เหลือหลังหักถูกตัวกรอง "สั้นกว่า 5 วิ" ของ Step 5 ทิ้งต่อเอง
+    """
+    if not deletes:
+        return deletes
+    spans = [
+        {"start": float(t["start"]), "end": float(t["end"])}
+        for t in transcript
+        if t.get("start") is not None and t.get("end") is not None
+        and t.get("avg_logprob") is not None
+        and float(t["avg_logprob"]) < UNREADABLE_LOGPROB
+        and _voiced_ratio(float(t["start"]), float(t["end"]), voice_segments) >= 0.5
+    ]
+    if not spans:
+        return deletes
+    kept = _subtract_spans(deletes, spans, min_piece=0.0)
+    before = sum(float(d["end"]) - float(d["start"]) for d in deletes)
+    after = sum(float(d["end"]) - float(d["start"]) for d in kept)
+    if before - after > 0.05:
+        print(f"🛡️ [Unreadable] คืนเสียงพูดที่ Whisper ถอดไม่ออก {before - after:.1f}s "
+              f"(avg_logprob < {UNREADABLE_LOGPROB}) — ไม่ใช่เสียงรบกวน โหมด full ไม่ตัดเอง")
+    return kept
+
+
 def _verify_outline_coverage(keep_segments: list[dict], outline: list[dict],
                              transcript: list[dict], total_duration: float,
                              min_coverage: float | None = None) -> list[dict]:
@@ -2243,6 +2487,10 @@ confidence: "high" = มั่นใจว่าลบได้เลย | "medi
         print(f"❌ JSON parse error: {e}\nRaw response:\n{response_text}")
         raise Exception(f"Gemini คืนค่า JSON ไม่ถูกต้อง: {e}")
 
+    # โหมด full: เสียงพูดที่ Whisper ถอดไม่ออกไม่ใช่เสียงรบกวน — คืนให้คนตัดต่อตัดสินเอง
+    if edit_mode == "full":
+        segments_to_delete = _spare_unreadable_speech(segments_to_delete, transcript, voice_segments)
+
     # Log สิ่งที่ AI จะลบ พร้อม confidence
     print(f"\n📋 AI Suggested Cuts ({len(segments_to_delete)} segments to delete):")
     total_cut = 0.0
@@ -2304,6 +2552,15 @@ confidence: "high" = มั่นใจว่าลบได้เลย | "medi
     # ── ตัวกันเชิงโครงสร้าง: คลิปต้องไม่จบดื้อ ๆ และขอบต้องไม่ค้างกลางประโยค ──
     final_segments = _protect_outro(final_segments, transcript, total_duration, voice_segments)
     final_segments = _snap_segments_to_sentences(final_segments, transcript, total_duration)
+
+    # ── ตัดเทคซ้ำ — ต้องอยู่ "หลัง" snap: ตัวยืดขอบขยายอย่างเดียว ถ้าหักก่อนมันจะดึงช่วงที่
+    #    ตัดกลับมา (จุดตัดอยู่กลางท่อนถอดเสียง) ; และต้องอยู่ก่อน _finish_last_sentence ──
+    retake_cuts = _find_retake_cuts(transcript)
+    if retake_cuts:
+        for c in retake_cuts:
+            print(f"🔁 [Retake] ตัดเทคซ้ำ {c['start']}s → {c['end']}s ({c['end'] - c['start']:.1f}s)")
+        final_segments = _subtract_spans(final_segments, retake_cuts)
+
     final_segments = _finish_last_sentence(final_segments, transcript, total_duration)
 
     # ── Enrich each keep_segment ด้วย text content จาก transcript (สำหรับ Preview) ──
