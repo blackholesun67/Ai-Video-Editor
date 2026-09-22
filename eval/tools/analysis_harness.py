@@ -25,8 +25,17 @@ for p in (os.getcwd(), "/app"):
         sys.path.insert(0, p)
 
 # label -> (job_id ที่เก็บ preview.json ของ baseline ไว้ใน storage)
+# ครบ 9 case (Final Evaluation Objective 1/2, เพิ่มเมื่อเตรียมความพร้อมรอบ Pre-Final →
+# Final Evaluation): V01 ไม่มี eval/V01/ground_truth.txt (ตรวจแล้ว — ไม่มีอยู่ในทุก commit)
+# จึงใช้ได้แค่เป็น sanity run ระดับ input/pipeline เท่านั้น recall/precision จะเป็น N/A เสมอ
+# ห้ามสร้างเฉลยปลอมให้ V01 เพื่อให้มีตัวเลข
 RUNS = {
+    "V01_full":    "8e43cd1d-431d-4f98-9e78-0c72946988e1",  # ไม่มี ground_truth.txt — sanity เท่านั้น
     "V02_full":    "0e4c606f-d1e1-42dd-a030-6be1cd904465",
+    "V03_full":    "9eb88221-4197-463f-8c62-1daed7dd9744",  # ⚠️ eval/V03/ground_truth.txt เขียนไว้สำหรับ mode: summary (มีแค่ TANGENT ใน SHOULD_CUT) — รัน full ได้จริง แต่ recall จะเป็น N/A โดยดีไซน์ (TANGENT ไม่อยู่ใน ALLOWED["full"] ของ score.py) ไม่ใช่บั๊ก
+    "V03_summary": "e30793df-0e40-4955-9b4f-c196f0574857",
+    "V04_full":    "9590035b-7af5-4e7b-92b9-496ed863a3ba",
+    "V05_full":    "4c4597f3-61a4-437d-a420-28d09f6f010b",
     "V06_full":    "0772b3c4-8449-48b6-bbb6-f2631a3aae3a",
     "V06_summary": "20692075-ce67-46ae-aea5-6b9672231db7",
     "V07_full":    "cc0db657-a323-4516-9f4c-3e8cf5a23685",

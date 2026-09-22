@@ -4,9 +4,11 @@
 - หลักฐาน baseline (ไม่ถูกแก้/ลบ): commit `cc454df` (preview.json ทุกคลิป + `logs.sha256`), เฉลย: commit `4189548`
 - โฟลเดอร์หลักฐานของรอบนี้: `eval/vad-filter-fix/` · เครื่องมือ: `eval/tools/`
 
-> **สถานะการทดสอบ (สรุปก่อนอ่านส่วนอื่น)**
-> ทดสอบแล้ว: ตัวกรอง (replay บนข้อมูลจริง), อินพุตที่ส่งให้ Gemini (dry-run ผ่าน `analyze_video_content` จริง โดย Gemini ถูกแทนด้วยตัวปลอม), กรณีขอบสังเคราะห์
-> **NOT TESTED: ผลการตัดปลายทางหลังผ่าน Gemini จริง (recall/precision หลังแก้)** — ต้องรันใน worker ซึ่งตอนนี้ Docker stack หยุดอยู่ (ดูหัวข้อ 6.4)
+> **สถานะการทดสอบ (สรุปก่อนอ่านส่วนอื่น — ปรับปรุงหลัง harness รันจริงในเซสชันเดียวกัน 22 นาทีให้หลัง)**
+> ทดสอบแล้ว (input-level): ตัวกรอง (replay บนข้อมูลจริง), อินพุตที่ส่งให้ Gemini (dry-run ผ่าน `analyze_video_content` จริง โดย Gemini ถูกแทนด้วยตัวปลอม), กรณีขอบสังเคราะห์ — 7 คลิปครบ
+> ทดสอบแล้ว (final-output, Gemini จริง ผ่าน `analysis_harness.py` — ดูหัวข้อ 6.4/7.2): **V02 full, V06 full, V06 summary, V07 full** (4/7 คลิป) — baseline vs control (โค้ดเดิมรันซ้ำ) vs new (โค้ดแก้แล้ว) ; V02 control ล้มเหลว (429/404/503 สลับกันทุก key×model) จึงมีเฉพาะ baseline vs new
+> **NOT TESTED (final-output): V01, V03, V04, V05** — นอกขอบเขต harness ที่กำหนดไว้ในรอบนี้ (input-level unchanged โดยโครงสร้างสำหรับ 4 คลิปนี้ ดูหัวข้อ 7.1)
+> ⚠️ ผลปลายทางชุดนี้ (`metrics_final_three_way.json`, `after/`, `control-old/`, `harness_out.txt`, `harness_stderr.txt`) ยัง **untracked ใน git ณ ตอนที่ปรับปรุงเอกสารนี้** — ต้อง commit แยกก่อนอ้างอิงในบทที่ 4
 
 ---
 
@@ -108,9 +110,9 @@ log ใหม่ (ไม่พิมพ์ข้อความของผู�
 ### 6.3 กรณีขอบสังเคราะห์ (ข้อมูลสังเคราะห์ — ตรวจพฤติกรรมโค้ด ไม่ใช่คุณภาพ): PASS ทั้งหมด
 ท่อนเงียบล้วน → ทิ้ง · ท่อนอยู่ในเสียงพูดเต็ม → เก็บ · คร่อมขอบ speech 25% → เก็บ · speech 10% → ทิ้ง · ท่อนไม่มีความยาวในเสียงพูด → เก็บ / นอกเสียงพูด → ทิ้ง · ไม่มีข้อมูล VAD → คืนทั้งหมด
 
-### 6.4 ทดสอบปลายทางใน worker (`analysis_harness.py`) — **NOT TESTED**
-ตัวสคริปต์เขียนและตรวจโครงสายงานด้วย 6.2 แล้ว แต่ **ยังไม่ได้รันกับ Gemini จริง** เพราะ Docker stack หยุดทำงานเมื่อ 17:57:50 (log `Warm shutdown` ทุกบริการ หลังผมรัน VAD dump ผ่านเพียงไม่กี่วินาที; สาเหตุที่หยุดยืนยันไม่ได้) ตามที่ตกลงกันว่าคุณรัน Docker เอง ผมจึงไม่สั่งเริ่ม stack
-คำสั่งที่ต้องรัน (PowerShell, จาก root โปรเจกต์ — ไม่ต้อง `--build`):
+### 6.4 ทดสอบปลายทางใน worker (`analysis_harness.py`) — **TESTED** (4/7 คลิป — ปรับปรุงหลังรันจริง 22 นาทีให้หลังบันทึกรายงานฉบับแรก)
+
+รันสำเร็จเมื่อ 2026-09-21 ~18:33–18:34 (เซสชันเดียวกับตอนเขียนรายงานฉบับแรก, หลัง Docker stack กลับมาทำงาน) ด้วยคำสั่งชุดเดิมที่ระบุไว้ในฉบับร่างแรก (คัดลอกไว้ด้านล่างเพื่อให้ทำซ้ำได้):
 ```
 docker compose up -d
 git show baseline-ch4:backend/core/ai_logic.py | Set-Content -Encoding utf8 $env:TEMP\ai_logic_old.py
@@ -121,7 +123,15 @@ docker compose exec -T worker python /tmp/analysis_harness.py 2> eval\vad-filter
 python eval\tools\harness_unpack.py
 python eval\tools\score.py
 ```
-สคริปต์รันโค้ดเดิม (control) คู่กับโค้ดใหม่ในรันเดียวกัน เพราะ Gemini ให้ผลไม่เหมือนกันทุกครั้ง (หลักฐาน: V07 สองรอบใน baseline อินพุตเหมือนกันแต่ผลต่างกัน — รอบแรกสั่งตัดทั้งคลิป รอบสองตอบ `[]`) ผลจะเขียนที่ `eval/vad-filter-fix/after/` และ `control-old/` โดยไม่แตะไฟล์ baseline
+สคริปต์รันโค้ดเดิม (`control`, tag `baseline-ch4` ผ่าน `ai_logic_old.py`) คู่กับโค้ดใหม่ (`new`, `ai_logic_new.py` = `5ad3d92`/`4308882`) ในรันเดียวกัน เพราะ Gemini ให้ผลไม่เหมือนกันทุกครั้ง (หลักฐาน: V07 สองรอบใน baseline อินพุตเหมือนกันแต่ผลต่างกัน — รอบแรกสั่งตัดทั้งคลิป รอบสองตอบ `[]`)
+
+**แฮชโค้ดที่ใช้รันจริง** (`eval/vad-filter-fix/code_under_test.sha256`, ตรวจซ้ำแล้วว่าไม่มีบรรทัด `[Silence Gap]` ปนใน log — ยืนยันว่าเป็น VAD-fix-only ไม่ปนกับรอบถัดไป): control = `2632b324…` (`baseline-ch4`), new = `aa7b4ccb…` (`5ad3d92`/`4308882`)
+
+ผลราย run: **V02 full** — control ล้มเหลว (ดู §7.2), new สำเร็จ · **V06 full** — control+new สำเร็จ · **V06 summary** — control+new สำเร็จ · **V07 full** — baseline+control+new สำเร็จ (cuts=[] ทั้ง 3 ชุด)
+
+ไฟล์ผลลัพธ์ (⚠️ **ยัง untracked ใน git ขณะปรับปรุงเอกสารนี้** — ต้อง commit แยกก่อนใช้ในบทที่ 4): `eval/vad-filter-fix/harness_out.txt`, `harness_stderr.txt`, `metrics_final_three_way.json`, `after/{V02_full,V06_full,V06_summary,V07_full}/{preview.json,harness.log}`, `control-old/{V02_full,V06_full,V06_summary,V07_full}/harness.log` (V02 ไม่มี `preview.json` เพราะ control ล้มเหลว)
+
+**V01, V03, V04, V05 ไม่ได้รันปลายทางในรอบนี้** (นอกขอบเขต harness ที่กำหนดไว้ — ยังคง NOT TESTED)
 
 ## 7. Before vs After
 
@@ -138,22 +148,33 @@ python eval\tools\score.py
 | V04 | 9/9 → 9/9 | 1,819 → 1,819 | 0.0 → 0.0 | unchanged |
 | V05 | 12/12 → 12/12 | 1,923 → 1,923 | 0.0 → 0.0 | unchanged |
 
-**7.2 ผลการตัดปลายทาง (recall / precision) — After = NOT TESTED**
-Before คำนวณจากไฟล์ baseline ด้วย `eval/tools/score.py` (`metrics_before.txt`) นิยามเดียวกับที่จะใช้กับ After: recall นับเฉพาะ SHOULD_CUT ประเภทที่โหมดนั้นอนุญาต (full: SILENCE/RETAKE/FILLER/TECH · summary: รวม TANGENT), precision นับเทียบ SHOULD_CUT ทุกประเภท
+**7.2 ผลการตัดปลายทาง (recall / precision) — TESTED 4/7 คลิป** (ตัวเลขจาก `eval/vad-filter-fix/metrics_final_three_way.json`, คำนวณด้วย `score()` เดิมจาก `eval/tools/score.py` ไม่แก้นิยาม)
 
-| Clip | Before Recall | After Recall | Before Precision | After Precision | Transcript Before | Transcript After |
+Baseline = ไฟล์ evidence เดิม (commit `cc454df`, รันครั้งเดียวตอน `baseline-ch4`) · Control = รันซ้ำโค้ด `baseline-ch4` วันนี้ (คุมความแปรปรวนของ Gemini) · New = โค้ดที่แก้แล้ว (`5ad3d92`/`4308882`) — นิยาม recall นับเฉพาะ SHOULD_CUT ประเภทที่โหมดนั้นอนุญาต (full: SILENCE/RETAKE/FILLER/TECH · summary: รวม TANGENT), precision นับเทียบ SHOULD_CUT ทุกประเภท
+
+| Clip | ชุด | Recall | Precision | ตัดนอกเฉลย (วิ) | ทับ KEEP (วิ) | ตัดรวม (วิ) |
 |---|---|---|---|---|---|---|
-| V02 full | 45.5% | NOT TESTED | 15.1% | NOT TESTED | 6/7 (983 ตัวอักษร) | 7/7 (1,294) |
-| V06 full | 59.3% | NOT TESTED | 74.2% | NOT TESTED | 11/12 (2,110) | 12/12 (2,421) |
-| V06 summary | 32.9% | NOT TESTED | 36.1% | NOT TESTED | 11/12 (2,105) | 12/12 (2,415) |
-| V07 full | 0.0% | NOT TESTED | N/A (ไม่มีการตัด) | NOT TESTED | 0/2 (2) | 2/2 (581) |
+| **V02 full** | Baseline | 45.5% | 15.1% | 28.1 | 0.0 | 33.1 |
+| | Control | **ERROR** — ล้มเหลวทั้ง 3 key × 2 model (key#1: 429 quota `gemini-2.5-flash` · key#2: 404 `gemini-2.5-flash` แล้ว 503 ×2 บน `gemini-3.6-flash` · key#3: 503 ×2 ทั้งสองโมเดล → error สุดท้าย "503 UNAVAILABLE") | | | | |
+| | **New** | **0.0%** | N/A (ไม่มีการตัด) | 0.0 | 0.0 | 0.0 |
+| **V06 full** | Baseline | 59.3% | 74.2% | 10.9 | 5.8 | 42.2 |
+| | Control | 79.4% | 49.0% | 35.7 | 5.8 | 70.0 |
+| | **New** | **65.8%** | **77.9%** | **9.1** | 5.8 | 41.3 |
+| **V06 summary** | Baseline | 32.9% | 36.1% | 39.6 | 5.1 | 62.0 |
+| | Control | 40.7% | 45.2% | 33.6 | 5.0 | 61.3 |
+| | **New** | **36.1%** | **66.3%** | **12.5** | 5.0 | 37.0 |
+| **V07 full** | Baseline | 0.0% | N/A | 0.0 | 0.0 | 0.0 |
+| | Control | 0.0% | N/A | 0.0 | 0.0 | 0.0 |
+| | **New** | **0.0%** | N/A | 0.0 | 0.0 | 0.0 |
 
-คอลัมน์ Transcript เป็นผล replay/dry-run จริง (ไม่ใช่ตัวเลขสมมติ) ส่วน After Recall/Precision ยังไม่มีเพราะยังไม่ได้รันปลายทาง
+อินพุต (จำนวนท่อน/ตัวอักษรที่ส่ง Gemini) เหมือนเดิมทุกประการกับตารางเดิมใน §7.1 (V02 6/7→7/7, V06 11/12→12/12, V07 0/2→2/2) — ไม่ได้เปลี่ยนซ้ำในตารางนี้
 
-**สิ่งที่ "คาด" แต่ยังไม่ได้วัด (ห้ามอ่านเป็นผลลัพธ์):**
-- เนื้อหาที่หายเพราะบั๊กนี้ควรกลับมา (V02 ~28 วินาที, V06 summary ~27.7 วินาที) แต่ Gemini ไม่แน่นอน
-- **recall ของ V02 อาจลดลงได้**: recall 45.5% ใน baseline เกิดจากช่วงเงียบ 46–51 ถูกครอบในการตัดผิด 33 วินาทีโดยบังเอิญ ถ้า Gemini เห็นท่อนครบ มันอาจไม่ตัดอะไรเลย (ปัญหาช่วงเงียบกลางท่อนยังอยู่ ดูหัวข้อ 9) เมตริกบางตัวจึงอาจแย่ลงทั้งที่การเก็บเนื้อหาดีขึ้น — ต้องอ่านค่า "นอกเฉลย" กับ "ทับ KEEP" ประกอบ ไม่ใช่ดู recall ตัวเดียว
-- **V07 น่าจะยังได้ recall ต่ำ** เพราะ hint ช่วงเงียบวัดจากช่องว่างระหว่างท่อน (2.5 วินาที < 3.0) และ Gemini เห็นแค่เวลาระดับท่อน
+**การตีความ (แยก input-level ออกจาก final-output ตามที่กำหนด):**
+- **V02 full — สิ่งที่คาดไว้ล่วงหน้าเกิดขึ้นจริง:** recall ลดจาก 45.5% → 0.0% เพราะ Gemini เห็นท่อนครบแล้ว**เลือกไม่ตัดอะไรเลย** (คนละกลไกกับตอน baseline ที่ตัดผิดตำแหน่ง 33 วินาทีโดยบังเอิญไปครอบช่วงเงียบจริง) — outside-GT ก็ลดจาก 28.1s → 0.0s ไปพร้อมกัน แปลว่า "การเก็บเนื้อหาดีขึ้น" (ไม่มีการตัดเนื้อหานอกเฉลยอีกต่อไป) แม้ recall ตัวเลขจะแย่ลงก็ตาม — ตรงกับคำเตือนในฉบับร่างแรกเป๊ะ ไม่มี control เทียบเพราะ Gemini error ทุก key×model
+- **V06 full — improved ทั้ง recall/precision/outside-GT เทียบ baseline:** recall +6.5pp, precision +3.8pp, outside-GT ลดลง 1.8s ; เทียบกับ control (โค้ดเดิมรันซ้ำวันนี้) new ดีกว่าชัดเจนทั้ง precision (+29pp) และ outside-GT (-26.6s) แม้ recall ต่ำกว่า control (65.8% vs 79.4%) เพราะ control ตัดกว้างเกินจริง (outside-GT 35.7s) ไม่ใช่ตัดแม่นกว่า
+- **V06 summary — improved ชัดเจนที่สุดในชุดนี้:** precision +30pp เทียบ baseline (36.1%→66.3%), outside-GT ลดจาก 39.6s เหลือ 12.5s (ดีขึ้น 68%) แม้ recall ใกล้เคียง baseline
+- **V07 full — unchanged ตามที่คาด:** ยังคง cuts=[] ทั้ง 3 ชุด เพราะช่องว่างระหว่างท่อนเดิม (2.5s) ยังต่ำกว่าเกณฑ์ hint (3.0s) และ VAD fix เพียงอย่างเดียวยังไม่ส่งช่วงเงียบกลางท่อนเป็น hint ให้ Gemini — ต้องรอ Silence Gap Fix (ดูหัวข้อ Silence Gap ในรายงานแยก)
+- **regression (ระบบเริ่มตัดเนื้อหาที่ไม่ควรตัดหรือไม่):** **ไม่พบ** ในทั้ง 3 คลิปที่มีผล — outside-GT ของ new ต่ำกว่าหรือเท่า baseline ทุกคลิป (V02 28.1→0, V06 full 10.9→9.1, V06 summary 39.6→12.5) ไม่มีคลิปใดที่ outside-GT เพิ่มขึ้น
 
 ## 8. Regression Check
 
@@ -161,10 +182,10 @@ Before คำนวณจากไฟล์ baseline ด้วย `eval/tools/sc
 |---|---|---|
 | transcript ที่ควรอยู่ยังอยู่ | **PASS** | ท่อนที่ตัวกรองเดิมเก็บ ถูกเก็บโดยตัวใหม่ครบทุกท่อนใน 72 ท่อน (`ทิ้งเพิ่ม = []` ทุกคลิป) |
 | ท่อนความเงียบจริงไม่ถูกส่งต่อทั้งหมด | **inconclusive** | ข้อมูลจริงไม่มีท่อนเงียบล้วนเลย (ต่ำสุด 45%) ตรวจได้เฉพาะข้อมูลสังเคราะห์ (PASS) |
-| Gemini ได้ transcript สมบูรณ์ขึ้น | **PASS (ระดับอินพุต)** | 7.1 · NOT TESTED ระดับผลปลายทาง |
-| คลิปที่อินพุตไม่เปลี่ยน (V01, V03, V04, V05) | **unchanged โดยโครงสร้าง** | ท่อนและตัวอักษรที่ส่งเหมือนเดิมทุกตัว จึงไม่ควรมีผลต่างจากโค้ด (ผลปลายทางต่างได้แต่จากความไม่แน่นอนของ Gemini) |
-| ระบบเริ่มตัดเนื้อหาที่ไม่ควรตัดเพราะ transcript เปลี่ยน | **NOT TESTED** | ต้องรันปลายทางและดูตัวชี้วัด "นอกเฉลย"/"ทับ KEEP" |
-| regression ที่พบ | **ไม่พบ** ในสิ่งที่ทดสอบ | ข้อจำกัด: ทดสอบระดับอินพุตเท่านั้น |
+| Gemini ได้ transcript สมบูรณ์ขึ้น | **PASS (ระดับอินพุต)** | 7.1 · **PASS (ระดับผลปลายทาง, 3/4 คลิปที่มีผล)** ดู 7.2 |
+| คลิปที่อินพุตไม่เปลี่ยน (V01, V03, V04, V05) | **unchanged โดยโครงสร้าง** | ท่อนและตัวอักษรที่ส่งเหมือนเดิมทุกตัว จึงไม่ควรมีผลต่างจากโค้ด (ผลปลายทางต่างได้แต่จากความไม่แน่นอนของ Gemini) — **final-output ของ 4 คลิปนี้ยัง NOT TESTED** |
+| ระบบเริ่มตัดเนื้อหาที่ไม่ควรตัดเพราะ transcript เปลี่ยน | **PASS — ไม่พบ** (V02, V06 full, V06 summary) | outside-GT ของ new ≤ baseline ทุกคลิปที่มีผล (V02 28.1→0.0s, V06 full 10.9→9.1s, V06 summary 39.6→12.5s) ดู 7.2 |
+| regression ที่พบ | **ไม่พบ** ในสิ่งที่ทดสอบ (input-level ครบ 7 คลิป + final-output 3/4 คลิปที่มีผล) | ข้อจำกัด: V01/V03/V04/V05 final-output ยังไม่ได้ทดสอบ ; V02 ไม่มี control เทียบ (Gemini error) |
 
 ## 9. Remaining Issues (แยกจาก VAD fix — ไม่ได้แก้ในรอบนี้)
 
@@ -177,10 +198,11 @@ Before คำนวณจากไฟล์ baseline ด้วย `eval/tools/sc
 
 ## 10. Conclusion
 
-- **ยืนยันด้วยข้อมูลแล้ว:** root cause คือการใช้จุดกึ่งกลาง (replay ตรงกับ log จริงทุกคลิป) และตัวกรองใหม่เก็บท่อนที่เคยถูกทิ้งครบ 4 ท่อน (V02 1, V06 1, V07 2) โดยไม่ทิ้งท่อนใดเพิ่มใน 72 ท่อน → **improved ในระดับอินพุตของ Gemini** สำหรับ V02, V06, V07 และ **unchanged** สำหรับ V01, V03, V04, V05
-- **ยังสรุปไม่ได้ว่า "ระบบดีขึ้น":** ผลปลายทาง (recall/precision/เนื้อหาที่หายจริง) = **NOT TESTED / inconclusive** และตัวชี้วัดบางตัว (เช่น recall ของ V02) อาจลดลงได้ทั้งที่เนื้อหาถูกเก็บดีขึ้น
-- ปัญหา Snap, ช่วงเงียบกลางท่อน, guard เทคซ้ำ และ Gemini ไม่ได้ถูกแก้และไม่ควรถูกนับเป็นผลของ VAD fix
-- ขั้นต่อไปที่ต้องทำเพื่อปิดรายงานนี้: รันคำสั่งในหัวข้อ 6.4 แล้วอ่านผลจาก `eval/vad-filter-fix/after/` เทียบ `control-old/` (n = 1 ต่อ run — ความแปรปรวนของ Gemini ทำให้ผลต่างเล็กน้อยไม่ควรตีความเป็นผลของการแก้)
+- **ยืนยันด้วยข้อมูลแล้ว (input-level):** root cause คือการใช้จุดกึ่งกลาง (replay ตรงกับ log จริงทุกคลิป) และตัวกรองใหม่เก็บท่อนที่เคยถูกทิ้งครบ 4 ท่อน (V02 1, V06 1, V07 2) โดยไม่ทิ้งท่อนใดเพิ่มใน 72 ท่อน → **improved ในระดับอินพุตของ Gemini** สำหรับ V02, V06, V07 และ **unchanged** สำหรับ V01, V03, V04, V05
+- **ระดับ final-output (TESTED 4/7 คลิป, n=1 ต่อคู่ — ดู 7.2):** V06 full และ V06 summary **improved** ชัดเจนทั้ง precision และ outside-GT เทียบทั้ง baseline และ control ; V02 full outside-GT ดีขึ้น (28.1s→0.0s) แต่ recall ลดลง (45.5%→0.0%) เพราะ Gemini เลือกไม่ตัดอะไรเลยเมื่อเห็นท่อนครบ — ตรงกับที่คาดไว้ล่วงหน้า ไม่ใช่ regression ; V07 full **unchanged** (cuts=[] ทั้ง 3 ชุด) เพราะ VAD fix อย่างเดียวยังไม่ทำให้ hint ช่วงเงียบเกิดขึ้น (ต้องรอ Silence Gap Fix) — **ไม่พบ regression ในคลิปใดที่มีผล**
+- **n=1 ต่อคู่ (ยกเว้น V07 ที่มีครบ 3 ชุด):** ผลนี้จึงเป็นหลักฐานเชิงกลไกที่สอดคล้องกันมากกว่าข้อสรุปเชิงสถิติที่แน่นอน ; **V01, V03, V04, V05 ยังไม่มีผล final-output เลย** (NOT TESTED นอกขอบเขต harness รอบนี้)
+- ปัญหา Snap, ช่วงเงียบกลางท่อน, guard เทคซ้ำ และ Gemini ไม่เสถียร ไม่ได้ถูกแก้และไม่ควรถูกนับเป็นผลของ VAD fix
+- **สถานะไฟล์หลักฐานชุด final-output (`metrics_final_three_way.json`, `after/`, `control-old/`, `harness_out.txt`, `harness_stderr.txt`): ยัง untracked ใน git ณ ตอนปรับปรุงเอกสารนี้** — ต้อง commit แยกก่อนอ้างอิงในบทที่ 4 (ไม่ใช่ scope ของการแก้เอกสารรอบนี้)
 
 ## ไฟล์หลักฐาน
 
@@ -190,8 +212,12 @@ Before คำนวณจากไฟล์ baseline ด้วย `eval/tools/sc
 | `eval/vad-filter-fix/vad_segments.json`, `vad_raw.txt`, `vad_stderr.txt` | ผล VAD จริง (Silero) ของ 7 คลิป — ตรวจตรงกับ log ตอนรันจริง |
 | `eval/vad-filter-fix/replay_results.txt/json` | replay ตัวกรองเดิม/ใหม่ + ความไวต่อเกณฑ์ + กรณีขอบ |
 | `eval/vad-filter-fix/dryrun_pipeline_input.txt` | อินพุตที่ส่งให้ Gemini ผ่าน `analyze_video_content` จริง (Gemini ปลอม) |
-| `eval/vad-filter-fix/metrics_before.txt`, `metrics.json` | recall/precision ก่อนแก้ (After = NOT TESTED) |
-| `eval/vad-filter-fix/code_under_test.sha256` | แฮชของโค้ดเดิม/ใหม่ที่ใช้ทดสอบ |
+| `eval/vad-filter-fix/metrics_before.txt` | recall/precision ก่อนแก้ (baseline เดี่ยว ๆ, รอบร่างแรก) |
+| `eval/vad-filter-fix/metrics.json` | ⚠️ ยังเขียนแบบ "after: NOT TESTED" ค้างอยู่ (modified ใน git status) — ไม่ตรงกับ `metrics_final_three_way.json` แล้ว รอปรับปรุงแยก |
+| `eval/vad-filter-fix/metrics_final_three_way.json` | **ผล final-output จริงครบ 4 คลิป (baseline/control/new)** — ใช้ทำตาราง §7.2 ⚠️ untracked |
+| `eval/vad-filter-fix/harness_out.txt`, `harness_stderr.txt` | ผลดิบของ `analysis_harness.py` รัน 18:33–18:34 (Gemini จริง) ⚠️ untracked |
+| `eval/vad-filter-fix/after/`, `control-old/` | `preview.json` (เฉพาะ run ที่สำเร็จ) + `harness.log` ทุก run รวม V02 control ที่ล้มเหลว ⚠️ untracked |
+| `eval/vad-filter-fix/code_under_test.sha256` | แฮชของโค้ดเดิม/ใหม่ที่ใช้ทดสอบ (ตรวจแล้วตรงกับที่ใช้รัน harness จริง) |
 | `eval/tools/` | `dump_vad.py`, `vad_measure.py`, `vad_filter_replay.py`, `score.py`, `analysis_harness.py`, `harness_dryrun.py`, `harness_unpack.py` |
 | baseline เดิม | `eval/V0x/preview*.json` + `eval/logs.sha256` (commit `cc454df`) — ไม่ถูกแก้ |
 
