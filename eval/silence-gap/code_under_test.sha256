@@ -1,0 +1,4 @@
+# sha256 ของโค้ดที่ใช้ทดสอบรอบ Silence Gap (คำนวณจากเนื้อหาแบบ LF ตัด BOM/CR)
+aa7b4ccb117f2828c409a867f7fa45eaffe4b84aeda3e0ad44a37040260a6392  backend/core/ai_logic.py @ vad-fix-v1 (5ad3d92)  = CONTROL / "โค้ดปัจจุบัน"
+e91d487e63ab86571a7a8133209e718d11b55d8b60f9e232e0b2b49981dafd78  backend/core/ai_logic.py (working tree, ยังไม่ commit) = NEW
+# ตรวจแล้วว่าไฟล์ที่ส่งเข้า worker (/tmp/ai_logic_old.py, /tmp/ai_logic_new.py) มีแฮชตรงกับสองบรรทัดข้างบน

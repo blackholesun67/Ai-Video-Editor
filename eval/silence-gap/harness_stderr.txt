@@ -1,0 +1,22 @@
+﻿docker : Using cache found in /tmp/torch_hub/hub/snakers4_silero-vad_master
+At line:3 char:1
++ docker compose exec -T worker python /tmp/analysis_harness.py 2> eval ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Using cache fou...lero-vad_master:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+### V02_full 0e4c606f-d1e1-42dd-a030-6be1cd904465
+Direct use of automatic function calling (AFC) in Models.generate_content is not recommended. Instead, we recommend to 
+use AFC in Chat.send_message. Similarly, direct use of AFC in Models.generate_content_stream is not recommended. 
+Instead, we recommend to use AFC in Chat.send_message_stream.
+    old: ERROR 750.6s
+    new: ok 59.0s
+### V06_full 0772b3c4-8449-48b6-bbb6-f2631a3aae3a
+    old: ok 89.1s
+    new: ok 56.2s
+### V06_summary 20692075-ce67-46ae-aea5-6b9672231db7
+    old: ERROR 72.4s
+    new: ERROR 3.8s
+### V07_full cc0db657-a323-4516-9f4c-3e8cf5a23685
+    old: ERROR 2.5s
+    new: ERROR 2.6s

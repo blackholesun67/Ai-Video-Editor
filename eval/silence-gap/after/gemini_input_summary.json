@@ -1,0 +1,175 @@
+{
+ "V01_full": {
+  "transcript_line": "[Transcript] 22 segments, 2,376 chars → Gemini",
+  "hint_gap_count": 1,
+  "hint_gaps": [
+   [
+    83.78,
+    88.1
+   ]
+  ],
+  "deletion_prompt_chars": 8116,
+  "deletion_prompt_sha256": "9834553c0cbb0321",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": [
+   "[Silence Gap] detected = 2 (between-segments 1, VAD 1) | usable = 1",
+   "segment=between/edge gap 83.8-88.1 duration=4.3 action=KEEP_AS_HINT"
+  ]
+ },
+ "V02_full": {
+  "transcript_line": "[Transcript] 7 segments, 1,294 chars → Gemini",
+  "hint_gap_count": 3,
+  "hint_gaps": [
+   [
+    30.41,
+    33.67
+   ],
+   [
+    47.36,
+    51.52
+   ],
+   [
+    84.43,
+    90.23
+   ]
+  ],
+  "deletion_prompt_chars": 7013,
+  "deletion_prompt_sha256": "4a492f1cc3bee9ac",
+  "gemini_calls": 1,
+  "deletion_prompt_found": true,
+  "silence_gap_log": [
+   "[Silence Gap] detected = 3 (between-segments 0, VAD 3) | usable = 3",
+   "segment=0 (1.7-34.9) internal gap 30.4-33.7 duration=3.3 action=KEEP_AS_HINT",
+   "segment=1 (34.4-65.4) internal gap 47.4-51.5 duration=4.2 action=KEEP_AS_HINT",
+   "segment=2 (68.0-94.9) internal gap 84.4-90.2 duration=5.8 action=KEEP_AS_HINT"
+  ]
+ },
+ "V03_summary": {
+  "transcript_line": "[Transcript] 8 segments, 1,576 chars → Gemini",
+  "hint_gap_count": 0,
+  "hint_gaps": [],
+  "deletion_prompt_chars": 6810,
+  "deletion_prompt_sha256": "cc6904b63d81b819",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": [
+   "[Silence Gap] detected = 0 (between-segments 0, VAD 0) | usable = 0"
+  ]
+ },
+ "V04_full": {
+  "transcript_line": "[Transcript] 9 segments, 1,819 chars → Gemini",
+  "hint_gap_count": 2,
+  "hint_gaps": [
+   [
+    58.69,
+    61.91
+   ],
+   [
+    71.11,
+    75.72
+   ]
+  ],
+  "deletion_prompt_chars": 7505,
+  "deletion_prompt_sha256": "dc75bb3c5750be18",
+  "gemini_calls": 1,
+  "deletion_prompt_found": true,
+  "silence_gap_log": [
+   "[Silence Gap] detected = 2 (between-segments 1, VAD 1) | usable = 2",
+   "segment=between/edge gap 58.7-61.9 duration=3.2 action=KEEP_AS_HINT",
+   "segment=2 (61.9-91.0) internal gap 71.1-75.7 duration=4.6 action=KEEP_AS_HINT"
+  ]
+ },
+ "V05_full": {
+  "transcript_line": "[Transcript] 12 segments, 1,923 chars → Gemini",
+  "hint_gap_count": 1,
+  "hint_gaps": [
+   [
+    54.59,
+    58.69
+   ]
+  ],
+  "deletion_prompt_chars": 7577,
+  "deletion_prompt_sha256": "b254010232a777ad",
+  "gemini_calls": 1,
+  "deletion_prompt_found": true,
+  "silence_gap_log": [
+   "[Silence Gap] detected = 1 (between-segments 1, VAD 0) | usable = 1",
+   "segment=between/edge gap 54.6-58.7 duration=4.1 action=KEEP_AS_HINT"
+  ]
+ },
+ "V06_full": {
+  "transcript_line": "[Transcript] 12 segments, 2,421 chars → Gemini",
+  "hint_gap_count": 2,
+  "hint_gaps": [
+   [
+    124.62,
+    128.95
+   ],
+   [
+    139.15,
+    142.72
+   ]
+  ],
+  "deletion_prompt_chars": 8111,
+  "deletion_prompt_sha256": "5efb1ab4e0ca5700",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": [
+   "[Silence Gap] detected = 2 (between-segments 1, VAD 1) | usable = 2",
+   "segment=between/edge gap 124.6-128.9 duration=4.3 action=KEEP_AS_HINT",
+   "segment=7 (128.9-151.9) internal gap 139.2-142.7 duration=3.6 action=KEEP_AS_HINT"
+  ]
+ },
+ "V06_summary": {
+  "transcript_line": "[Transcript] 12 segments, 2,415 chars → Gemini",
+  "hint_gap_count": 2,
+  "hint_gaps": [
+   [
+    124.62,
+    128.95
+   ],
+   [
+    139.15,
+    142.72
+   ]
+  ],
+  "deletion_prompt_chars": 7992,
+  "deletion_prompt_sha256": "d967455ab5773bcc",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": [
+   "[Silence Gap] detected = 2 (between-segments 1, VAD 1) | usable = 2",
+   "segment=between/edge gap 124.6-128.9 duration=4.3 action=KEEP_AS_HINT",
+   "segment=7 (128.9-151.9) internal gap 139.2-142.7 duration=3.6 action=KEEP_AS_HINT"
+  ]
+ },
+ "V07_full": {
+  "transcript_line": "[Transcript] 2 segments, 581 chars → Gemini",
+  "hint_gap_count": 3,
+  "hint_gaps": [
+   [
+    16.83,
+    31.49
+   ],
+   [
+    37.12,
+    49.2
+   ],
+   [
+    62.97,
+    82.63
+   ]
+  ],
+  "deletion_prompt_chars": 6299,
+  "deletion_prompt_sha256": "11cdc3c3fa52de84",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": [
+   "[Silence Gap] detected = 3 (between-segments 0, VAD 3) | usable = 3",
+   "segment=0 (0.0-52.6) internal gap 16.8-31.5 duration=14.7 action=KEEP_AS_HINT",
+   "segment=0 (0.0-52.6) internal gap 37.1-49.2 duration=12.1 action=KEEP_AS_HINT",
+   "segment=1 (55.1-94.9) internal gap 63.0-82.6 duration=19.7 action=KEEP_AS_HINT"
+  ]
+ }
+}

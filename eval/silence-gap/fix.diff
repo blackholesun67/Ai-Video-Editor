@@ -1,0 +1,131 @@
+diff --git a/backend/core/ai_logic.py b/backend/core/ai_logic.py
+index 27f8d0b..f27c7e1 100644
+--- a/backend/core/ai_logic.py
++++ b/backend/core/ai_logic.py
+@@ -961,14 +961,75 @@ def merge_close_segments(segments: list[dict], gap_threshold: float = 2.0) -> li
+     return merged
+ 
+ 
++def _vad_silence_gaps(voice_segments: list[dict], transcript: list[dict],
++                      total_duration: float, min_gap: float) -> tuple[list[dict], list[dict], int]:
++    """
++    ช่วงเงียบ "ภายใน" ท่อนถอดเสียง — จาก VAD (ช่องว่างระหว่าง voice_segments ≥ min_gap) ที่ผ่าน guard
++
++    ทำไมต้องมี: Whisper รวมหลายประโยคไว้ท่อนเดียวได้ (p90 = 20 วิ) ความเงียบกลางท่อนจึงไม่โผล่เป็น
++    ช่องว่างระหว่างท่อน — _long_silence_gaps เดิมมองไม่เห็น ทั้งที่ get_silence_gaps() (vad_logic)
++    คำนวณช่วงเหล่านี้ได้อยู่แล้วแต่ไม่มีที่ใดเรียกใช้เลย
++
++    guard: ความเงียบต้องไม่มีเสียงพูดตามหลักฐานทั้งสองแหล่ง — VAD ไม่เห็นเสียงพูด "และ" Whisper ไม่มีคำในช่วงนั้น
++    (วัดจริง 7 จาก 14 ช่วงของ VAD มีคำ Whisper ทับที่ขอบ 0.0-0.8 วิ) → หักช่วงที่ [start, end] ของคำทับออก
++    แล้วเก็บเศษที่ยังยาว ≥ min_gap ; ท่อนที่ไม่มี words[] ตรวจซ้ำไม่ได้ จึงพึ่ง VAD อย่างเดียว
++
++    คืน: (ช่วงที่ใช้ได้, ช่วงที่ทิ้งพร้อมเหตุผล, จำนวนช่วงเงียบดิบจาก VAD) — รูปแบบ {"start","end","dur"} เหมือน _long_silence_gaps
++    """
++    try:
++        # import ตอนเรียก ไม่ใช่ตอนโหลดโมดูล: vad_logic โหลดโมเดล Silero ทันทีที่ import
++        # (worker โหลดไว้แล้วผ่าน tasks.py) — ห้ามย้ายไปไว้บนสุดของไฟล์นี้
++        from core.vad_logic import get_silence_gaps
++    except Exception as e:
++        print(f"⚠️ [Silence Gap] ใช้ข้อมูล VAD ไม่ได้ ({e}) — ใช้เฉพาะช่องว่างระหว่างท่อน")
++        return [], [], 0
++
++    words = sorted(
++        (float(w["start"]), max(float(w["end"]), float(w["start"])))
++        for s in transcript for w in (s.get("words") or [])
++        if w.get("start") is not None and w.get("end") is not None
++    )
++    usable: list[dict] = []
++    ignored: list[dict] = []
++    raw = get_silence_gaps(voice_segments, total_duration, min_gap=min_gap)
++    for g in raw:
++        a, b = float(g["start"]), float(g["end"])
++        free = [(a, b)]
++        for ws, we in words:
++            if we <= a or ws >= b:
++                continue
++            nxt = []
++            for fa, fb in free:
++                if we <= fa or ws >= fb:
++                    nxt.append((fa, fb))
++                    continue
++                if ws > fa:
++                    nxt.append((fa, ws))
++                if we < fb:
++                    nxt.append((we, fb))
++            free = nxt
++        kept = [(fa, fb) for fa, fb in free if fb - fa >= min_gap]
++        if not kept:
++            ignored.append({"start": round(a, 2), "end": round(b, 2), "dur": round(b - a, 2),
++                            "reason": "speech_inside(Whisper words)"})
++        for fa, fb in kept:
++            usable.append({"start": round(fa, 2), "end": round(fb, 2), "dur": round(fb - fa, 2)})
++    return usable, ignored, len(raw)
++
++
+ def _long_silence_gaps(transcript: list[dict], total_duration: float = 0.0,
+-                       min_gap: float | None = None) -> list[dict]:
++                       min_gap: float | None = None,
++                       voice_segments: list[dict] | None = None) -> list[dict]:
+     """
+-    หาช่วง "ไม่มีเสียงพูด" ที่ยาวพอควร จากช่องว่างระหว่าง transcript segment ที่ติดกัน
+-    (+ ช่วงต้น/ท้ายคลิป) — Whisper เปิด vad_filter อยู่แล้ว ช่องว่าง = ความเงียบจริง
++    หาช่วง "ไม่มีเสียงพูด" ที่ยาวพอควร แล้วรวมเป็นรายการเดียว (ผลรวมของ 2 แหล่ง):
++      1. ช่องว่างระหว่าง transcript segment ที่ติดกัน (+ ช่วงต้น/ท้ายคลิป) — Whisper เปิด vad_filter
++         อยู่แล้ว ช่องว่าง = ความเงียบจริง (แหล่งเดิม)
++      2. ช่วงเงียบจาก VAD ที่อยู่ "ภายใน" ท่อนเดียวกัน (ผ่าน guard ใน _vad_silence_gaps)
++         — ไม่ส่ง voice_segments มา = ทำงานเหมือนเดิมทุกประการ
+ 
+     ใช้เป็น hint ส่งให้ Gemini พิจารณาตัด (ไม่ตัดเองแบบกลไก)
+     คืน: [{"start": .., "end": .., "dur": ..}] เรียงตามเวลา
++    log: "[Silence Gap] detected = X | usable = Y" + บรรทัดต่อช่วง (ไม่พิมพ์ข้อความของผู้ใช้)
+     """
+     min_gap = SILENCE_HINT_MIN_GAP if min_gap is None else min_gap
+     segs = sorted(
+@@ -991,7 +1052,36 @@ def _long_silence_gaps(transcript: list[dict], total_duration: float = 0.0,
+     if total_duration and tail >= min_gap:                # เงียบตอนท้ายคลิป
+         gaps.append({"start": round(segs[-1]["end"], 2), "end": round(total_duration, 2),
+                      "dur": round(tail, 2)})
+-    return gaps
++    if not voice_segments:
++        return gaps
++
++    vad_gaps, vad_ignored, vad_raw = _vad_silence_gaps(voice_segments, segs, total_duration, min_gap)
++
++    # รวมสองแหล่ง: ช่วงที่ทับกัน = ความเงียบเดียวกัน (ต่อเป็นช่วงเดียว)
++    merged: list[dict] = []
++    for g in sorted(gaps + vad_gaps, key=lambda x: x["start"]):
++        if merged and g["start"] <= merged[-1]["end"] + 0.05:
++            merged[-1]["end"] = round(max(merged[-1]["end"], g["end"]), 2)
++            merged[-1]["dur"] = round(merged[-1]["end"] - merged[-1]["start"], 2)
++        else:
++            merged.append(dict(g))
++
++    def _where(g: dict) -> str:
++        mid = (g["start"] + g["end"]) / 2
++        for i, s in enumerate(segs):
++            if s["start"] <= mid <= s["end"]:
++                return f"segment={i} ({s['start']:.1f}-{s['end']:.1f}) internal"
++        return "segment=between/edge"
++
++    print(f"[Silence Gap] detected = {len(gaps) + vad_raw} "
++          f"(between-segments {len(gaps)}, VAD {vad_raw}) | usable = {len(merged)}")
++    for g in merged:
++        print(f"  {_where(g)} gap {g['start']:.1f}-{g['end']:.1f} duration={g['dur']:.1f} "
++              f"action=KEEP_AS_HINT")
++    for g in vad_ignored:
++        print(f"  gap {g['start']:.1f}-{g['end']:.1f} duration={g['dur']:.1f} action=IGNORE "
++              f"reason={g['reason']}")
++    return merged
+ 
+ 
+ def _format_silence_hint(gaps: list[dict], limit: int = 15) -> str:
+@@ -2356,7 +2446,8 @@ def analyze_video_content(
+         return result
+ 
+     # ── hint ช่วงเงียบ + บล็อกความเข้มตามโหมด (full = ปกติ, summary = ตัดหนักแต่เข้าใจครบ) ──
+-    silence_hint = _format_silence_hint(_long_silence_gaps(transcript, total_duration))
++    silence_hint = _format_silence_hint(
++        _long_silence_gaps(transcript, total_duration, voice_segments=voice_segments))
+ 
+     # กติกาความเข้มของ summary เลือกทีหลัง — ต้องรู้ชนิดเนื้อหาจาก outline ก่อน
+     # (ไม่มี outline → ใช้บล็อก informational เป็นค่าตั้งต้น)

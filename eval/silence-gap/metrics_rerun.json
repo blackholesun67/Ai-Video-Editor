@@ -1,0 +1,129 @@
+{
+ "V07 full": {
+  "before": {
+   "mode": "full",
+   "cut_s": 0,
+   "transcript_end": 94.9,
+   "recall": 0.0,
+   "precision": null,
+   "outside_gt_s": 0,
+   "keep_violation_s": 0,
+   "cuts": [],
+   "all_cut": false,
+   "f1": null,
+   "silence_gt_s": 43.0,
+   "silence_cut_s": 0
+  },
+  "control": {
+   "mode": "full",
+   "cut_s": 0,
+   "transcript_end": 94.9,
+   "recall": 0.0,
+   "precision": null,
+   "outside_gt_s": 0,
+   "keep_violation_s": 0,
+   "cuts": [],
+   "all_cut": false,
+   "f1": null,
+   "silence_gt_s": 43.0,
+   "silence_cut_s": 0
+  },
+  "new": {
+   "mode": "full",
+   "cut_s": 0,
+   "transcript_end": 94.9,
+   "recall": 0.0,
+   "precision": null,
+   "outside_gt_s": 0,
+   "keep_violation_s": 0,
+   "cuts": [],
+   "all_cut": false,
+   "f1": null,
+   "silence_gt_s": 43.0,
+   "silence_cut_s": 0
+  }
+ },
+ "V06 summary": {
+  "before": {
+   "mode": "summary",
+   "cut_s": 37.0,
+   "transcript_end": 176.8,
+   "recall": 0.3606,
+   "precision": 0.6629,
+   "outside_gt_s": 12.5,
+   "keep_violation_s": 5.0,
+   "cuts": [
+    [
+     37.8,
+     46.5
+    ],
+    [
+     82.6,
+     105.9
+    ],
+    [
+     111.2,
+     116.3
+    ]
+   ],
+   "all_cut": false,
+   "f1": 0.4671,
+   "silence_gt_s": 0,
+   "silence_cut_s": 0
+  },
+  "control": {
+   "mode": "summary",
+   "cut_s": 67.0,
+   "transcript_end": 176.8,
+   "recall": 0.7803,
+   "precision": 0.7915,
+   "outside_gt_s": 14.0,
+   "keep_violation_s": 5.0,
+   "cuts": [
+    [
+     32.8,
+     48.0
+    ],
+    [
+     59.1,
+     105.9
+    ],
+    [
+     111.2,
+     116.3
+    ]
+   ],
+   "all_cut": false,
+   "f1": 0.7859,
+   "silence_gt_s": 0,
+   "silence_cut_s": 0
+  },
+  "new": {
+   "mode": "summary",
+   "cut_s": 42.7,
+   "transcript_end": 176.8,
+   "recall": 0.4226,
+   "precision": 0.6728,
+   "outside_gt_s": 14.0,
+   "keep_violation_s": 5.0,
+   "cuts": [
+    [
+     33.6,
+     48.0
+    ],
+    [
+     82.6,
+     105.9
+    ],
+    [
+     111.2,
+     116.3
+    ]
+   ],
+   "all_cut": false,
+   "f1": 0.5191,
+   "silence_gt_s": 0,
+   "silence_cut_s": 0
+  }
+ }
+}

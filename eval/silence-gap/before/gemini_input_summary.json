@@ -1,0 +1,107 @@
+{
+ "V01_full": {
+  "transcript_line": "[Transcript] 22 segments, 2,376 chars → Gemini",
+  "hint_gap_count": 1,
+  "hint_gaps": [
+   [
+    83.78,
+    88.1
+   ]
+  ],
+  "deletion_prompt_chars": 8116,
+  "deletion_prompt_sha256": "9834553c0cbb0321",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": []
+ },
+ "V02_full": {
+  "transcript_line": "[Transcript] 7 segments, 1,294 chars → Gemini",
+  "hint_gap_count": 0,
+  "hint_gaps": [],
+  "deletion_prompt_chars": 6641,
+  "deletion_prompt_sha256": "8ed65e658b51034b",
+  "gemini_calls": 1,
+  "deletion_prompt_found": true,
+  "silence_gap_log": []
+ },
+ "V03_summary": {
+  "transcript_line": "[Transcript] 8 segments, 1,576 chars → Gemini",
+  "hint_gap_count": 0,
+  "hint_gaps": [],
+  "deletion_prompt_chars": 6810,
+  "deletion_prompt_sha256": "cc6904b63d81b819",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": []
+ },
+ "V04_full": {
+  "transcript_line": "[Transcript] 9 segments, 1,819 chars → Gemini",
+  "hint_gap_count": 1,
+  "hint_gaps": [
+   [
+    58.69,
+    61.91
+   ]
+  ],
+  "deletion_prompt_chars": 7473,
+  "deletion_prompt_sha256": "de73020fff269dc1",
+  "gemini_calls": 1,
+  "deletion_prompt_found": true,
+  "silence_gap_log": []
+ },
+ "V05_full": {
+  "transcript_line": "[Transcript] 12 segments, 1,923 chars → Gemini",
+  "hint_gap_count": 1,
+  "hint_gaps": [
+   [
+    54.59,
+    58.69
+   ]
+  ],
+  "deletion_prompt_chars": 7577,
+  "deletion_prompt_sha256": "b254010232a777ad",
+  "gemini_calls": 1,
+  "deletion_prompt_found": true,
+  "silence_gap_log": []
+ },
+ "V06_full": {
+  "transcript_line": "[Transcript] 12 segments, 2,421 chars → Gemini",
+  "hint_gap_count": 1,
+  "hint_gaps": [
+   [
+    124.62,
+    128.95
+   ]
+  ],
+  "deletion_prompt_chars": 8077,
+  "deletion_prompt_sha256": "9a811256ee1289b8",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": []
+ },
+ "V06_summary": {
+  "transcript_line": "[Transcript] 12 segments, 2,415 chars → Gemini",
+  "hint_gap_count": 1,
+  "hint_gaps": [
+   [
+    124.62,
+    128.95
+   ]
+  ],
+  "deletion_prompt_chars": 7958,
+  "deletion_prompt_sha256": "ec5973cd1fff1675",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": []
+ },
+ "V07_full": {
+  "transcript_line": "[Transcript] 2 segments, 581 chars → Gemini",
+  "hint_gap_count": 0,
+  "hint_gaps": [],
+  "deletion_prompt_chars": 5928,
+  "deletion_prompt_sha256": "c0cd13485ad54972",
+  "gemini_calls": 2,
+  "deletion_prompt_found": true,
+  "silence_gap_log": []
+ }
+}

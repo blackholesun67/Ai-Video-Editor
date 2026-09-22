@@ -1,0 +1,390 @@
+{
+ "old_ref": "vad-fix-v1",
+ "min_gap": 3.0,
+ "clips": {
+  "V01": {
+   "old_usable": 1,
+   "new_usable": 1,
+   "old_gaps": [
+    {
+     "start": 83.78,
+     "end": 88.1,
+     "dur": 4.32
+    }
+   ],
+   "new_gaps": [
+    {
+     "start": 83.78,
+     "end": 88.1,
+     "dur": 4.32
+    }
+   ],
+   "new_only": [],
+   "no_vad_equals_old": true,
+   "overlap_vad_speech_s": 0.0,
+   "overlap_whisper_words_s": 0.0,
+   "gt_keep_overlap_s": 0,
+   "vad_part": [
+    {
+     "start": 83.78,
+     "end": 88.1,
+     "dur": 4.32
+    }
+   ],
+   "vad_ignored": [],
+   "legacy_gaps_overlap_vad_speech_s": 0.0,
+   "gt_cut_coverage": [],
+   "log": [
+    "[Silence Gap] detected = 2 (between-segments 1, VAD 1) | usable = 1",
+    "  segment=between/edge gap 83.8-88.1 duration=4.3 action=KEEP_AS_HINT"
+   ]
+  },
+  "V02": {
+   "old_usable": 0,
+   "new_usable": 3,
+   "old_gaps": [],
+   "new_gaps": [
+    {
+     "start": 30.41,
+     "end": 33.67,
+     "dur": 3.26
+    },
+    {
+     "start": 47.36,
+     "end": 51.52,
+     "dur": 4.16
+    },
+    {
+     "start": 84.43,
+     "end": 90.23,
+     "dur": 5.8
+    }
+   ],
+   "new_only": [
+    {
+     "start": 30.41,
+     "end": 33.67,
+     "dur": 3.26
+    },
+    {
+     "start": 47.36,
+     "end": 51.52,
+     "dur": 4.16
+    },
+    {
+     "start": 84.43,
+     "end": 90.23,
+     "dur": 5.8
+    }
+   ],
+   "no_vad_equals_old": true,
+   "overlap_vad_speech_s": 0.0,
+   "overlap_whisper_words_s": 0.0,
+   "gt_keep_overlap_s": 3.3,
+   "vad_part": [
+    {
+     "start": 30.41,
+     "end": 33.67,
+     "dur": 3.26
+    },
+    {
+     "start": 47.36,
+     "end": 51.52,
+     "dur": 4.16
+    },
+    {
+     "start": 84.43,
+     "end": 90.23,
+     "dur": 5.8
+    }
+   ],
+   "vad_ignored": [],
+   "legacy_gaps_overlap_vad_speech_s": 0,
+   "gt_cut_coverage": [
+    [
+     46.0,
+     51.0,
+     3.6
+    ],
+    [
+     84.0,
+     90.0,
+     5.6
+    ]
+   ],
+   "log": [
+    "[Silence Gap] detected = 3 (between-segments 0, VAD 3) | usable = 3",
+    "  segment=0 (1.7-34.9) internal gap 30.4-33.7 duration=3.3 action=KEEP_AS_HINT",
+    "  segment=1 (34.4-65.4) internal gap 47.4-51.5 duration=4.2 action=KEEP_AS_HINT",
+    "  segment=2 (68.0-94.9) internal gap 84.4-90.2 duration=5.8 action=KEEP_AS_HINT"
+   ]
+  },
+  "V03": {
+   "old_usable": 0,
+   "new_usable": 0,
+   "old_gaps": [],
+   "new_gaps": [],
+   "new_only": [],
+   "no_vad_equals_old": true,
+   "overlap_vad_speech_s": 0,
+   "overlap_whisper_words_s": 0,
+   "gt_keep_overlap_s": 0,
+   "vad_part": [],
+   "vad_ignored": [],
+   "legacy_gaps_overlap_vad_speech_s": 0,
+   "gt_cut_coverage": [
+    [
+     43.0,
+     86.0,
+     0
+    ]
+   ],
+   "log": [
+    "[Silence Gap] detected = 0 (between-segments 0, VAD 0) | usable = 0"
+   ]
+  },
+  "V04": {
+   "old_usable": 1,
+   "new_usable": 2,
+   "old_gaps": [
+    {
+     "start": 58.69,
+     "end": 61.91,
+     "dur": 3.22
+    }
+   ],
+   "new_gaps": [
+    {
+     "start": 58.69,
+     "end": 61.91,
+     "dur": 3.22
+    },
+    {
+     "start": 71.11,
+     "end": 75.72,
+     "dur": 4.61
+    }
+   ],
+   "new_only": [
+    {
+     "start": 71.11,
+     "end": 75.72,
+     "dur": 4.61
+    }
+   ],
+   "no_vad_equals_old": true,
+   "overlap_vad_speech_s": 0.0,
+   "overlap_whisper_words_s": 0.0,
+   "gt_keep_overlap_s": 0,
+   "vad_part": [
+    {
+     "start": 71.11,
+     "end": 75.72,
+     "dur": 4.61
+    }
+   ],
+   "vad_ignored": [],
+   "legacy_gaps_overlap_vad_speech_s": 3.22,
+   "gt_cut_coverage": [
+    [
+     47.0,
+     55.0,
+     0.0
+    ],
+    [
+     67.0,
+     75.0,
+     3.9
+    ],
+    [
+     104.0,
+     109.0,
+     0.0
+    ]
+   ],
+   "log": [
+    "[Silence Gap] detected = 2 (between-segments 1, VAD 1) | usable = 2",
+    "  segment=between/edge gap 58.7-61.9 duration=3.2 action=KEEP_AS_HINT",
+    "  segment=2 (61.9-91.0) internal gap 71.1-75.7 duration=4.6 action=KEEP_AS_HINT"
+   ]
+  },
+  "V05": {
+   "old_usable": 1,
+   "new_usable": 1,
+   "old_gaps": [
+    {
+     "start": 54.59,
+     "end": 58.69,
+     "dur": 4.1
+    }
+   ],
+   "new_gaps": [
+    {
+     "start": 54.59,
+     "end": 58.69,
+     "dur": 4.1
+    }
+   ],
+   "new_only": [],
+   "no_vad_equals_old": true,
+   "overlap_vad_speech_s": 0,
+   "overlap_whisper_words_s": 0,
+   "gt_keep_overlap_s": 0.0,
+   "vad_part": [],
+   "vad_ignored": [],
+   "legacy_gaps_overlap_vad_speech_s": 4.1,
+   "gt_cut_coverage": [],
+   "log": [
+    "[Silence Gap] detected = 1 (between-segments 1, VAD 0) | usable = 1",
+    "  segment=between/edge gap 54.6-58.7 duration=4.1 action=KEEP_AS_HINT"
+   ]
+  },
+  "V06": {
+   "old_usable": 1,
+   "new_usable": 2,
+   "old_gaps": [
+    {
+     "start": 124.62,
+     "end": 128.95,
+     "dur": 4.33
+    }
+   ],
+   "new_gaps": [
+    {
+     "start": 124.62,
+     "end": 128.95,
+     "dur": 4.33
+    },
+    {
+     "start": 139.15,
+     "end": 142.72,
+     "dur": 3.57
+    }
+   ],
+   "new_only": [
+    {
+     "start": 139.15,
+     "end": 142.72,
+     "dur": 3.57
+    }
+   ],
+   "no_vad_equals_old": true,
+   "overlap_vad_speech_s": 0.0,
+   "overlap_whisper_words_s": 0.0,
+   "gt_keep_overlap_s": 0.0,
+   "vad_part": [
+    {
+     "start": 139.15,
+     "end": 142.72,
+     "dur": 3.57
+    }
+   ],
+   "vad_ignored": [],
+   "legacy_gaps_overlap_vad_speech_s": 4.33,
+   "gt_cut_coverage": [
+    [
+     25.0,
+     40.0,
+     0.0
+    ],
+    [
+     52.0,
+     105.0,
+     0.0
+    ]
+   ],
+   "log": [
+    "[Silence Gap] detected = 2 (between-segments 1, VAD 1) | usable = 2",
+    "  segment=between/edge gap 124.6-128.9 duration=4.3 action=KEEP_AS_HINT",
+    "  segment=7 (128.9-151.9) internal gap 139.2-142.7 duration=3.6 action=KEEP_AS_HINT"
+   ]
+  },
+  "V07": {
+   "old_usable": 0,
+   "new_usable": 3,
+   "old_gaps": [],
+   "new_gaps": [
+    {
+     "start": 16.83,
+     "end": 31.49,
+     "dur": 14.66
+    },
+    {
+     "start": 37.12,
+     "end": 49.2,
+     "dur": 12.08
+    },
+    {
+     "start": 62.97,
+     "end": 82.63,
+     "dur": 19.66
+    }
+   ],
+   "new_only": [
+    {
+     "start": 16.83,
+     "end": 31.49,
+     "dur": 14.66
+    },
+    {
+     "start": 37.12,
+     "end": 49.2,
+     "dur": 12.08
+    },
+    {
+     "start": 62.97,
+     "end": 82.63,
+     "dur": 19.66
+    }
+   ],
+   "no_vad_equals_old": true,
+   "overlap_vad_speech_s": 0.0,
+   "overlap_whisper_words_s": 0.0,
+   "gt_keep_overlap_s": 0.0,
+   "vad_part": [
+    {
+     "start": 16.83,
+     "end": 31.49,
+     "dur": 14.66
+    },
+    {
+     "start": 37.12,
+     "end": 49.2,
+     "dur": 12.08
+    },
+    {
+     "start": 62.97,
+     "end": 82.63,
+     "dur": 19.66
+    }
+   ],
+   "vad_ignored": [],
+   "legacy_gaps_overlap_vad_speech_s": 0,
+   "gt_cut_coverage": [
+    [
+     17.0,
+     31.0,
+     14.0
+    ],
+    [
+     38.0,
+     48.0,
+     10.0
+    ],
+    [
+     63.0,
+     82.0,
+     19.0
+    ]
+   ],
+   "log": [
+    "[Silence Gap] detected = 3 (between-segments 0, VAD 3) | usable = 3",
+    "  segment=0 (0.0-52.6) internal gap 16.8-31.5 duration=14.7 action=KEEP_AS_HINT",
+    "  segment=0 (0.0-52.6) internal gap 37.1-49.2 duration=12.1 action=KEEP_AS_HINT",
+    "  segment=1 (55.1-94.9) internal gap 63.0-82.6 duration=19.7 action=KEEP_AS_HINT"
+   ]
+  }
+ },
+ "edge_cases_pass": true,
+ "problems": []
+}
