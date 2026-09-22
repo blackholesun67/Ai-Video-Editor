@@ -1,0 +1,126 @@
+[
+ {
+  "label": "V02 full (new, Silence Gap Fix)",
+  "clip": "V02",
+  "cuts": [
+   {
+    "start": 84.43,
+    "end": 90.23
+   }
+  ],
+  "recorded_final": [
+   [
+    0.0,
+    84.43
+   ],
+   [
+    90.23,
+    110.83
+   ]
+  ]
+ },
+ {
+  "label": "V06 full (new, Silence Gap Fix)",
+  "clip": "V06",
+  "cuts": [
+   {
+    "start": 26.48,
+    "end": 35.79
+   },
+   {
+    "start": 124.62,
+    "end": 128.95
+   },
+   {
+    "start": 139.15,
+    "end": 142.72
+   }
+  ],
+  "recorded_final": [
+   [
+    0.0,
+    25.87
+   ],
+   [
+    35.74,
+    82.64
+   ],
+   [
+    105.91,
+    111.23
+   ],
+   [
+    116.28,
+    176.79
+   ]
+  ]
+ },
+ {
+  "label": "V06 full (control-old, ก่อน Silence Gap Fix)",
+  "clip": "V06",
+  "cuts": [
+   {
+    "start": 26.48,
+    "end": 33.58
+   },
+   {
+    "start": 115.0,
+    "end": 120.0
+   }
+  ],
+  "recorded_final": [
+   [
+    0.0,
+    25.87
+   ],
+   [
+    33.46,
+    82.64
+   ],
+   [
+    105.91,
+    111.23
+   ],
+   [
+    116.28,
+    176.79
+   ]
+  ]
+ },
+ {
+  "label": "V06 summary (control-old rerun, ก่อน Silence Gap Fix)",
+  "clip": "V06",
+  "cuts": [
+   {
+    "start": 32.54,
+    "end": 49.3
+   },
+   {
+    "start": 60.53,
+    "end": 101.52
+   },
+   {
+    "start": 124.62,
+    "end": 128.95
+   }
+  ],
+  "recorded_final": [
+   [
+    0.0,
+    32.82
+   ],
+   [
+    48.02,
+    59.12
+   ],
+   [
+    105.91,
+    111.23
+   ],
+   [
+    116.28,
+    176.79
+   ]
+  ]
+ }
+]

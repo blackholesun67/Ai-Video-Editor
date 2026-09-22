@@ -1,0 +1,122 @@
+--- /tmp/pre_round_patched.py	2026-09-22 14:51:11.346273200 +0700
++++ backend/core/ai_logic.py	2026-09-22 14:54:06.656011500 +0700
+@@ -1811,12 +1811,50 @@
+     return min(cands) if cands else pos
+ 
+ 
++def _is_silence_boundary(pos: float, seg: dict, voice_segments: list[dict] | None,
++                         before: bool) -> bool:
++    """
++    ขอบนี้ตกอยู่ใน "ช่วงเงียบที่ยืนยันแล้ว" ไหม — ใช้หลักเดียวกับ guard ของ `_vad_silence_gaps`
++    (VAD ไม่เห็นเสียงพูด "และ" Whisper ไม่มีคำทับตำแหน่งนี้) ไม่ใช่การคำนวณ silence gap ใหม่
++    (นั่นคือหน้าที่ของ `get_silence_gaps()`/`_vad_silence_gaps` อยู่แล้ว) แค่ตรวจจุดเดียวว่า
++    "อยู่ในย่านเงียบหรือเปล่า" ก่อนตัดสินใจว่าจะปล่อยให้ `_word_bound` เดินหาคำไหม
++
++    boundary ที่มาจาก silence-gap hint จะตกอยู่ **พอดีขอบ** ของ voice_segment/word เสมอ
++    (เพราะคำนวณมาจากขอบช่องว่างเดียวกัน) เช็คแบบ inclusive ตรง ๆ ที่ `pos` จึงชนขอบ "ฝั่งเสียงพูด"
++    พอดีทุกครั้งและ False เสมอ (วัดจริงกับ V07: ยืนยันแล้วว่า pos ทั้ง 4 ตกชนขอบแบบนี้หมด) —
++    ต้อง probe จุดที่ **จะเดินไป** (ก่อน/หลัง pos เล็กน้อย ทิศเดียวกับ `before` ของ `_word_bound`)
++    ไม่ใช่ pos เป๊ะ ถึงจะบอกได้ถูกว่า "ฝั่งที่กำลังจะขยายไป" เป็นเสียงพูดหรือความเงียบ
++    epsilon 0.05 วิ ใช้ค่าเดียวกับที่ `_snap_bounds` ใช้เทียบขอบ segment อยู่แล้ว (ไม่ใช่ค่าใหม่)
++
++    ไม่มี voice_segments (เส้นทางเดิมที่ไม่ส่งมา) → คืน False เสมอ = พฤติกรรมเดิมทุกประการ
++    """
++    if not voice_segments:
++        return False
++    probe = pos - 0.05 if before else pos + 0.05
++    if any(float(v["start"]) <= probe <= float(v["end"]) for v in voice_segments):
++        return False   # VAD ยืนยันว่ามีเสียงพูดฝั่งที่จะเดินไป — ไม่ใช่ช่วงเงียบ ปล่อยให้ _word_bound ทำงานตามปกติ
++    words = seg.get("words") or []
++    if any(w.get("start") is not None and w.get("end") is not None
++           and float(w["start"]) <= probe <= float(w["end"]) for w in words):
++        return False   # มีคำ Whisper ทับฝั่งที่จะเดินไป — ไม่ใช่ช่วงเงียบ
++    return True
++
++
+ def _snap_bounds(start: float, end: float, tr: list[dict],
+-                 total_duration: float) -> tuple[float, float]:
++                 total_duration: float,
++                 voice_segments: list[dict] | None = None) -> tuple[float, float]:
+     """
+     ขยับขอบช่วงเดียวให้ตกที่ "จุดที่คนพูดหยุดจริง" — ใช้ร่วมกันทั้ง deletion path และ hook
+ 
+     `tr` ต้องเรียงตามเวลาแล้ว ; ขยายออกอย่างเดียว ไม่หดเข้า
++
++    `voice_segments` (ไม่บังคับ): กัน `_word_bound` เดิน "ข้ามช่วงเงียบ" ไปหาคำที่อยู่อีกฝั่ง —
++    เคสจริง (V07): ขอบตกในช่วงเงียบที่ VAD ยืนยันแล้วและ Whisper ไม่มีคำทับ (เพราะ AI เพิ่งเลือกตัด
++    ช่วงเงียบนั้นตาม hint ของ Silence Gap Fix) แต่ `_word_bound` ไม่รู้ว่ากำลังยืนอยู่ติดช่วงเงียบ
++    จึงเดินหาคำที่ใกล้ที่สุด "อีกฝั่งของช่วงเงียบ" ซึ่งอาจไกลถึง 15-20 วินาที ทำให้ keep-span ที่ควรจะ
++    เล็กลงกลับบวมจนทับซ้อนกับช่วงข้างเคียง แล้ว `merge_close_segments` (ใน `_snap_segments_to_sentences`)
++    รวมกลับเป็นก้อนเดียว = กลืนช่วงเงียบที่เพิ่งตัดสินใจตัดไปทั้งหมด — ดู eval/silence-gap/snap-wordbound-gap-bug.md
++    ไม่ส่ง `voice_segments` = ทำงานเหมือนเดิมทุกประการ (`_is_silence_boundary` คืน False เสมอ)
+     """
+     limit_lo, limit_hi = start - SNAP_MAX_EXTEND, end + SNAP_MAX_EXTEND
+ 
+@@ -1827,8 +1865,13 @@
+                 # Whisper อาจให้ segment ยาวเป็นนาที — กลืนทั้งก้อนแล้วช่วงจะบวมมาก
+                 # จึงกลืนเฉพาะท่อนที่ยาวสมเหตุผล (≤ SNAP_MAX_SENTENCE)
+                 # นอกนั้นตกไปใช้ขอบคำ (มี word timestamps อยู่แล้ว) เพื่อไม่ให้ค้างกลางคำ
+-                start = (float(t["start"]) if start - float(t["start"]) <= SNAP_MAX_SENTENCE
+-                         else _word_bound(t, start, before=True))
++                # ยกเว้นขอบนี้ตกในช่วงเงียบที่ยืนยันแล้ว (ไม่มีคำให้ป้องกันอยู่แล้ว) — คงตำแหน่งเดิมไว้
++                # แทนที่จะให้ _word_bound เดินข้ามช่วงเงียบไปหาคำอีกฝั่ง
++                if start - float(t["start"]) <= SNAP_MAX_SENTENCE:
++                    start = float(t["start"])
++                elif not _is_silence_boundary(start, t, voice_segments, before=True):
++                    start = _word_bound(t, start, before=True)
++                # else: ขอบอยู่ในช่วงเงียบที่ยืนยันแล้ว ไม่มีคำให้กันตัดกลางคำ — ไม่ขยับ
+             j = i
+             while j > 0 and start - float(tr[j - 1]["end"]) < SENTENCE_PAUSE:
+                 if float(tr[j - 1]["start"]) < limit_lo:
+@@ -1841,8 +1884,11 @@
+     for i in range(len(tr) - 1, -1, -1):
+         if tr[i]["start"] < end - 0.05:
+             if tr[i]["end"] > end:
+-                end = (float(tr[i]["end"]) if float(tr[i]["end"]) - end <= SNAP_MAX_SENTENCE
+-                       else _word_bound(tr[i], end, before=False))
++                if float(tr[i]["end"]) - end <= SNAP_MAX_SENTENCE:
++                    end = float(tr[i]["end"])
++                elif not _is_silence_boundary(end, tr[i], voice_segments, before=False):
++                    end = _word_bound(tr[i], end, before=False)
++                # else: ขอบอยู่ในช่วงเงียบที่ยืนยันแล้ว — ไม่ขยับ (เหตุผลเดียวกับขอบหน้า)
+             j = i
+             while j + 1 < len(tr) and float(tr[j + 1]["start"]) - end < SENTENCE_PAUSE:
+                 if float(tr[j + 1]["end"]) > limit_hi:
+@@ -1924,7 +1970,8 @@
+ 
+ 
+ def _snap_segments_to_sentences(segments: list[dict], transcript: list[dict],
+-                                total_duration: float) -> list[dict]:
++                                total_duration: float,
++                                voice_segments: list[dict] | None = None) -> list[dict]:
+     """
+     บังคับให้ขอบทุกช่วงที่เก็บตกที่ "จุดที่คนพูดหยุดจริง"
+ 
+@@ -1938,6 +1985,9 @@
+          จนเจอการหยุดพูดจริง = จบประโยค ; จำกัดที่ SNAP_MAX_EXTEND กันยืดเกินเหตุ
+ 
+     ขยายออกอย่างเดียว ไม่หดเข้า → ไม่มีทางทำให้เนื้อหาหายเพิ่ม
++
++    `voice_segments` (ไม่บังคับ): ส่งต่อให้ `_snap_bounds` กัน "กลืนช่วงเงียบที่ยืนยันแล้วกลับเข้ามา"
++    (ดู docstring ของ `_snap_bounds`) ไม่ส่ง = พฤติกรรมเดิมทุกประการ
+     """
+     if not transcript or not segments:
+         return segments
+@@ -1950,7 +2000,7 @@
+ 
+     snapped: list[dict] = []
+     for seg in segments:
+-        s, e = _snap_bounds(float(seg["start"]), float(seg["end"]), tr, total_duration)
++        s, e = _snap_bounds(float(seg["start"]), float(seg["end"]), tr, total_duration, voice_segments)
+         snapped.append({**seg, "start": s, "end": e})
+ 
+     merged = merge_close_segments(snapped, gap_threshold=0.0)   # ขอบที่ขยายแล้วชนกัน → รวม
+@@ -2677,7 +2727,7 @@
+ 
+     # ── ตัวกันเชิงโครงสร้าง: คลิปต้องไม่จบดื้อ ๆ และขอบต้องไม่ค้างกลางประโยค ──
+     final_segments = _protect_outro(final_segments, transcript, total_duration, voice_segments)
+-    final_segments = _snap_segments_to_sentences(final_segments, transcript, total_duration)
++    final_segments = _snap_segments_to_sentences(final_segments, transcript, total_duration, voice_segments)
+ 
+     # ── ตัดเทคซ้ำ — ต้องอยู่ "หลัง" snap: ตัวยืดขอบขยายอย่างเดียว ถ้าหักก่อนมันจะดึงช่วงที่
+     #    ตัดกลับมา (จุดตัดอยู่กลางท่อนถอดเสียง) ; และต้องอยู่ก่อน _finish_last_sentence ──

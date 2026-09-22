@@ -1,0 +1,50 @@
+﻿====================================================================================================
+1) V07 REAL CASE — 3 ช่วงเงียบที่ Gemini เสนอตัดจริง (16.83-31.49, 37.12-49.20, 62.97-82.63)
+====================================================================================================
+BUGGY (Silence Gap Fix only)                         : [{'start': 0.0, 'end': 94.87}]
+FIXED, ไม่ส่ง voice_segments (คาดว่า = BUGGY เป๊ะ)     : [{'start': 0.0, 'end': 94.87}]
+FIXED, ส่ง voice_segments (โค้ดจริงที่จะใช้งาน)        : [{'start': 0.0, 'end': 16.83}, {'start': 31.49, 'end': 37.12}, {'start': 49.2, 'end': 62.97}, {'start': 82.63, 'end': 94.87}]
+
+  [PASS] BUGGY ยุบเป็น keep-all 1 ช่วง (ยืนยันซ้ำว่าบั๊กจริง ก่อนแก้)  
+  [PASS] FIXED ไม่ส่ง voice_segments ต้องเหมือน BUGGY เป๊ะ (backward compatible, ไม่ส่ง = พฤติกรรมเดิม)  fixed_no_vad=[{'start': 0.0, 'end': 94.87}]
+  [PASS] FIXED ส่ง voice_segments ต้องไม่ยุบเป็น keep-all อีกต่อไป  
+  [PASS] FIXED ส่ง voice_segments ต้องได้ keep-segments >= 4 ช่วง (ตรงกับ invert ของ 3 cuts)  n=4
+  [PASS] FIXED ส่ง voice_segments ต้องใกล้เคียงขอบที่ Gemini เสนอจริง (คลาดไม่เกิน 0.5s/ขอบ)  got=[{'start': 0.0, 'end': 16.83}, {'start': 31.49, 'end': 37.12}, {'start': 49.2, 'end': 62.97}, {'start': 82.63, 'end': 94.87}]
+
+====================================================================================================
+2) SYNTHETIC B1-B4 (ไม่เรียก Gemini, เทียบ BUGGY vs FIXED with voice_segments)
+====================================================================================================
+
+--- B1: ตัดช่วงเงียบเดี่ยว ๆ ---
+  BUGGY          : [{'start': 0.0, 'end': 94.87}]
+  FIXED (no VAD) : [{'start': 0.0, 'end': 94.87}]
+  FIXED (+VAD)   : [{'start': 0.0, 'end': 16.83}, {'start': 31.49, 'end': 94.87}]
+  [PASS] B1: ตัดช่วงเงียบเดี่ยว ๆ: FIXED(no VAD) == BUGGY (ไม่ส่ง voice_segments ต้องเหมือนเดิมเป๊ะ)  
+  [PASS] B1: BUGGY ต้องยุบเป็น keep-all (ยืนยันสภาพก่อนแก้)  
+  [PASS] B1: FIXED(+VAD) ต้องไม่ยุบเป็น keep-all (เกณฑ์ที่ผู้ใช้กำหนด)  
+
+--- B2: cut ใกล้ขอบ segment (< SNAP_MAX_SENTENCE=6.0s, ไม่ใช่ silence gap) ---
+  BUGGY          : [{'start': 0.0, 'end': 2.61}, {'start': 7.91, 'end': 94.87}]
+  FIXED (no VAD) : [{'start': 0.0, 'end': 2.61}, {'start': 7.91, 'end': 94.87}]
+  FIXED (+VAD)   : [{'start': 0.0, 'end': 2.61}, {'start': 7.91, 'end': 94.87}]
+  [PASS] B2: cut ใกล้ขอบ segment (< SNAP_MAX_SENTENCE=6.0s, ไม่ใช่ silence gap): FIXED(no VAD) == BUGGY (ไม่ส่ง voice_segments ต้องเหมือนเดิมเป๊ะ)  
+  [PASS] B2: FIXED(+VAD) ต้องทำงานเหมือนเดิม (ไม่มี silence gap ในเคสนี้ ไม่ควรมีอะไรเปลี่ยน)  buggy=[{'start': 0.0, 'end': 2.61}, {'start': 7.91, 'end': 94.87}] fixed=[{'start': 0.0, 'end': 2.61}, {'start': 7.91, 'end': 94.87}]
+
+--- B3: cut ตรงช่องว่างระหว่าง 2 ท่อนจริง (52.58-55.15) ---
+  BUGGY          : [{'start': 0.0, 'end': 52.58}, {'start': 55.15, 'end': 94.87}]
+  FIXED (no VAD) : [{'start': 0.0, 'end': 52.58}, {'start': 55.15, 'end': 94.87}]
+  FIXED (+VAD)   : [{'start': 0.0, 'end': 52.58}, {'start': 55.15, 'end': 94.87}]
+  [PASS] B3: cut ตรงช่องว่างระหว่าง 2 ท่อนจริง (52.58-55.15): FIXED(no VAD) == BUGGY (ไม่ส่ง voice_segments ต้องเหมือนเดิมเป๊ะ)  
+  [PASS] B3: FIXED(+VAD) ต้องทำงานเหมือนเดิม (cut ตรงช่องว่างระหว่างท่อนจริง ไม่ใช่เงียบในท่อนเดียว)  buggy=[{'start': 0.0, 'end': 52.58}, {'start': 55.15, 'end': 94.87}] fixed=[{'start': 0.0, 'end': 52.58}, {'start': 55.15, 'end': 94.87}]
+
+--- B4: 2 cuts ในท่อนเดียวกัน (gap1+gap2, ไม่รวม gap3) ---
+  BUGGY          : [{'start': 0.0, 'end': 94.87}]
+  FIXED (no VAD) : [{'start': 0.0, 'end': 94.87}]
+  FIXED (+VAD)   : [{'start': 0.0, 'end': 16.83}, {'start': 31.49, 'end': 37.12}, {'start': 49.2, 'end': 94.87}]
+  [PASS] B4: 2 cuts ในท่อนเดียวกัน (gap1+gap2, ไม่รวม gap3): FIXED(no VAD) == BUGGY (ไม่ส่ง voice_segments ต้องเหมือนเดิมเป๊ะ)  
+  [PASS] B4: BUGGY ต้องยุบเป็น keep-all (ยืนยันสภาพก่อนแก้)  
+  [PASS] B4: FIXED(+VAD) ต้องไม่เกิด chain-merge เป็น keep-all  
+
+====================================================================================================
+สรุป: PASS=15 FAIL=0
+====================================================================================================

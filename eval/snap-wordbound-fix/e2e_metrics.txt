@@ -1,0 +1,15 @@
+﻿before (VAD-fix baseline):
+  cuts=[]
+  recall=0.0% precision=N/A f1=N/A outside_gt=0s keep_violation=0s all_cut=False
+control-old (rerun2, vad-fix-v1):
+  cuts=[]
+  recall=0.0% precision=N/A f1=N/A outside_gt=0s keep_violation=0s all_cut=False
+control-old (this E2E run, vad-fix-v1):
+  cuts=[]
+  recall=0.0% precision=N/A f1=N/A outside_gt=0s keep_violation=0s all_cut=False
+new BEFORE fix (rerun2, Silence Gap Fix only, buggy):
+  cuts=[]
+  recall=0.0% precision=N/A f1=N/A outside_gt=0s keep_violation=0s all_cut=False
+new AFTER fix (this E2E run, Silence Gap Fix + snap-wordbound fix):
+  cuts=[(16.8, 31.5), (37.1, 49.2), (63.0, 82.6)]
+  recall=100.0% precision=92.7% f1=96.2% outside_gt=3.4s keep_violation=0.0s all_cut=False
