@@ -2353,14 +2353,10 @@ def call_gemini_with_retry(full_prompt, max_attempts_per_model: int = 2,
                     err_str = str(e)
                     if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
                         print(f"📉 {model_name} quota exceeded on {key_label}.")
-                        # quota หมดทั้ง key — switch ทั้งคีย์ ไม่ใช่แค่ model
-                        # (เพราะ Gemini ใช้ quota ระดับ project/account)
-                        if "PROJECT" in err_str.upper() or "DAILY" in err_str.upper():
-                            key_quota_exhausted = True
-                            break
-                        else:
-                            # quota แค่ model นี้ → ลอง model อื่นใน key เดิม
-                            break
+                        # โควตาที่แจ้งมาผูกกับ model นี้เป็นหลัก (แม้ error จะพูดถึง
+                        # project/daily) — ลอง model อื่นบน key เดิมก่อนเสมอ เผื่อ
+                        # model นั้นยังมีโควตาแยกเหลือ แล้วค่อยข้าม key ถ้าหมดทุก model จริง
+                        break
                     elif "401" in err_str or "UNAUTHENTICATED" in err_str:
                         print(f"🚫 {key_label} invalid key, switching key...")
                         key_quota_exhausted = True
