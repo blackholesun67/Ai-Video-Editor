@@ -65,6 +65,8 @@
 | [`objective4/PARTICIPANT-PLAN.md`](objective4/PARTICIPANT-PLAN.md) | แผนจำนวนผู้เข้าร่วม 4B/C/D (ข้อเสนอ ยังไม่ได้จัดหาคนจริง) |
 | [`objective4/functional/job-5ab40c1a/INVESTIGATION-NOTES.md`](objective4/functional/job-5ab40c1a/INVESTIGATION-NOTES.md) | **การสืบสาเหตุ job ที่ล้มครั้งที่ 2** — ไฟล์เสียง/VAD ไม่ใช่ปัญหา ; ข้อสรุป "transcript-cache bug" เดิมถูกถอนแล้ว 2026-09-24 (ดูหัวข้อแก้ไขบนสุดของไฟล์) สาเหตุจริง: worker รัน image เก่าก่อนแก้ VAD-prefilter (ยืนยันแล้ว) |
 | [`objective4/functional/run2-post-rebuild/checklist_result.md`](objective4/functional/run2-post-rebuild/checklist_result.md) | **4A รอบใหม่หลัง rebuild (ใช้ผลนี้)** — checklist ตามข้อ + หลักฐาน (upload/preview/subtitle/render responses, process_log, ffprobe, `burn/frame_t3s.jpg`) ; ไม่มี token ในไฟล์ |
+| [`objective4/UI-MANUAL-CHECKLIST.md`](objective4/UI-MANUAL-CHECKLIST.md) | **checklist 33 ข้อให้ผู้ใช้ทดสอบหน้าเว็บด้วยมือ** (ส่วน UI ของ 4A ที่ API ยืนยันไม่ได้) — ผล: NOT RUN |
+| [`objective4/functional/run3-v04-repeat/SUMMARY.md`](objective4/functional/run3-v04-repeat/SUMMARY.md) | รอบเสริม V04 (ทำซ้ำเช็ค "0 ช่วงตัด" ของ V02) + `process_log.txt`, `preview.json` |
 | `objective4/functional/job-5ab40c1a/extracted_audio.wav` | ไฟล์เสียงหลังผ่าน ffmpeg extract ของ job ที่ล้ม (เก็บไว้เทียบ SHA-256 กับต้นฉบับ) |
 
 **หลักฐาน 4A ทั้งหมดอยู่ใน `RESULTS-TEMPLATE.md` หัวข้อ "A. Functional"** (ตาราง PASS/FAIL ต่อขั้นตอน,
