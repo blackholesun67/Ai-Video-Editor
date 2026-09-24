@@ -1,0 +1,23 @@
+Using cache found in /tmp/torch_hub/hub/snakers4_silero-vad_master
+### V02_full 0e4c606f-d1e1-42dd-a030-6be1cd904465
+Direct use of automatic function calling (AFC) in Models.generate_content is not recommended. Instead, we recommend to use AFC in Chat.send_message. Similarly, direct use of AFC in Models.generate_content_stream is not recommended. Instead, we recommend to use AFC in Chat.send_message_stream.
+    old: ok 24.1s
+    new: ok 22.6s
+### V03_full 9eb88221-4197-463f-8c62-1daed7dd9744
+    old: ok 14.3s
+    new: ok 12.9s
+### V03_summary e30793df-0e40-4955-9b4f-c196f0574857
+    old: ok 37.2s
+    new: ok 24.8s
+### V04_full 9590035b-7af5-4e7b-92b9-496ed863a3ba
+    old: ok 29.7s
+    new: ok 32.7s
+### V06_full 0772b3c4-8449-48b6-bbb6-f2631a3aae3a
+    old: ok 26.4s
+    new: ok 18.4s
+### V06_summary 20692075-ce67-46ae-aea5-6b9672231db7
+    old: ok 37.8s
+    new: ok 82.9s
+### V07_full cc0db657-a323-4516-9f4c-3e8cf5a23685
+    old: ok 24.9s
+    new: ok 16.7s

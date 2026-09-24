@@ -1,0 +1,83 @@
+[2026-09-24 07:28:34,841: INFO/MainProcess] Task tasks.render_only_task[c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57-render] received
+[2026-09-24 07:28:34,858: WARNING/MainProcess] 
+==================================================
+[2026-09-24 07:28:34,858: WARNING/MainProcess] 🎬 STANDARD EDIT (burn_subtitle=False)
+[2026-09-24 07:28:34,858: WARNING/MainProcess] ==================================================
+[2026-09-24 07:28:34,992: WARNING/MainProcess] 🎬 [filter_complex] 2 segment(s), audio=True → final_summary.mp4
+ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021 the FFmpeg developers
+  built with gcc 11 (Ubuntu 11.2.0-19ubuntu1)
+  configuration: --prefix=/usr --extra-version=0ubuntu0.22.04.1 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --enable-gnutls --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libgsm --enable-libjack --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librabbitmq --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libsrt --enable-libssh --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-libzmq --enable-libzvbi --enable-lv2 --enable-omx --enable-openal --enable-opencl --enable-opengl --enable-sdl2 --enable-pocketsphinx --enable-librsvg --enable-libmfx --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-libx264 --enable-shared
+  libavutil      56. 70.100 / 56. 70.100
+  libavcodec     58.134.100 / 58.134.100
+  libavformat    58. 76.100 / 58. 76.100
+  libavdevice    58. 13.100 / 58. 13.100
+  libavfilter     7.110.100 /  7.110.100
+  libswscale      5.  9.100 /  5.  9.100
+  libswresample   3.  9.100 /  3.  9.100
+  libpostproc    55.  9.100 / 55.  9.100
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/app/storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/V2_________.mp4':
+  Metadata:
+    minor_version   : 512
+    major_brand     : isom
+    compatible_brands: isomiso6iso2avc1mp41
+    Hw              : 1
+    LvMetaInfo      : {"data":{"appVersion":"15.4.0","ch1":"SEO","ch2":"google","editType":"edit","exportType":"export","original_edittype":"edit","os":"web","product":"vicutweb","videoId":"9VXzbCFFdw6X9c5nIqNIobpLcl4RHkf7OQYq00-"},"source_type":"vicutweb"}
+    bitrate         : 0
+    maxrate         : 0
+    te_is_reencode  : 1
+    encoder         : Lavf58.45.100
+  Duration: 00:01:52.83, start: 0.000000, bitrate: 2379 kb/s
+  Stream #0:0(und): Video: h264 (Main) (avc1 / 0x31637661), yuv420p(tv, bt709), 1280x720 [SAR 1:1 DAR 16:9], 2243 kb/s, 29.99 fps, 30 tbr, 1000k tbn, 60 tbc (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+  Stream #0:1(und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, stereo, fltp, 127 kb/s (default)
+    Metadata:
+      handler_name    : SoundHandler
+      vendor_id       : [0][0][0][0]
+Stream mapping:
+  Stream #0:0 (h264) -> trim
+  Stream #0:0 (h264) -> trim
+  Stream #0:1 (aac) -> atrim
+  Stream #0:1 (aac) -> atrim
+  fps -> Stream #0:0 (libx264)
+  aformat -> Stream #0:1 (aac)
+Press [q] to stop, [?] for help
+[libx264 @ 0x5cecfbea7940] using SAR=1/1
+[libx264 @ 0x5cecfbea7940] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
+[libx264 @ 0x5cecfbea7940] profile Constrained Baseline, level 3.1, 4:2:0, 8-bit
+[libx264 @ 0x5cecfbea7940] 264 - core 163 r3060 5db6aa6 - H.264/MPEG-4 AVC codec - Copyleft 2003-2021 - http://www.videolan.org/x264.html - options: cabac=0 ref=1 deblock=0:0:0 analyse=0:0 me=dia subme=0 psy=1 psy_rd=1.00:0.00 mixed_ref=0 me_range=16 chroma_me=1 trellis=0 8x8dct=0 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=0 threads=18 lookahead_threads=3 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=0 weightp=0 keyint=250 keyint_min=25 scenecut=0 intra_refresh=0 rc=crf mbtree=0 crf=23.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=0
+Output #0, mp4, to '/app/storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/final_summary.mp4':
+  Metadata:
+    minor_version   : 512
+    major_brand     : isom
+    compatible_brands: isomiso6iso2avc1mp41
+    Hw              : 1
+    LvMetaInfo      : {"data":{"appVersion":"15.4.0","ch1":"SEO","ch2":"google","editType":"edit","exportType":"export","original_edittype":"edit","os":"web","product":"vicutweb","videoId":"9VXzbCFFdw6X9c5nIqNIobpLcl4RHkf7OQYq00-"},"source_type":"vicutweb"}
+    bitrate         : 0
+    maxrate         : 0
+    te_is_reencode  : 1
+    encoder         : Lavf58.76.100
+  Stream #0:0: Video: h264 (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1280x720 [SAR 1:1 DAR 16:9], q=2-31, 30 fps, 15360 tbn (default)
+    Metadata:
+      encoder         : Lavc58.134.100 libx264
+    Side data:
+      cpb: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
+  Stream #0:1: Audio: aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 160 kb/s (default)
+    Metadata:
+      encoder         : Lavc58.134.100 aac
+frame=    2 fps=0.0 q=0.0 size=       0kB time=00:00:00.00 bitrate=N/A speed=   0x    frame=  234 fps=0.0 q=16.0 size=    1280kB time=00:00:07.13 bitrate=1470.0kbits/s speed=13.2x    frame=  488 fps=470 q=15.0 size=    3072kB time=00:00:15.60 bitrate=1613.2kbits/s speed=  15x    frame=  716 fps=464 q=16.0 size=    4608kB time=00:00:23.20 bitrate=1627.1kbits/s speed=  15x    frame=  950 fps=465 q=15.0 size=    6144kB time=00:00:31.00 bitrate=1623.6kbits/s speed=15.2x    frame= 1191 fps=468 q=16.0 size=    8192kB time=00:00:39.03 bitrate=1719.3kbits/s speed=15.4x    frame= 1430 fps=470 q=14.0 size=    9728kB time=00:00:47.00 bitrate=1695.6kbits/s speed=15.4x    frame= 1662 fps=469 q=17.0 size=   11264kB time=00:00:54.73 bitrate=1685.9kbits/s speed=15.4x    frame= 1894 fps=468 q=19.0 size=   12800kB time=00:01:02.46 bitrate=1678.6kbits/s speed=15.4x    frame= 2121 fps=467 q=16.0 size=   14336kB time=00:01:10.03 bitrate=1676.9kbits/s speed=15.4x    frame= 2337 fps=463 q=21.0 size=   15872kB time=00:01:17.23 bitrate=1683.5kbits/s speed=15.3x    frame= 2532 fps=456 q=16.0 size=   17408kB time=00:01:23.73 bitrate=1703.1kbits/s speed=15.1x    frame= 2766 fps=457 q=17.0 size=   19200kB time=00:01:31.53 bitrate=1718.4kbits/s speed=15.1x    frame= 3010 fps=460 q=19.0 size=   20992kB time=00:01:39.66 bitrate=1725.4kbits/s speed=15.2x    [mp4 @ 0x5cecfbe97fc0] Starting second pass: moving the moov atom to the beginning of the file
+frame= 3150 fps=443 q=-1.0 Lsize=   23305kB time=00:01:45.04 bitrate=1817.4kbits/s speed=14.8x    
+video:21160kB audio:2054kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 0.387286%
+[libx264 @ 0x5cecfbea7940] frame I:13    Avg QP:13.62  size: 86038
+[libx264 @ 0x5cecfbea7940] frame P:3137  Avg QP:16.37  size:  6551
+[libx264 @ 0x5cecfbea7940] mb I  I16..4: 100.0%  0.0%  0.0%
+[libx264 @ 0x5cecfbea7940] mb P  I16..4:  0.1%  0.0%  0.0%  P16..4: 17.2%  0.0%  0.0%  0.0%  0.0%    skip:82.7%
+[libx264 @ 0x5cecfbea7940] coded y,uvDC,uvAC intra: 35.1% 37.8% 24.9% inter: 8.9% 7.2% 1.4%
+[libx264 @ 0x5cecfbea7940] i16 v,h,dc,p: 63% 14% 14% 10%
+[libx264 @ 0x5cecfbea7940] i8c dc,h,v,p: 69% 11% 13%  7%
+[libx264 @ 0x5cecfbea7940] kb/s:1650.87
+[aac @ 0x5cecfbe97340] Qavg: 16347.146
+[2026-09-24 07:28:42,158: WARNING/MainProcess] 🎉 STANDARD EDIT SUCCESS → storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/final_summary.mp4
+[2026-09-24 07:28:42,162: WARNING/MainProcess] 🧹 Cleaned temp: /app/storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/temp_segments
+[2026-09-24 07:28:42,236: INFO/MainProcess] Task tasks.render_only_task[c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57-render] succeeded in 7.394400504000259s: {'status': 'SUCCESS', 'progress': 100, 'mode': 'final', 'output_url': 'c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/final_summary.mp4', 'message': 'ตัดต่อเสร็จเรียบร้อย!', 'edit_summary': {'segments_kept': 2, 'duration_kept_seconds': 105.0, 'burn_subtitle': False}}

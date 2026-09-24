@@ -1,0 +1,91 @@
+[2026-09-24 07:26:59,422: INFO/MainProcess] Task tasks.process_video_task[c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57] received
+[2026-09-24 07:26:59,429: WARNING/MainProcess] 🎬 Extracting audio (with loudness norm): storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/V2_________.mp4 -> storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/full_audio.wav
+ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021 the FFmpeg developers
+  built with gcc 11 (Ubuntu 11.2.0-19ubuntu1)
+  configuration: --prefix=/usr --extra-version=0ubuntu0.22.04.1 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --enable-gnutls --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libgsm --enable-libjack --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librabbitmq --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libsrt --enable-libssh --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-libzmq --enable-libzvbi --enable-lv2 --enable-omx --enable-openal --enable-opencl --enable-opengl --enable-sdl2 --enable-pocketsphinx --enable-librsvg --enable-libmfx --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-libx264 --enable-shared
+  libavutil      56. 70.100 / 56. 70.100
+  libavcodec     58.134.100 / 58.134.100
+  libavformat    58. 76.100 / 58. 76.100
+  libavdevice    58. 13.100 / 58. 13.100
+  libavfilter     7.110.100 /  7.110.100
+  libswscale      5.  9.100 /  5.  9.100
+  libswresample   3.  9.100 /  3.  9.100
+  libpostproc    55.  9.100 / 55.  9.100
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/V2_________.mp4':
+  Metadata:
+    minor_version   : 512
+    major_brand     : isom
+    compatible_brands: isomiso6iso2avc1mp41
+    Hw              : 1
+    LvMetaInfo      : {"data":{"appVersion":"15.4.0","ch1":"SEO","ch2":"google","editType":"edit","exportType":"export","original_edittype":"edit","os":"web","product":"vicutweb","videoId":"9VXzbCFFdw6X9c5nIqNIobpLcl4RHkf7OQYq00-"},"source_type":"vicutweb"}
+    bitrate         : 0
+    maxrate         : 0
+    te_is_reencode  : 1
+    encoder         : Lavf58.45.100
+  Duration: 00:01:52.83, start: 0.000000, bitrate: 2379 kb/s
+  Stream #0:0(und): Video: h264 (Main) (avc1 / 0x31637661), yuv420p(tv, bt709), 1280x720 [SAR 1:1 DAR 16:9], 2243 kb/s, 29.99 fps, 30 tbr, 1000k tbn, 60 tbc (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+  Stream #0:1(und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, stereo, fltp, 127 kb/s (default)
+    Metadata:
+      handler_name    : SoundHandler
+      vendor_id       : [0][0][0][0]
+Stream mapping:
+  Stream #0:1 -> #0:0 (aac (native) -> pcm_s16le (native))
+Press [q] to stop, [?] for help
+Output #0, wav, to 'storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/full_audio.wav':
+  Metadata:
+    minor_version   : 512
+    major_brand     : isom
+    compatible_brands: isomiso6iso2avc1mp41
+    Hw              : 1
+    LvMetaInfo      : {"data":{"appVersion":"15.4.0","ch1":"SEO","ch2":"google","editType":"edit","exportType":"export","original_edittype":"edit","os":"web","product":"vicutweb","videoId":"9VXzbCFFdw6X9c5nIqNIobpLcl4RHkf7OQYq00-"},"source_type":"vicutweb"}
+    bitrate         : 0
+    maxrate         : 0
+    te_is_reencode  : 1
+    ISFT            : Lavf58.76.100
+  Stream #0:0(und): Audio: pcm_s16le ([1][0][0][0] / 0x0001), 16000 Hz, mono, s16, 256 kb/s (default)
+    Metadata:
+      handler_name    : SoundHandler
+      vendor_id       : [0][0][0][0]
+      encoder         : Lavc58.134.100 pcm_s16le
+size=       0kB time=00:00:00.00 bitrate=N/A speed=   0x    size=     256kB time=00:00:12.79 bitrate= 163.9kbits/s speed=25.6x    size=     768kB time=00:00:26.99 bitrate= 233.0kbits/s speed=26.9x    size=    1280kB time=00:00:41.99 bitrate= 249.7kbits/s speed=27.9x    size=    1536kB time=00:00:56.99 bitrate= 220.8kbits/s speed=28.4x    size=    2048kB time=00:01:13.09 bitrate= 229.5kbits/s speed=29.2x    size=    2560kB time=00:01:28.89 bitrate= 235.9kbits/s speed=29.6x    size=    3072kB time=00:01:41.69 bitrate= 247.5kbits/s speed=  29x    size=    3524kB time=00:01:52.77 bitrate= 256.0kbits/s speed=28.7x    
+video:0kB audio:3524kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 0.002161%
+[2026-09-24 07:27:03,525: WARNING/MainProcess] [VAD] Audio loaded: storage/c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57/full_audio.wav
+[2026-09-24 07:27:03,525: WARNING/MainProcess] [VAD] Duration: 112.8s
+[2026-09-24 07:27:04,210: WARNING/MainProcess] [VAD] Found 22 raw → 5 merged voice segments
+[2026-09-24 07:27:04,211: WARNING/MainProcess] [VAD] Speech: 90.8s | Silence gaps to cut: 18.4s
+[2026-09-24 07:27:06,942: WARNING/MainProcess] 🎞️ [Visual] ฉากเปลี่ยน 0 จุด · เฟรมดำ 1 ช่วง · ภาพค้าง 0 ช่วง (2.7s)
+[2026-09-24 07:27:06,959: WARNING/MainProcess] ⚡ [Cache HIT] transcript loaded for hash=8b2382e167446a03 (7 segments)
+[2026-09-24 07:27:06,959: WARNING/MainProcess] Total duration: 110.8s (1.8 min)
+[2026-09-24 07:27:06,959: WARNING/MainProcess] [VAD Pre-filter] original segments = 7 | kept = 7 | removed = 0 | min speech overlap = 20%
+[2026-09-24 07:27:06,959: WARNING/MainProcess]   segment 0 1.7-34.9 speech overlap = 86% KEEP
+[2026-09-24 07:27:06,959: WARNING/MainProcess]   segment 1 34.4-65.4 speech overlap = 85% KEEP
+[2026-09-24 07:27:06,959: WARNING/MainProcess]   segment 2 68.0-94.9 speech overlap = 66% KEEP
+[2026-09-24 07:27:06,959: WARNING/MainProcess] [Transcript] 7 segments, 1,294 chars → Gemini
+[2026-09-24 07:27:06,960: WARNING/MainProcess] [Silence Gap] detected = 3 (between-segments 0, VAD 3) | usable = 3
+[2026-09-24 07:27:06,960: WARNING/MainProcess]   segment=0 (1.7-34.9) internal gap 30.4-33.7 duration=3.3 action=KEEP_AS_HINT
+[2026-09-24 07:27:06,960: WARNING/MainProcess]   segment=1 (34.4-65.4) internal gap 47.4-51.5 duration=4.2 action=KEEP_AS_HINT
+[2026-09-24 07:27:06,960: WARNING/MainProcess]   segment=2 (68.0-94.9) internal gap 84.4-90.2 duration=5.8 action=KEEP_AS_HINT
+[2026-09-24 07:27:07,553: WARNING/MainProcess] 🖼️ [Keyframe] ดึงภาพ 8/8 ภาพ (67 KB)
+[2026-09-24 07:27:07,553: WARNING/MainProcess] ⚡ [Pipeline] Running AI Correction + Deletion in parallel...
+[2026-09-24 07:27:07,555: WARNING/MainProcess] ⚡ [AI-Correct] Skipped — no Latin chars (ไม่มีอะไรต้องแก้/แปล)
+[2026-09-24 07:27:07,556: WARNING/MainProcess] Sending filtered transcript to Gemini (Deletion mode) + 8 ภาพ...
+[2026-09-24 07:27:07,672: WARNING/MainProcess] 🔑 [key#1/4] Trying with API key …SL8zw
+[2026-09-24 07:27:07,672: WARNING/MainProcess] 🚀 [key#1/4] Trying gemini-2.5-flash (Attempt 1/2)...
+[2026-09-24 07:27:07,672: INFO/MainProcess] AFC is enabled with max remote calls: 10.
+[2026-09-24 07:27:07,673: WARNING/MainProcess] Direct use of automatic function calling (AFC) in Models.generate_content is not recommended. Instead, we recommend to use AFC in Chat.send_message. Similarly, direct use of AFC in Models.generate_content_stream is not recommended. Instead, we recommend to use AFC in Chat.send_message_stream.
+[2026-09-24 07:27:25,033: INFO/MainProcess] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+[2026-09-24 07:27:25,036: WARNING/MainProcess] ✅ Corrected text applied to 7 segments
+[2026-09-24 07:27:25,036: WARNING/MainProcess] 
+📋 AI Suggested Cuts (0 segments to delete):
+[2026-09-24 07:27:25,036: WARNING/MainProcess]   Total to cut: 0.0s (0.0 min)
+[2026-09-24 07:27:25,036: WARNING/MainProcess]   Will keep: 110.8s (1.8 min)
+[2026-09-24 07:27:25,036: WARNING/MainProcess] ✅ [Outro] คลิปจบถึงท้ายคำพูดแล้ว (110.8s / 110.8s)
+[2026-09-24 07:27:25,038: WARNING/MainProcess] ✅ Final keep segments (1 total):
+[2026-09-24 07:27:25,038: WARNING/MainProcess]   0.0s → 110.83s  (110.8s)  จบที่: …ข้าใจความเสียงด้วยครับขอบคุณครับ
+[2026-09-24 07:27:25,038: WARNING/MainProcess] 
+📊 Edit Summary (standard): 1 segments, 110.8s
+[2026-09-24 07:27:25,390: WARNING/MainProcess] 📝 Pre-generated 44 subtitle phrases
+[2026-09-24 07:27:25,403: INFO/MainProcess] Task tasks.process_video_task[c00c222e-bbe2-4112-8f6c-ea1b2e2c8c57] succeeded in 25.980735407999873s: {'status': 'SUCCESS', 'progress': 100, 'mode': 'preview', 'message': 'วิเคราะห์เสร็จ — กรุณา review', 'segments': [{'start': 0.0, 'end': 110.83, 'text': 'วี02 ทดสอบสวัสดีครับ วันนี้ผมจะมาพูดเกี่ยวกับพื้นธานการลงธุณในฮุนครับเวลาพูดถึงฮุน หลายคนอาจจะนึกถึง กราฟราคาที่มีทั้งขึ้นแล้วลงแต่จริงๆแล้วฮุนไม่ได้มีแค่เรื่องของราคาครับเพราะเบื่องหลังราคาคือธุรกิตข...'}], 'edit_summary': {'segments_kept': 1, 'duration_kept_seconds': 110.8}}
