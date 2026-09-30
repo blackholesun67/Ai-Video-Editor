@@ -9,6 +9,7 @@ from celery.schedules import crontab
 from celery.exceptions import Ignore
 from core.ffmpeg_utils import extract_clean_audio, edit_and_merge_video, render_tiktok_video
 from core.ai_logic import analyze_video_content
+from core import ai_logic
 from core.vad_logic import get_voice_activity
 from core.visual_logic import get_visual_signals
 from core.srt_utils import generate_phrases_from_transcript, remap_edited_phrases
@@ -334,6 +335,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
             except Exception:
                 pass
 
+        ai_logic.GEMINI_CALLS.clear()   # นับเฉพาะคำขอ Gemini ของงานนี้ (บันทึกลง preview.json)
         ai_result, transcript = analyze_video_content(
             audio_path=audio_path,
             user_prompt=user_prompt,
@@ -376,6 +378,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
             "selected_segments": ai_result,     # ← selection เริ่มต้น = ช่วงที่ AI เลือก
             "visual": visual,                   # ← ขีดฉากเปลี่ยน/เฟรมดำ ให้หน้า preview วาด
             "total_keep_seconds": round(total_keep, 1),
+            "gemini_models_used": sorted(set(ai_logic.GEMINI_CALLS)),   # audit ย้อนหลังว่างานนี้ใช้โมเดลไหนจริง
         })
 
         if preview_mode:

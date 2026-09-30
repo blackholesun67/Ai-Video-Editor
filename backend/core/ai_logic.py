@@ -34,6 +34,11 @@ FALLBACK_MODELS = [
 ]
 print(f"🤖 Gemini fallback models: {FALLBACK_MODELS}")
 
+# โมเดลที่ตอบสำเร็จจริงในงานปัจจุบัน — tasks.py ล้างก่อนเริ่มงานแล้วบันทึกลง preview.json
+# (audit ย้อนหลัง: log ของ container หายทุกครั้งที่ rebuild) ; worker รันทีละงาน (--pool=solo)
+# จึงใช้ตัวแปรระดับโมดูลได้ ; AI-Correction เรียกจากหลาย thread แต่ list.append ปลอดภัยใน CPython
+GEMINI_CALLS: list[str] = []
+
 # Cache client ต่อ key เพื่อไม่ต้อง re-init ทุกครั้ง
 _clients_cache: dict[str, "genai.Client"] = {}
 
@@ -786,6 +791,8 @@ def call_gemini_with_specific_key(full_prompt: str, key_idx: int,
                 )
                 text = _response_text(response, f"{key_label}/{model_name}")
                 if text.strip():
+                    print(f"✅ [{key_label}] Gemini ตอบสำเร็จด้วย {model_name}")
+                    GEMINI_CALLS.append(model_name)
                     return text
                 last_error = RuntimeError(f"{model_name} returned empty response")
                 break   # ลอง model ถัดไป
@@ -2329,6 +2336,8 @@ def call_gemini_with_retry(full_prompt, max_attempts_per_model: int = 2,
                     )
                     text = _response_text(response, f"{key_label}/{model_name}")
                     if text.strip():
+                        print(f"✅ [{key_label}] Gemini ตอบสำเร็จด้วย {model_name}")
+                        GEMINI_CALLS.append(model_name)
                         return text
                     last_error = RuntimeError(f"{model_name} returned empty response")
                     break   # text ว่าง → ลอง model ถัดไป
