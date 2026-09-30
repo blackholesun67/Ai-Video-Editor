@@ -18,7 +18,8 @@ const STEPS = [
   { id: 4, label: 'ตัดและรวมคลิป',   icon: Film,       progressMin: 80, progressMax: 100 },
 ];
 
-// งานที่ยังไม่เริ่มประมวลผลเลย (ค้างในคิว) นานเกินนี้ → ถือว่าค้างจริง เลิก poll
+// งานที่ยังไม่เริ่มประมวลผลเลย (รอคิว) นานเกินนี้ → เตือนว่ายังรอคิว แต่ poll ต่อ
+// (worker ทำทีละงาน --concurrency=1 ผู้ใช้หลายคนพร้อมกันจึงรอคิวนานได้จริง ไม่ใช่งานค้าง)
 const STUCK_IN_QUEUE_MS = 15 * 60 * 1000;   // 15 นาที
 // เพดานสูงสุด — ต่อให้กำลังทำงานอยู่ ถ้าเกินนี้ก็เลิก poll (worker อาจค้างเงียบ ๆ)
 const MAX_POLL_MS = 90 * 60 * 1000;         // 90 นาที
@@ -34,6 +35,7 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
   const [elapsedSec, setElapsedSec] = useState(0);
   const [canceling, setCanceling] = useState(false);
   const [slowWarn, setSlowWarn] = useState(false);
+  const [queueWarn, setQueueWarn] = useState(false);
   const intervalRef = useRef(null);
   const startTimeRef = useRef(Date.now());
   const sawProgressRef = useRef(false);   // เคยเห็น task เริ่มประมวลผลจริงไหม
@@ -81,18 +83,14 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
       if (cancelled) return;
 
       const elapsed = Date.now() - startTimeRef.current;
-      // ยังไม่เริ่มประมวลผลเลย (ค้างในคิว) นานเกินไป → worker น่าจะไม่ทำงาน
-      if (!sawProgressRef.current && elapsed > STUCK_IN_QUEUE_MS) {
-        stopPolling();
-        setStatus('FAILURE');
-        setMessage('งานค้างในคิว — worker อาจไม่ทำงาน ลองรีสตาร์ท backend/worker แล้วลองใหม่');
-        return;
-      }
+      // ยังไม่เริ่มประมวลผลเลยนานเกินไป → แค่เตือนว่ายังรอคิว ยัง poll ต่อ
+      // (เดิมประกาศว่าล้มเหลว ทั้งที่งานยังอยู่ในคิวและจะถูกทำต่อ)
+      setQueueWarn(!sawProgressRef.current && elapsed > STUCK_IN_QUEUE_MS);
       // เพดานสูงสุดจริง ๆ — ต่อให้กำลังทำงานอยู่ ก็เลิก poll (แต่งานอาจเสร็จเบื้องหลัง)
       if (elapsed > MAX_POLL_MS) {
         stopPolling();
         setStatus('FAILURE');
-        setMessage('ใช้เวลานานผิดปกติ — งานอาจค้าง ลองกลับมาเปิดหน้านี้ใหม่ หรือเริ่มใหม่');
+        setMessage('ยังไม่เสร็จภายใน 90 นาที — งานอาจยังประมวลผลต่อเบื้องหลัง ดูสถานะได้ที่ "งานของฉัน"');
         return;
       }
       // นานกว่าปกติแต่ยังทำงานอยู่ → แค่เตือน ยัง poll ต่อ
@@ -233,6 +231,13 @@ const Processing = ({ jobId, onComplete, onCancel }) => {
           {slowWarn && !isFailure && !isSuccess && (
             <p className="text-xs text-amber-600 mt-4 max-w-sm mx-auto leading-relaxed">
               ⏳ ใช้เวลานานกว่าปกติ (วิดีโอยาว/เครื่องช้า) — ยังทำงานอยู่ ไม่ต้องปิดหรือเริ่มใหม่
+            </p>
+          )}
+
+          {/* รอคิวนาน (มีงานของผู้ใช้อื่นอยู่ก่อน) — ไม่ใช่ error */}
+          {queueWarn && !isFailure && !isSuccess && (
+            <p className="text-xs text-amber-600 mt-4 max-w-sm mx-auto leading-relaxed">
+              ⏳ ยังรอคิวอยู่ — มีงานของผู้ใช้คนอื่นกำลังประมวลผล ไม่ต้องปิดหรือเริ่มใหม่
             </p>
           )}
 

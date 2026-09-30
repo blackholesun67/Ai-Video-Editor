@@ -34,6 +34,10 @@ const TOPICS = [
 // จำกัดขนาดไฟล์ฝั่ง client — ตรงกับ MAX_FILE_SIZE_MB ของ backend
 const MAX_FILE_MB = 2048;
 
+// ลดเสียงรบกวนอยู่นอกขอบเขต 4 objective ของงานวิจัย — ซ่อนช่วงทดสอบ
+// (backend ยังรองรับครบ ; state denoise คงเป็น false จึงส่ง denoise=false เหมือนเดิม — เปิดคืนได้ที่ค่านี้)
+const SHOW_DENOISE_OPTION = false;
+
 const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -44,11 +48,13 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
   const [topicId, setTopicId] = useState(null);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [burnSubtitle, setBurnSubtitle] = useState(false);
+  // ค่าเริ่มต้นเปิด — หน้าแก้ซับเป็นส่วนหนึ่งของการทดสอบ (ผู้ใช้ติ๊กออกเองได้)
+  const [burnSubtitle, setBurnSubtitle] = useState(true);
   const [denoise, setDenoise] = useState(false);
   // วิธีจัดเฟรมตอนแปลงเป็น 9:16 — ตั้งต้น blur เพราะ crop กินความกว้างไปมากในคลิปไวด์
   const [tiktokFit, setTiktokFit] = useState('blur');
-  const [previewMode, setPreviewMode] = useState(false);
+  // ค่าเริ่มต้นเปิด — หน้ารีวิวช่วงตัดเป็นหัวใจของ Objective 4 (ผู้ใช้ติ๊กออกเองได้)
+  const [previewMode, setPreviewMode] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
@@ -257,7 +263,7 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
             <Choice key={id} active={cutMode === id} onClick={() => setCutMode(id)} icon={m.icon} title={m.label} desc={m.desc} />
           ))}
         </div>
-        <p className="text-xs text-slate-400 mt-2.5">ทุกโหมดตัดช่วงเงียบและลดเสียงรบกวนให้อัตโนมัติ</p>
+        <p className="text-xs text-slate-400 mt-2.5">ทุกโหมดตัดช่วงเงียบให้อัตโนมัติ</p>
       </section>
 
       {/* รูปแบบวิดีโอ — 2 ตัวเลือกสมดุล · คลิปแนวตั้งเลือกได้แค่ 9:16 */}
@@ -383,6 +389,7 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
             </div>
           </label>
 
+          {SHOW_DENOISE_OPTION && (
           <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-colors ${
             denoise ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
           }`}>
@@ -394,6 +401,7 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
               <p className="text-xs text-slate-500 mt-0.5">สำหรับวิดีโอที่มีเสียง noise เช่น พัดลม แอร์ ถ่ายนอกสถานที่ — เสียงพูดอาจเปลี่ยนเล็กน้อย</p>
             </div>
           </label>
+          )}
 
           <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-colors ${
             previewMode ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50'
