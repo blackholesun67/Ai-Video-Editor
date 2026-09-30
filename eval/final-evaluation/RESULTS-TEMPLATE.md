@@ -21,6 +21,7 @@
 ### Objective 2 — Audio-only vs Audio+Visual: required tier ครบ, should-do ไม่ได้ทำ ⚠️
 - **Required tier (n≥2 ทุก case, audio-only, 9/9 case) ครบสมบูรณ์แล้ว** — เพียงพอสำหรับตอบคำถามเชิงทิศทางของ Objective 2
 - **Should-do tier (n=4 สำหรับ 6 case หลัก) ไม่ได้ทำ** — พยายามแล้ว 1 ครั้งหลัง fix (`e136e8a`) ตามลำดับที่วางแผนไว้ (V07 ของ Objective 1 ก่อน แล้วค่อย Objective 2) แต่การพยายามเติม V07 (Objective 1) เจอว่าโควตาหมดทั้งระบบ (4 key × 2 model) จึงต้องหยุดตามเงื่อนไขที่ตกลงไว้ก่อนจะได้เริ่ม Objective 2 should-do แม้แต่รันเดียว
+- **Qualitative checklist ทำแล้ว (2026-09-30):** reason ของ audio+visual ไม่อ้างภาพเลย (0/46) และช่องว่าง 10.1pp ส่วนใหญ่มาจาก 2 รันเดี่ยวที่อธิบายได้โดยไม่เกี่ยวกับภาพ → ดู [`objective2/QUALITATIVE-REASON-ANALYSIS.md`](objective2/QUALITATIVE-REASON-ANALYSIS.md)
 - ผลที่มีอยู่ (n=2–3 ต่อ case) พอบอกทิศทางได้ (audio-only recall ต่ำกว่า audio+visual ~10.1pp) แต่ **n ยังน้อยกว่า Objective 1 และ Gemini variability สูงมาก — ต้องรายงานเป็น "แนวโน้ม" ไม่ใช่ "ข้อสรุปเชิงสถิติที่มั่นใจสูง" ในบทที่ 4**
 - Qualitative findings (`reason` field เทียบ audio-only vs audio+visual) **ยังไม่ได้ทำ** — งานนี้ไม่ต้องเรียก Gemini เพิ่ม ใช้ `harness.log`/`preview.json` ที่มีอยู่แล้วได้เลย เป็นงานที่ยังค้างอยู่ ไม่เกี่ยวกับโควตา
 
@@ -65,7 +66,7 @@
 |---|---|---|
 | Objective 1: V07 top-up เป็น n=4 | พยายามแล้ว ไม่สำเร็จ | โควตาหมดทั้งระบบ — ใช้ n=3 (SD=0) แทนได้ |
 | Objective 2: should-do tier (n=4, 6 case) | ไม่ได้เริ่มเลย | โควตาหมดทั้งระบบ (พบระหว่างพยายามเติม V07 ของ Objective 1 ก่อนหน้า) |
-| Objective 2: qualitative `reason`-field checklist | ยังไม่ได้ทำ | **ไม่เกี่ยวกับโควตา** — เป็นงานวิเคราะห์ log ที่มีอยู่แล้ว ทำต่อได้ทันทีโดยไม่ต้องเรียก Gemini |
+| Objective 2: qualitative `reason`-field checklist | ✅ **ทำแล้ว 2026-09-30** | ดู [`objective2/QUALITATIVE-REASON-ANALYSIS.md`](objective2/QUALITATIVE-REASON-ANALYSIS.md) |
 | Objective 4A (รอบเก่า 2026-09-23 — โมฆะ, แทนด้วยรอบใหม่ PASS ระดับ API) | ไม่ถึงขั้นนี้ 2 ครั้งติด | ครั้ง 1 โควตาหมด, ครั้ง 2 worker รัน image เก่าก่อนแก้ VAD-prefilter (ยืนยัน 2026-09-24 ไม่ใช่ cache bug) — หยุดตามคำสั่ง ไม่ลองครั้งที่ 3 |
 | Objective 3 (subtitle) | ไม่ได้เริ่ม | ตามแผนเดิม ต้องใช้ reference data + คนภายนอก — ดู `objective3/DATA-SETUP.md`, `REMAINING-TESTS.md` |
 | Objective 4B/C/D (expert/user/manual-vs-AI) | ไม่ได้เริ่ม | ตามแผนเดิม ต้องใช้ผู้เข้าร่วมจริง — ดู `objective4/PARTICIPANT-PLAN.md`, `REMAINING-TESTS.md` |
@@ -164,8 +165,8 @@
 
 | Case | Audio-only recall | Audio+Visual recall | Δ | หมายเหตุ |
 |---|---|---|---|---|
-| V02_full | 25.3% (n=2) | 50.6% (n=4) | +25.3pp | ภาพช่วยให้ตัดตรง GT ได้บ่อยขึ้น |
-| V03_summary | 36.8% (n=2) | 63.6% (n=4) | +26.8pp | เช่นกัน |
+| V02_full | 25.3% (n=2) | 50.6% (n=4) | +25.3pp | ~~ภาพช่วยให้ตัดตรง GT ได้บ่อยขึ้น~~ **แก้ 2026-09-30:** มาจาก A 1 รันที่ Gemini เสนอ 0 ช่วง — reason ของ B ไม่อ้างภาพ (ดู qualitative) |
+| V03_summary | 36.8% (n=2) | 63.6% (n=4) | +26.8pp | ~~เช่นกัน~~ **แก้ 2026-09-30:** A เสนอตัดครบ 2/2 แต่ 1 รันถูก `_verify_outline_coverage` (ข้อความล้วน) คืนกลับ |
 | V04_full | 27.2% (n=3) | 27.5% (n=4) | ~0 | ใกล้เคียงกันมาก |
 | V06_full | 61.5% (n=2) | 66.5% (n=4) | +5.0pp | ใกล้เคียงกัน |
 | V06_summary | 58.3% (n=2) | 61.7% (n=4) | +3.4pp | ใกล้เคียงกัน |
@@ -175,9 +176,15 @@
 
 ### Qualitative findings (Checklist จาก objective2/PROTOCOL.md)
 
+**✅ ตรวจแล้ว 2026-09-30** จาก `harness.log` 48 รัน (A 19 / B 29, reason 82 ข้อความ) ไม่เรียก Gemini เพิ่ม — รายละเอียดเต็ม: [`objective2/QUALITATIVE-REASON-ANALYSIS.md`](objective2/QUALITATIVE-REASON-ANALYSIS.md)
+
 | Case | อ้างอิงภาพใน reason หรือไม่ | ระบุ outro ถูกไหม | ตัด/เก็บ CTA | false negative เปลี่ยนไหม |
 |---|---|---|---|---|
-| ทุกเคส | **TBD — ยังไม่ได้ตรวจ** | TBD | TBD | TBD |
+| ทุกเคส | **B: 0/46 ไม่อ้างภาพเลย** · A: 1/36 เดา "intro slate" จากเสียง (ไม่ได้เห็นภาพ) | ไม่มีช่วง outro ในชุดคลิป — ทดสอบไม่ได้ | ไม่มี CTA ในชุดคลิป — ทดสอบไม่ได้ | ต่างเฉพาะรายรัน ไม่มีทิศทางคงที่ (ต่างจริง 3 ช่วงใน V02/V03_summary/V05) |
+
+**สรุปเชิงคุณภาพ:** recall ต่าง 10.1pp — 8.7pp (86%) มาจาก V02 + V03_summary ซึ่งแต่ละ case เกิดจาก **รันเดียว** ในเงื่อนไข A
+(Gemini ตอบ 0 ช่วง 1 ครั้ง / guard ข้อความล้วนคืนช่วง 1 ครั้ง) และเหตุการณ์ประเภทเดียวกันเกิดในเงื่อนไข B ด้วย →
+**ข้อมูลชุดนี้ไม่สนับสนุนว่าภาพทำให้ recall สูงขึ้น** ; n=2 ต่อ case จึงเป็นระดับข้อสังเกต ไม่ใช่ข้อสรุปทางสถิติ
 
 **สรุป:** **ยังสรุปไม่ได้ว่า "ภาพช่วยจริงหรือไม่"** — มีตัวเลขเชิงปริมาณครบแล้ว (n=2-4 ต่อคลิป) แต่ยังไม่ได้อ่าน `reason` field ของ Gemini เทียบ 2 เงื่อนไขตาม checklist ที่ออกแบบไว้ (ขั้นตอนนี้ไม่ต้องใช้ Gemini เพิ่ม ทำได้จาก `harness.log`/`preview.json` ที่มีอยู่แล้ว เป็นงานที่ควรทำต่อก่อนเขียนบทที่ 4)
 

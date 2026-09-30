@@ -1,0 +1,1882 @@
+{
+ "runs": [
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 59.9,
+     "e": 61.44,
+     "reason": "Garbled speech and unintelligible words, indicating a technical issue or audio quality problem."
+    },
+    {
+     "conf": "high",
+     "s": 61.68,
+     "e": 62.92,
+     "reason": "Garbled speech and unintelligible words, indicating a technical issue or audio quality problem."
+    },
+    {
+     "conf": "high",
+     "s": 74.32,
+     "e": 90.12,
+     "reason": "Combination of repeated phrases (speaker attempting to re-state a point), garbled speech, filler words ('เอ่อ'), a period of silence, and self-correction ('ขอพูดใหม่นะครับ'). This section aims to remove false starts and clean up delivery."
+    },
+    {
+     "conf": "high",
+     "s": 105.73,
+     "e": 106.71,
+     "reason": "Segment contains highly garbled and unintelligible speech ('ประการพรคบgery750', 'นากลงธุณข ar', 'หู prayed'), making the example presented incomprehensible."
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     70.4
+    ],
+    [
+     88.1,
+     135.72
+    ]
+   ],
+   "retake": [
+    [
+     70.4,
+     78.86
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V01_full",
+   "path": "objective1/rep1/after/V01_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 84.43,
+     "e": 90.23,
+     "reason": "ช่วงเงียบยาวผิดปกติในระหว่างประโยค ทำให้การพูดขาดความต่อเนื่อง ควรตัดออกเพื่อให้วิดีโอดูราบรื่นขึ้น"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     84.43
+    ],
+    [
+     90.23,
+     110.83
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V02_full",
+   "path": "objective1/rep1/after/V02_full/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V03_full",
+   "path": "objective1/rep1/after/V03_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 36.46,
+     "e": 87.28,
+     "reason": "เรื่องเล่าเปรียบเทียบการซื้อโทรศัพท์มือถือที่ยาวและละเอียดเกินไป ทำให้เป็น Off-topic tangent หรือ รายละเอียดปลีกย่อยที่ไม่เพิ่มความเข้าใจหลักเกี่ยวกับการลงทุนในหุ้นอย่างมีนัยสำคัญ"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     36.6
+    ],
+    [
+     87.28,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V03_summary",
+   "path": "objective1/rep1/after/V03_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 49.56,
+     "e": 57.54,
+     "reason": "ผู้พูดให้คำตอบเริ่มต้นแล้วแก้ไขตัวเองเพื่อให้ข้อมูลที่ถูกต้องและครบถ้วนยิ่งขึ้น"
+    },
+    {
+     "conf": "high",
+     "s": 58.69,
+     "e": 61.91,
+     "reason": "ช่วงเงียบ / ไม่มีเสียงพูด ที่ตรวจพบ"
+    },
+    {
+     "conf": "high",
+     "s": 71.11,
+     "e": 75.72,
+     "reason": "ช่วงเงียบ / ไม่มีเสียงพูด ที่ตรวจพบ"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     50.21
+    ],
+    [
+     58.69,
+     143.24
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V04_full",
+   "path": "objective1/rep1/after/V04_full/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     123.07
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V05_full",
+   "path": "objective1/rep1/after/V05_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 26.48,
+     "e": 38.23,
+     "reason": "เทคซ้ำ: ผู้พูดพูดประโยคเดิมซ้ำเกี่ยวกับวิธีที่หุ้นสร้างผลตอบแทน ('ก็คือการจ่ายเงินปันผล' ในเทคแรก เทียบกับ 'ก็อาจจ่ายเงินปันผล' ในเทคที่สองซึ่งถูกเก็บไว้) จึงตัดเทคแรกทิ้งเพื่อเก็บเทคสุดท้ายที่สมบูรณ์กว่า"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     25.87
+    ],
+    [
+     38.22,
+     82.64
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V06_full",
+   "path": "objective1/rep1/after/V06_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 86.97,
+     "e": 101.52,
+     "reason": "Off-topic tangent: เรื่องเล่าเกี่ยวกับแมวที่ไม่เกี่ยวข้องกับเนื้อหาหลักของการลงทุนหุ้น"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     82.64
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V06_summary",
+   "path": "objective1/rep1/after/V06_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 16.83,
+     "e": 31.49,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติระหว่างการพูด"
+    },
+    {
+     "conf": "high",
+     "s": 37.12,
+     "e": 49.2,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติระหว่างการพูด"
+    },
+    {
+     "conf": "high",
+     "s": 62.97,
+     "e": 82.63,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติระหว่างการพูด"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     16.83
+    ],
+    [
+     31.49,
+     37.12
+    ],
+    [
+     49.2,
+     62.97
+    ],
+    [
+     82.63,
+     94.87
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V07_full",
+   "path": "objective1/rep1/after/V07_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 83.78,
+     "e": 88.1,
+     "reason": "ช่วงเงียบ / ไม่มีเสียงพูด ที่ยาวผิดปกติ"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     70.4
+    ],
+    [
+     78.86,
+     135.72
+    ]
+   ],
+   "retake": [
+    [
+     70.4,
+     78.86
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V01_full",
+   "path": "objective1/rep1/control-old/V01_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 84.43,
+     "e": 90.23,
+     "reason": "ช่วงเงียบยาวผิดปกติระหว่างประโยค ทำให้จังหวะการพูดไม่ต่อเนื่องและนานเกินไป (5.8 วินาที)"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     84.43
+    ],
+    [
+     90.23,
+     110.83
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V02_full",
+   "path": "objective1/rep1/control-old/V02_full/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V03_full",
+   "path": "objective1/rep1/control-old/V03_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 43.0,
+     "e": 87.28,
+     "reason": "ตัวอย่างเปรียบเทียบเรื่องการเลือกซื้อโทรศัพท์มือถือและโปรโมชัน ซึ่งเป็นรายละเอียดปลีกย่อยที่ยาวเกินไปและนอกเหนือจากเนื้อหาหลักเรื่องหุ้น"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     44.44
+    ],
+    [
+     87.28,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-3.6-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V03_summary",
+   "path": "objective1/rep1/control-old/V03_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 1.09,
+     "e": 5.43,
+     "reason": "เทคนิค/เตรียมงานก่อนเริ่มสัมภาษณ์ (pre-roll, test speech)"
+    },
+    {
+     "conf": "high",
+     "s": 43.7,
+     "e": 53.27,
+     "reason": "พูดผิดและแก้ไขคำตอบ (incorrect answer and self-correction phrase)"
+    },
+    {
+     "conf": "high",
+     "s": 69.96,
+     "e": 75.72,
+     "reason": "พูดซ้ำตัวอย่างและช่วงเงียบที่ยาวเกินไป (repeated example and associated long silence)"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     43.83
+    ],
+    [
+     53.21,
+     70.21
+    ],
+    [
+     75.72,
+     143.24
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V04_full",
+   "path": "objective1/rep1/control-old/V04_full/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     123.07
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V05_full",
+   "path": "objective1/rep1/control-old/V05_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 26.48,
+     "e": 35.25,
+     "reason": "พูดซ้ำประโยคเดิม เก็บเทคที่สองที่พูดต่อ"
+    },
+    {
+     "conf": "high",
+     "s": 113.11,
+     "e": 118.81,
+     "reason": "พูดผิดและแก้ไขทันที"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     25.87
+    ],
+    [
+     34.78,
+     82.64
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     118.76,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V06_full",
+   "path": "objective1/rep1/control-old/V06_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 26.48,
+     "e": 34.9,
+     "reason": "REPETITION: ประโยคอธิบายผลตอบแทนจากหุ้นซ้ำซ้อน ไม่เพิ่มข้อมูลใหม่"
+    },
+    {
+     "conf": "high",
+     "s": 60.53,
+     "e": 101.52,
+     "reason": "OFF_TOPIC_TANGENT: เนื้อหาเกี่ยวกับการวางแผนการเงินส่วนบุคคลที่ไม่เกี่ยวข้องโดยตรงกับหลักการลงทุนหุ้น และเรื่องเล่าส่วนตัวเกี่ยวกับแมวซึ่งเป็นเนื้อหานอกเรื่องอย่างชัดเจน"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     25.87
+    ],
+    [
+     34.78,
+     59.12
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V06_summary",
+   "path": "objective1/rep1/control-old/V06_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 16.83,
+     "e": 31.49,
+     "reason": "ช่วงเงียบ / ไม่มีเสียงพูด ที่ยาวผิดปกติ"
+    },
+    {
+     "conf": "high",
+     "s": 37.12,
+     "e": 49.2,
+     "reason": "ช่วงเงียบ / ไม่มีเสียงพูด ที่ยาวผิดปกติ"
+    },
+    {
+     "conf": "high",
+     "s": 62.97,
+     "e": 82.63,
+     "reason": "ช่วงเงียบ / ไม่มีเสียงพูด ที่ยาวผิดปกติ"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     16.83
+    ],
+    [
+     31.49,
+     37.12
+    ],
+    [
+     49.2,
+     62.97
+    ],
+    [
+     82.63,
+     94.87
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V07_full",
+   "path": "objective1/rep1/control-old/V07_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 84.43,
+     "e": 90.23,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติ (Long pause in thought)"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     84.43
+    ],
+    [
+     90.23,
+     110.83
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V02_full",
+   "path": "objective1/rep2/after/V02_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 61.67,
+     "e": 87.78,
+     "reason": "ตัวอย่างเปรียบเทียบการเลือกซื้อโทรศัพท์ส่วนเกิน ที่ลงรายละเอียดปลีกย่อยมากเกินไป (เช่น การอ่านรีวิว แบตเตอรี่ ความร้อน สเปกเครื่อง การตรวจสอบโปรโมชัน) ซึ่งไม่จำเป็นต่อการทำความเข้าใจประเด็นหลักที่ว่า 'การลงทุนในหุ้นต้องศึกษาข้อมูล ไม่ใช่แค่ดูราคา' โดยเนื้อหาหลักของการเปรียบเทียบได้กล่าวถึงไปแล้วในช่วงก่อนหน้า"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     61.1
+    ],
+    [
+     87.28,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V03_summary",
+   "path": "objective1/rep2/after/V03_summary/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     143.24
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V04_full",
+   "path": "objective1/rep2/after/V04_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 26.48,
+     "e": 34.0,
+     "reason": "Repeated take: first utterance of the same sentence 'หุ้นสามารถสร้างผลตอบแทนให้เราได้จากราคาหุ้นที่เพิ่มขึ้น หรือในบางบริษัท ก็คือการจ่ายเงินปันผล'. Keeping the rephrased version that follows."
+    },
+    {
+     "conf": "high",
+     "s": 109.5,
+     "e": 117.0,
+     "reason": "Incorrect statement 'ถ้าบริษัทมีรายได้เพิ่มขึ้นก็แปลว่ากำไรต้องเพิ่มขึ้นด้วย' followed by explicit self-correction 'อันนี้ไม่ถูกครับผมพูดผิด'."
+    },
+    {
+     "conf": "high",
+     "s": 124.62,
+     "e": 128.95,
+     "reason": "Prolonged silence between two main points, identified by VAD filter."
+    },
+    {
+     "conf": "high",
+     "s": 139.15,
+     "e": 142.72,
+     "reason": "Prolonged silence between a point and a summary, identified by VAD filter."
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     25.87
+    ],
+    [
+     33.98,
+     82.64
+    ],
+    [
+     105.91,
+     109.51
+    ],
+    [
+     117.0,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V06_full",
+   "path": "objective1/rep2/after/V06_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 26.48,
+     "e": 40.5,
+     "reason": "REPETITION: ประโยคอธิบายผลตอบแทนจากหุ้นซ้ำซ้อนกัน โดยมีความแตกต่างเพียงเล็กน้อย"
+    },
+    {
+     "conf": "high",
+     "s": 60.53,
+     "e": 101.52,
+     "reason": "OFF_TOPIC_TANGENT: เนื้อหาเกี่ยวกับการวางแผนการเงินส่วนบุคคลและเรื่องเล่าเกี่ยวกับแมว ไม่ได้เกี่ยวข้องโดยตรงกับการลงทุนหุ้นที่เป็นประเด็นหลัก"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     25.87
+    ],
+    [
+     40.5,
+     59.12
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V06_summary",
+   "path": "objective1/rep2/after/V06_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 84.43,
+     "e": 90.23,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติ (5.8 วินาที) ระหว่างประโยค"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     84.43
+    ],
+    [
+     90.23,
+     110.83
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V02_full",
+   "path": "objective1/rep2/control-old/V02_full/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V03_summary",
+   "path": "objective1/rep2/control-old/V03_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 1.09,
+     "e": 8.5,
+     "reason": "Technical issue: Unwanted audio artifact before the actual interview question begins."
+    },
+    {
+     "conf": "high",
+     "s": 53.0,
+     "e": 61.91,
+     "reason": "Self-correction: Speaker clarifies a previous statement about profit, cutting the initial imprecise statement, the meta-commentary, and a short pause before the clear explanation."
+    },
+    {
+     "conf": "high",
+     "s": 67.4,
+     "e": 75.72,
+     "reason": "Repeated take: Speaker rephrases an example for clarity, cutting the first attempt and the subsequent pause."
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     1.09
+    ],
+    [
+     8.38,
+     58.69
+    ],
+    [
+     61.91,
+     67.73
+    ],
+    [
+     75.72,
+     143.24
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V04_full",
+   "path": "objective1/rep2/control-old/V04_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 26.48,
+     "e": 36.48,
+     "reason": "เทคซ้ำ: ผู้พูดพูดประโยคเดิมซ้ำเพื่อปรับคำพูดเล็กน้อยจาก 'ก็คือการจ่ายเงินปันผล' เป็น 'ก็อาจจ่ายเงินปันผล' โดยไม่เพิ่มข้อมูลใหม่ ควรเก็บเทคสุดท้าย"
+    },
+    {
+     "conf": "high",
+     "s": 124.62,
+     "e": 128.95,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติระหว่างการเปลี่ยนหัวข้อ (จาก 'ดังนั้น' ไป 'นอกจากนั้น')"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     25.87
+    ],
+    [
+     36.4,
+     82.64
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V06_full",
+   "path": "objective1/rep2/control-old/V06_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 31.75,
+     "e": 49.33,
+     "reason": "REPETITION: พูดซ้ำเนื้อหาเรื่องวิธีการที่หุ้นสร้างผลตอบแทนโดยไม่เพิ่มข้อมูลใหม่"
+    },
+    {
+     "conf": "high",
+     "s": 91.5,
+     "e": 101.52,
+     "reason": "OFF_TOPIC_TANGENT: เรื่องเล่าเกี่ยวกับแมวซึ่งไม่เกี่ยวข้องกับเนื้อหาหลักของการลงทุนหุ้น"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     31.76
+    ],
+    [
+     48.02,
+     82.64
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V06_summary",
+   "path": "objective1/rep2/control-old/V06_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 16.83,
+     "e": 31.49,
+     "reason": "ช่วงเงียบยาวผิดปกติ ไม่มีเสียงพูด"
+    },
+    {
+     "conf": "high",
+     "s": 37.12,
+     "e": 49.2,
+     "reason": "ช่วงเงียบยาวผิดปกติ ไม่มีเสียงพูด"
+    },
+    {
+     "conf": "high",
+     "s": 62.97,
+     "e": 82.63,
+     "reason": "ช่วงเงียบยาวผิดปกติ ไม่มีเสียงพูด"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     16.83
+    ],
+    [
+     31.49,
+     37.12
+    ],
+    [
+     49.2,
+     62.97
+    ],
+    [
+     82.63,
+     94.87
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "B_audio+visual",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V07_full",
+   "path": "objective1/rep2/control-old/V07_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 59.9,
+     "e": 61.44,
+     "reason": "ปัญหาเทคนิค, เสียงพูดไม่ชัดเจนและไม่เป็นคำ"
+    },
+    {
+     "conf": "high",
+     "s": 61.68,
+     "e": 62.92,
+     "reason": "ปัญหาเทคนิค, เสียงพูดไม่ชัดเจนและไม่เป็นคำ"
+    },
+    {
+     "conf": "high",
+     "s": 63.92,
+     "e": 66.08,
+     "reason": "ปัญหาเทคนิค, เสียงพูดไม่ชัดเจนและไม่เป็นคำ"
+    },
+    {
+     "conf": "high",
+     "s": 73.88,
+     "e": 80.92,
+     "reason": "พูดซ้ำ ติดขัด และพูดผิด"
+    },
+    {
+     "conf": "high",
+     "s": 82.08,
+     "e": 88.1,
+     "reason": "Filler, พูดไม่เป็นประโยค, และช่วงเงียบยาว"
+    },
+    {
+     "conf": "high",
+     "s": 105.73,
+     "e": 106.71,
+     "reason": "ปัญหาเทคนิค, เสียงพูดไม่ชัดเจนและไม่เป็นคำ"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     70.4
+    ],
+    [
+     88.1,
+     135.72
+    ]
+   ],
+   "retake": [
+    [
+     70.4,
+     78.86
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V01_full",
+   "path": "objective2/rep1/after/V01_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 54.59,
+     "e": 58.69,
+     "reason": "ช่วงเงียบ/หยุดคิดที่ผิดปกติหลังจากประโยคค้าง"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     123.07
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep1",
+   "tag": "after",
+   "case": "V05_full",
+   "path": "objective2/rep1/after/V05_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 83.78,
+     "e": 88.1,
+     "reason": "ช่วงเงียบ ไม่มีเสียงพูดที่ยาวผิดปกติ"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     70.4
+    ],
+    [
+     78.86,
+     135.72
+    ]
+   ],
+   "retake": [
+    [
+     70.4,
+     78.86
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V01_full",
+   "path": "objective2/rep1/control-old/V01_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 1.09,
+     "e": 6.5,
+     "reason": "ช่วงเริ่มต้นของการเตรียมตัวถ่ายทำหรือทดสอบเสียง (pre-roll/technical setup)"
+    },
+    {
+     "conf": "high",
+     "s": 46.0,
+     "e": 55.0,
+     "reason": "ผู้พูดให้คำตอบในเบื้องต้นแล้วแก้ไขคำพูดทันที โดยมีคำพูดว่า 'เดี๋ยวก่อนนะครับผมขอแก้คำตอบนิดหนึ่งครับ'"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     46.59
+    ],
+    [
+     54.65,
+     143.24
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V04_full",
+   "path": "objective2/rep1/control-old/V04_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 54.59,
+     "e": 58.69,
+     "reason": "ช่วงเงียบ / ไม่มีเสียงพูด (Silent segment)"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     123.07
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep1",
+   "tag": "control-old",
+   "case": "V05_full",
+   "path": "objective2/rep1/control-old/V05_full/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     110.83
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V02_full",
+   "path": "objective2/rep2/after/V02_full/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V03_full",
+   "path": "objective2/rep2/after/V03_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 50.86,
+     "e": 87.78,
+     "reason": "OFF_TOPIC_TANGENT: ตัวอย่างเปรียบเทียบการเลือกซื้อโทรศัพท์มือถือที่ยาวเกินไป เป็นการขยายความที่ไม่เพิ่มความเข้าใจหลัก และไม่จำเป็นต่อการเข้าใจประเด็นเรื่องการลงทุนในหุ้น ซึ่งมีการกล่าวถึงหลักการศึกษาข้อมูลไว้แล้วในส่วนอื่น"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     54.38
+    ],
+    [
+     87.28,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V03_summary",
+   "path": "objective2/rep2/after/V03_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 50.3,
+     "e": 61.91,
+     "reason": "ตอบผิดแล้วแก้ไขทันที พร้อมช่วงเงียบก่อนตอบใหม่"
+    },
+    {
+     "conf": "high",
+     "s": 70.15,
+     "e": 75.72,
+     "reason": "พูดประโยคเดิมซ้ำเพราะพูดผิดหรือติดขัด เก็บเทคสุดท้าย"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     50.3
+    ],
+    [
+     61.91,
+     70.21
+    ],
+    [
+     75.72,
+     143.24
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V04_full",
+   "path": "objective2/rep2/after/V04_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 26.48,
+     "e": 37.3,
+     "reason": "เทคซ้ำ: ผู้พูดพูดประโยคเดิมซ้ำโดยแก้ไขคำเล็กน้อย (ก็คือ vs ก็อาจ) เก็บเทคสุดท้ายเพื่อให้ได้เนื้อหาที่สมบูรณ์และไม่มีการพูดซ้ำ"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     25.87
+    ],
+    [
+     37.24,
+     82.64
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V06_full",
+   "path": "objective2/rep2/after/V06_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 35.8,
+     "e": 50.8,
+     "reason": "REPETITION: พูดซ้ำการอธิบายว่าหุ้นสร้างผลตอบแทนได้อย่างไร"
+    },
+    {
+     "conf": "high",
+     "s": 60.53,
+     "e": 78.0,
+     "reason": "OFF_TOPIC_TANGENT: เนื้อหาเกี่ยวกับการวางแผนการเงินและค่าใช้จ่ายในชีวิตประจำวัน ซึ่งไม่ใช่ประเด็นหลักของการลงทุนหุ้น"
+    },
+    {
+     "conf": "high",
+     "s": 78.46,
+     "e": 102.52,
+     "reason": "OFF_TOPIC_TANGENT: เนื้อหาต่อเนื่องเรื่องการเก็บเงินที่ไม่ใช่ประเด็นหลักของการลงทุนหุ้น และเรื่องเล่าเกี่ยวกับแมวที่ไม่เกี่ยวข้องกับเนื้อหาเลย"
+    },
+    {
+     "conf": "high",
+     "s": 124.62,
+     "e": 128.95,
+     "reason": "SILENCE: ช่วงไม่มีเสียงพูดระหว่างประโยค"
+    },
+    {
+     "conf": "high",
+     "s": 139.15,
+     "e": 142.72,
+     "reason": "SILENCE: ช่วงไม่มีเสียงพูดระหว่างประโยค"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     35.88
+    ],
+    [
+     48.02,
+     59.12
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V06_summary",
+   "path": "objective2/rep2/after/V06_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 16.83,
+     "e": 31.49,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติ"
+    },
+    {
+     "conf": "high",
+     "s": 37.12,
+     "e": 49.2,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติ"
+    },
+    {
+     "conf": "high",
+     "s": 62.97,
+     "e": 82.63,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติ"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     16.83
+    ],
+    [
+     31.49,
+     37.12
+    ],
+    [
+     49.2,
+     62.97
+    ],
+    [
+     82.63,
+     94.87
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "after",
+   "case": "V07_full",
+   "path": "objective2/rep2/after/V07_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 84.43,
+     "e": 90.23,
+     "reason": "ช่วงเงียบที่ยาวผิดปกติ (5.8 วินาที)"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     84.43
+    ],
+    [
+     90.23,
+     110.83
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V02_full",
+   "path": "objective2/rep2/control-old/V02_full/harness.log"
+  },
+  {
+   "cuts": [],
+   "keep": [
+    [
+     0.0,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V03_full",
+   "path": "objective2/rep2/control-old/V03_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 63.57,
+     "e": 87.28,
+     "reason": "ตัวอย่างเปรียบเทียบการเลือกซื้อโทรศัพท์ที่ลงรายละเอียดปลีกย่อยมากเกินไป (เช่น การอ่านรีวิว, เช็คแบตเตอรี่, ความร้อน, สเปก, โปรโมชั่นลดราคา) ซึ่งไม่จำเป็นต่อการเข้าใจหลักการลงทุนหุ้นที่ต้องการสื่อสาร การตัดส่วนนี้จะช่วยให้เนื้อหากระชับขึ้นโดยไม่เสียประเด็นหลักของตัวอย่าง (คือการดูหลายปัจจัย ไม่ใช่แค่ราคา)"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     103.94
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V03_summary",
+   "path": "objective2/rep2/control-old/V03_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 1.09,
+     "e": 3.45,
+     "reason": "ปัญหานำเข้า/ฉากเริ่มต้น (Technical intro slate) ไม่ใช่เนื้อหาที่ต้องการ"
+    },
+    {
+     "conf": "high",
+     "s": 75.72,
+     "e": 80.6,
+     "reason": "เทคซ้ำ ผู้พูดพูดประโยคตัวอย่างเดิมซ้ำ เก็บเทคสุดท้ายที่สมบูรณ์กว่า"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     143.24
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V04_full",
+   "path": "objective2/rep2/control-old/V04_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 26.48,
+     "e": 33.0,
+     "reason": "พูดซ้ำประโยคแรก เก็บเทคสุดท้ายที่คล้ายกัน"
+    },
+    {
+     "conf": "high",
+     "s": 110.1,
+     "e": 117.8,
+     "reason": "ผู้พูดพูดผิดและแก้ไขทันที ตัดส่วนที่พูดผิดและประโยคที่บอกว่าพูดผิดออก"
+    },
+    {
+     "conf": "high",
+     "s": 124.62,
+     "e": 128.95,
+     "reason": "ช่วงเงียบที่ตรวจพบโดย VAD"
+    },
+    {
+     "conf": "high",
+     "s": 139.15,
+     "e": 142.72,
+     "reason": "ช่วงเงียบที่ตรวจพบโดย VAD"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     25.87
+    ],
+    [
+     32.96,
+     82.64
+    ],
+    [
+     105.91,
+     110.13
+    ],
+    [
+     117.74,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V06_full",
+   "path": "objective2/rep2/control-old/V06_full/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 33.0,
+     "e": 40.7,
+     "reason": "REPETITION: การอธิบายวิธีที่หุ้นสร้างผลตอบแทนถูกพูดซ้ำโดยไม่มีข้อมูลใหม่เพิ่มเติม"
+    },
+    {
+     "conf": "high",
+     "s": 86.4,
+     "e": 101.52,
+     "reason": "OFF_TOPIC_TANGENT: เรื่องเล่าส่วนตัวเกี่ยวกับแมวซึ่งไม่เกี่ยวข้องกับประเด็นหลักของการลงทุนในหุ้นหรือการวางแผนการเงิน"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     33.06
+    ],
+    [
+     40.7,
+     82.64
+    ],
+    [
+     105.91,
+     111.23
+    ],
+    [
+     116.28,
+     176.79
+    ]
+   ],
+   "retake": [
+    [
+     82.64,
+     105.91
+    ],
+    [
+     111.23,
+     116.28
+    ]
+   ],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V06_summary",
+   "path": "objective2/rep2/control-old/V06_summary/harness.log"
+  },
+  {
+   "cuts": [
+    {
+     "conf": "high",
+     "s": 16.83,
+     "e": 31.49,
+     "reason": "Long silence / no speech"
+    },
+    {
+     "conf": "high",
+     "s": 37.12,
+     "e": 49.2,
+     "reason": "Long silence / no speech"
+    },
+    {
+     "conf": "high",
+     "s": 62.97,
+     "e": 82.63,
+     "reason": "Long silence / no speech"
+    }
+   ],
+   "keep": [
+    [
+     0.0,
+     16.83
+    ],
+    [
+     31.49,
+     37.12
+    ],
+    [
+     49.2,
+     62.97
+    ],
+    [
+     82.63,
+     94.87
+    ]
+   ],
+   "retake": [],
+   "model": "gemini-2.5-flash",
+   "ok": true,
+   "cond": "A_audio-only",
+   "rep": "rep2",
+   "tag": "control-old",
+   "case": "V07_full",
+   "path": "objective2/rep2/control-old/V07_full/harness.log"
+  }
+ ],
+ "gt": {
+  "V01_full": {
+   "cut": [],
+   "keep": []
+  },
+  "V02_full": {
+   "cut": [
+    [
+     46.0,
+     51.0,
+     "SILENCE"
+    ],
+    [
+     84.0,
+     90.0,
+     "SILENCE"
+    ]
+   ],
+   "keep": []
+  },
+  "V03_full": {
+   "cut": [
+    [
+     43.0,
+     86.0,
+     "TANGENT"
+    ]
+   ],
+   "keep": []
+  },
+  "V03_summary": {
+   "cut": [
+    [
+     43.0,
+     86.0,
+     "TANGENT"
+    ]
+   ],
+   "keep": []
+  },
+  "V04_full": {
+   "cut": [
+    [
+     47.0,
+     55.0,
+     "RETAKE"
+    ],
+    [
+     67.0,
+     75.0,
+     "RETAKE"
+    ],
+    [
+     104.0,
+     109.0,
+     "RETAKE"
+    ]
+   ],
+   "keep": []
+  },
+  "V05_full": {
+   "cut": [],
+   "keep": []
+  },
+  "V06_full": {
+   "cut": [
+    [
+     25.0,
+     40.0,
+     "RETAKE"
+    ],
+    [
+     52.0,
+     105.0,
+     "TANGENT"
+    ]
+   ],
+   "keep": []
+  },
+  "V06_summary": {
+   "cut": [
+    [
+     25.0,
+     40.0,
+     "RETAKE"
+    ],
+    [
+     52.0,
+     105.0,
+     "TANGENT"
+    ]
+   ],
+   "keep": []
+  },
+  "V07_full": {
+   "cut": [
+    [
+     17.0,
+     31.0,
+     "SILENCE"
+    ],
+    [
+     38.0,
+     48.0,
+     "SILENCE"
+    ],
+    [
+     63.0,
+     82.0,
+     "SILENCE"
+    ]
+   ],
+   "keep": []
+  }
+ }
+}

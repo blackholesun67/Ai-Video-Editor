@@ -47,6 +47,7 @@
 | `objective2/metrics_combined.json`, `metrics_rep1.json` | ผลลัพธ์ตัวเลข audio-only |
 | `objective2/rep1_out.txt` + `rep1/{after,control-old}/<case>/` | **รอบ 1 — pre-fix** — ล้มเหลวบางส่วน (V01/V04-old/V05 เท่านั้นที่สำเร็จ, ที่เหลือ 429) |
 | `objective2/rep2_out.txt` + `rep2/{after,control-old}/<case>/` | **รอบ 2 — pre-fix** — รันที่เหลือจนครบ required tier (n≥2 ทุก case) |
+| [`objective2/QUALITATIVE-REASON-ANALYSIS.md`](objective2/QUALITATIVE-REASON-ANALYSIS.md) + `objective2/qualitative/` | **Qualitative checklist (2026-09-30)** — วิเคราะห์ `reason` 82 ข้อความจาก 48 รัน, อธิบายที่มาของ recall ต่าง 10.1pp, ร่างย่อหน้าบทที่ 4 |
 | — | **should-do tier (n=4) ไม่ได้ทำ** — หยุดก่อนเริ่มเพราะโควตาหมดทั้งระบบ (พบตอนเติม V07 ของ Objective 1 ก่อนหน้า) |
 
 ## 4. Objective 3 — Subtitle (ยังไม่เริ่มทดสอบจริง)
