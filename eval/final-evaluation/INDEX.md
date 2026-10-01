@@ -38,6 +38,7 @@
 | `objective1/rep1_out.txt` + `rep1/{after,control-old}/<case>/` | **รอบ 1 — pre-fix (HEAD `822656f`)** n=2 ทุก case (9 case) — `preview.json` + `harness.log` ต่อ case |
 | `objective1/rep2_out.txt` + `rep2/{after,control-old}/<case>/` | **รอบ 2 — pre-fix** n=4 สำหรับ 6 case หลัก (V07 ได้แค่ 3 เพราะโควตาหมดกลางรัน) |
 | `objective1/rep3_out.txt`, `rep3_stderr.txt` + `rep3/{after,control-old}/V07_full/` | **รอบ 3 — POST-FIX (HEAD `e136e8a`)** ความพยายามเติม V07 เป็น n=4 — **ล้มเหลวทั้งคู่** (โควตาหมดทั้งระบบ) มีแค่ `harness.log` (ไม่มี `preview.json` เพราะ error) |
+| [`objective1/accuracy/`](objective1/accuracy/) | **Accuracy/Specificity (2026-10-01)** — `obj1_accuracy.py` + `accuracy_output.txt` + `accuracy_raw.json` (TP/TN/FP/FN ต่อรัน 27 รัน, pre-fix, ไม่ใช้ Gemini) ; ตารางสรุปอยู่ใน `RESULTS-TEMPLATE.md` หัวข้อ "Accuracy / Specificity" |
 
 ## 3. Objective 2 — Audio-only vs Audio+Visual
 
