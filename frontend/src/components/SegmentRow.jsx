@@ -134,7 +134,7 @@ export default function SegmentRow({
               "{text}"
             </p>
           ) : isCut ? (
-            <p className="text-sm italic text-slate-400">(ไม่มีเสียงพูด)</p>
+            <p className="text-sm italic text-slate-400">(ยังไม่มีข้อความซับ — อาจต้องแก้เอง)</p>
           ) : null}
 
           {reason && <p className="text-xs text-slate-500 mt-1 italic">💡 {reason}</p>}
