@@ -8,7 +8,7 @@
 > ทดสอบแล้ว (input-level): ตัวกรอง (replay บนข้อมูลจริง), อินพุตที่ส่งให้ Gemini (dry-run ผ่าน `analyze_video_content` จริง โดย Gemini ถูกแทนด้วยตัวปลอม), กรณีขอบสังเคราะห์ — 7 คลิปครบ
 > ทดสอบแล้ว (final-output, Gemini จริง ผ่าน `analysis_harness.py` — ดูหัวข้อ 6.4/7.2): **V02 full, V06 full, V06 summary, V07 full** (4/7 คลิป) — baseline vs control (โค้ดเดิมรันซ้ำ) vs new (โค้ดแก้แล้ว) ; V02 control ล้มเหลว (429/404/503 สลับกันทุก key×model) จึงมีเฉพาะ baseline vs new
 > **NOT TESTED (final-output): V01, V03, V04, V05** — นอกขอบเขต harness ที่กำหนดไว้ในรอบนี้ (input-level unchanged โดยโครงสร้างสำหรับ 4 คลิปนี้ ดูหัวข้อ 7.1)
-> ⚠️ ผลปลายทางชุดนี้ (`metrics_final_three_way.json`, `after/`, `control-old/`, `harness_out.txt`, `harness_stderr.txt`) ยัง **untracked ใน git ณ ตอนที่ปรับปรุงเอกสารนี้** — ต้อง commit แยกก่อนอ้างอิงในบทที่ 4
+> ✅ ผลปลายทางชุดนี้ (`metrics_final_three_way.json`, `after/`, `control-old/`, `harness_out.txt`, `harness_stderr.txt`) **commit เข้า git แล้วที่ `065c824`** (`harness.log` ถูก `.gitignore` บล็อก จึงใช้ `git add -f`) — แต่ตัวเลขเป็น snapshot ที่โค้ด `5ad3d92` ไม่ใช่ผลสุดท้ายสำหรับบทที่ 4 (ดูหมายเหตุที่แถว `metrics.json` ในตารางไฟล์หลักฐาน)
 
 ---
 
@@ -129,7 +129,7 @@ python eval\tools\score.py
 
 ผลราย run: **V02 full** — control ล้มเหลว (ดู §7.2), new สำเร็จ · **V06 full** — control+new สำเร็จ · **V06 summary** — control+new สำเร็จ · **V07 full** — baseline+control+new สำเร็จ (cuts=[] ทั้ง 3 ชุด)
 
-ไฟล์ผลลัพธ์ (⚠️ **ยัง untracked ใน git ขณะปรับปรุงเอกสารนี้** — ต้อง commit แยกก่อนใช้ในบทที่ 4): `eval/vad-filter-fix/harness_out.txt`, `harness_stderr.txt`, `metrics_final_three_way.json`, `after/{V02_full,V06_full,V06_summary,V07_full}/{preview.json,harness.log}`, `control-old/{V02_full,V06_full,V06_summary,V07_full}/harness.log` (V02 ไม่มี `preview.json` เพราะ control ล้มเหลว)
+ไฟล์ผลลัพธ์ (**commit แล้วที่ `065c824`** ; `harness.log` ต้อง `git add -f` เพราะ `.gitignore` บล็อก `*.log`): `eval/vad-filter-fix/harness_out.txt`, `harness_stderr.txt`, `metrics_final_three_way.json`, `after/{V02_full,V06_full,V06_summary,V07_full}/{preview.json,harness.log}`, `control-old/{V02_full,V06_full,V06_summary,V07_full}/harness.log` (V02 ไม่มี `preview.json` เพราะ control ล้มเหลว)
 
 **V01, V03, V04, V05 ไม่ได้รันปลายทางในรอบนี้** (นอกขอบเขต harness ที่กำหนดไว้ — ยังคง NOT TESTED)
 
@@ -202,7 +202,7 @@ Baseline = ไฟล์ evidence เดิม (commit `cc454df`, รันคร
 - **ระดับ final-output (TESTED 4/7 คลิป, n=1 ต่อคู่ — ดู 7.2):** V06 full และ V06 summary **improved** ชัดเจนทั้ง precision และ outside-GT เทียบทั้ง baseline และ control ; V02 full outside-GT ดีขึ้น (28.1s→0.0s) แต่ recall ลดลง (45.5%→0.0%) เพราะ Gemini เลือกไม่ตัดอะไรเลยเมื่อเห็นท่อนครบ — ตรงกับที่คาดไว้ล่วงหน้า ไม่ใช่ regression ; V07 full **unchanged** (cuts=[] ทั้ง 3 ชุด) เพราะ VAD fix อย่างเดียวยังไม่ทำให้ hint ช่วงเงียบเกิดขึ้น (ต้องรอ Silence Gap Fix) — **ไม่พบ regression ในคลิปใดที่มีผล**
 - **n=1 ต่อคู่ (ยกเว้น V07 ที่มีครบ 3 ชุด):** ผลนี้จึงเป็นหลักฐานเชิงกลไกที่สอดคล้องกันมากกว่าข้อสรุปเชิงสถิติที่แน่นอน ; **V01, V03, V04, V05 ยังไม่มีผล final-output เลย** (NOT TESTED นอกขอบเขต harness รอบนี้)
 - ปัญหา Snap, ช่วงเงียบกลางท่อน, guard เทคซ้ำ และ Gemini ไม่เสถียร ไม่ได้ถูกแก้และไม่ควรถูกนับเป็นผลของ VAD fix
-- **สถานะไฟล์หลักฐานชุด final-output (`metrics_final_three_way.json`, `after/`, `control-old/`, `harness_out.txt`, `harness_stderr.txt`): ยัง untracked ใน git ณ ตอนปรับปรุงเอกสารนี้** — ต้อง commit แยกก่อนอ้างอิงในบทที่ 4 (ไม่ใช่ scope ของการแก้เอกสารรอบนี้)
+- **สถานะไฟล์หลักฐานชุด final-output (`metrics_final_three_way.json`, `after/`, `control-old/`, `harness_out.txt`, `harness_stderr.txt`): commit แล้วที่ `065c824`** — อยู่ใน git แล้ว อ้างอิงได้ ; ตัวเลขเป็น snapshot ที่โค้ด `5ad3d92` (ดูหมายเหตุที่แถว `metrics.json` ในตารางไฟล์หลักฐาน)
 
 ## ไฟล์หลักฐาน
 
@@ -213,10 +213,10 @@ Baseline = ไฟล์ evidence เดิม (commit `cc454df`, รันคร
 | `eval/vad-filter-fix/replay_results.txt/json` | replay ตัวกรองเดิม/ใหม่ + ความไวต่อเกณฑ์ + กรณีขอบ |
 | `eval/vad-filter-fix/dryrun_pipeline_input.txt` | อินพุตที่ส่งให้ Gemini ผ่าน `analyze_video_content` จริง (Gemini ปลอม) |
 | `eval/vad-filter-fix/metrics_before.txt` | recall/precision ก่อนแก้ (baseline เดี่ยว ๆ, รอบร่างแรก) |
-| `eval/vad-filter-fix/metrics.json` | ⚠️ ยังเขียนแบบ "after: NOT TESTED" ค้างอยู่ (modified ใน git status) — ไม่ตรงกับ `metrics_final_three_way.json` แล้ว รอปรับปรุงแยก |
-| `eval/vad-filter-fix/metrics_final_three_way.json` | **ผล final-output จริงครบ 4 คลิป (baseline/control/new)** — ใช้ทำตาราง §7.2 ⚠️ untracked |
-| `eval/vad-filter-fix/harness_out.txt`, `harness_stderr.txt` | ผลดิบของ `analysis_harness.py` รัน 18:33–18:34 (Gemini จริง) ⚠️ untracked |
-| `eval/vad-filter-fix/after/`, `control-old/` | `preview.json` (เฉพาะ run ที่สำเร็จ) + `harness.log` ทุก run รวม V02 control ที่ล้มเหลว ⚠️ untracked |
+| `eval/vad-filter-fix/metrics.json` | **อัปเดตแล้ว (commit `065c824`):** ช่อง `after` ของ 4 คลิปที่รันปลายทาง (V02 full, V06 full, V06 summary, V07 full) มีค่าจริง ตรงกับ `metrics_final_three_way.json` และผล re-score จาก `after/*/preview.json` ; V03/V04/V05 ไม่ได้รันปลายทางรอบนี้ จึงไม่มีค่า `after` (ตรงกับ §7.2) · ⚠️ **ตัวเลขชุดนี้เป็น snapshot ที่โค้ด `5ad3d92` (ก่อน snap fix และ silence-gap fix)** — ตัวเลขที่ใช้เขียนบทที่ 4 ต้องมาจากผลรอบ Final Evaluation ล่าสุดเท่านั้น (เช่น V07 = 100%, V02 = 50.6%) ห้ามอ้างตัวเลขจากไฟล์นี้ (เช่น V02 = 0%) เป็นผลสุดท้าย |
+| `eval/vad-filter-fix/metrics_final_three_way.json` | **ผล final-output จริงครบ 4 คลิป (baseline/control/new)** — ใช้ทำตาราง §7.2 (commit แล้วที่ `065c824`) |
+| `eval/vad-filter-fix/harness_out.txt`, `harness_stderr.txt` | ผลดิบของ `analysis_harness.py` รัน 18:33–18:34 (Gemini จริง) (commit แล้วที่ `065c824`) |
+| `eval/vad-filter-fix/after/`, `control-old/` | `preview.json` (เฉพาะ run ที่สำเร็จ) + `harness.log` ทุก run รวม V02 control ที่ล้มเหลว (commit แล้วที่ `065c824`) |
 | `eval/vad-filter-fix/code_under_test.sha256` | แฮชของโค้ดเดิม/ใหม่ที่ใช้ทดสอบ (ตรวจแล้วตรงกับที่ใช้รัน harness จริง) |
 | `eval/tools/` | `dump_vad.py`, `vad_measure.py`, `vad_filter_replay.py`, `score.py`, `analysis_harness.py`, `harness_dryrun.py`, `harness_unpack.py` |
 | baseline เดิม | `eval/V0x/preview*.json` + `eval/logs.sha256` (commit `cc454df`) — ไม่ถูกแก้ |
