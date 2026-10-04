@@ -223,45 +223,48 @@ function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* ── Header ─────────────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/70">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-9 w-9 flex-shrink-0 rounded-xl bg-indigo-600 flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <div>
-              <h1 className="text-base font-semibold text-slate-900 leading-tight">AI Video Smart Editor</h1>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-semibold text-slate-900 leading-tight truncate">AI Video Smart Editor</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {token ? (
               <>
                 {(jobId || videoUrl) && !showJobs && (
                   <button
                     onClick={handleResetConfirm}
                     title="เริ่มทำวิดีโอใหม่ — ล้างงานทั้งหมด กลับหน้าอัปโหลด"
-                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 bg-white border border-red-200 px-3.5 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
+                    aria-label="เริ่มทำวิดีโอใหม่"
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 bg-white border border-red-200 px-2.5 sm:px-3.5 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
                   >
                     <RotateCcw className="h-4 w-4" />
-                    เริ่มทำวิดีโอใหม่
+                    <span className="hidden sm:inline">เริ่มทำวิดีโอใหม่</span>
                   </button>
                 )}
                 {!showJobs && (
                   <button
                     onClick={openMyJobs}
                     title="งานของฉัน"
-                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                    aria-label="งานของฉัน"
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-2.5 sm:px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
                   >
                     <FolderOpen className="h-4 w-4" />
-                    งานของฉัน
+                    <span className="hidden sm:inline">งานของฉัน</span>
                   </button>
                 )}
                 <button
                   onClick={handleLogout}
                   title="ออกจากระบบ"
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                  aria-label="ออกจากระบบ"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-2.5 sm:px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
-                  ออกจากระบบ
+                  <span className="hidden sm:inline">ออกจากระบบ</span>
                 </button>
               </>
             ) : (
