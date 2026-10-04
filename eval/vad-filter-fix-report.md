@@ -129,7 +129,7 @@ python eval\tools\score.py
 
 ผลราย run: **V02 full** — control ล้มเหลว (ดู §7.2), new สำเร็จ · **V06 full** — control+new สำเร็จ · **V06 summary** — control+new สำเร็จ · **V07 full** — baseline+control+new สำเร็จ (cuts=[] ทั้ง 3 ชุด)
 
-ไฟล์ผลลัพธ์ (**commit แล้วที่ `065c824`** ; `harness.log` ต้อง `git add -f` เพราะ `.gitignore` บล็อก `*.log`): `eval/vad-filter-fix/harness_out.txt`, `harness_stderr.txt`, `metrics_final_three_way.json`, `after/{V02_full,V06_full,V06_summary,V07_full}/{preview.json,harness.log}`, `control-old/{V02_full,V06_full,V06_summary,V07_full}/harness.log` (V02 ไม่มี `preview.json` เพราะ control ล้มเหลว)
+ไฟล์ผลลัพธ์ (**commit แล้วที่ `065c824`** ; `harness.log` ต้อง `git add -f` เพราะ `.gitignore` บล็อก `*.log`): `eval/vad-filter-fix/harness_out.txt`, `harness_stderr.txt`, `metrics_final_three_way.json`, `after/{V02_full,V06_full,V06_summary,V07_full}/{preview.json,harness.log}`, `control-old/{V02_full,V06_full,V06_summary,V07_full}/harness.log` และ `control-old/{V06_full,V06_summary,V07_full}/preview.json` (V02 มีแค่ `harness.log` ไม่มี `preview.json` เพราะ control ล้มเหลว)
 
 **V01, V03, V04, V05 ไม่ได้รันปลายทางในรอบนี้** (นอกขอบเขต harness ที่กำหนดไว้ — ยังคง NOT TESTED)
 
