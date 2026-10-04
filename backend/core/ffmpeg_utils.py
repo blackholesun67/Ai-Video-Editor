@@ -1,3 +1,4 @@
+import json
 import subprocess
 import os
 import shutil
@@ -114,6 +115,34 @@ def _probe_fps_expr(path: str, default: str = "30") -> str:
         return raw if 1.0 < fps < 240.0 and float(den) != 0 else default
     except Exception:
         return default
+
+
+def _probe_rotation(path: str) -> int:
+    """คืนมุมที่ต้องหมุน "ตามเข็มนาฬิกา" ให้ภาพตั้งตรง: 0 / 90 / 180 / 270
+
+    คลิปจากมือถือมักเก็บพิกเซลเป็นแนวนอน (1920x1080) แล้วใส่ metadata บอกให้เพลเยอร์หมุนตอนแสดง
+    อ่านจาก display matrix (side data `rotation` — องศาทวนเข็ม ffprobe รายงานเป็น -90 สำหรับ
+    "หมุนตามเข็ม 90") ก่อน ถ้าไม่มีค่อยใช้ tag `rotate` (องศาตามเข็ม) ; อ่านไม่ได้ = 0 (พฤติกรรมเดิม)
+    """
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_streams", "-of", "json", path],
+            capture_output=True, text=True, check=True).stdout
+        st = (json.loads(out).get("streams") or [{}])[0]
+        angles = [float(x["rotation"]) for x in st.get("side_data_list", []) if "rotation" in x]
+        cw = (-angles[0]) % 360 if angles else float(st.get("tags", {}).get("rotate", 0)) % 360
+        snapped = int(round(cw / 90.0)) % 4 * 90
+        if abs(cw - round(cw / 90.0) * 90) > 1.5:
+            print(f"⚠️ [rotation] มุมหมุน {cw:.1f}° ไม่ใช่ทวีคูณของ 90 — ไม่หมุน")
+            return 0
+        return snapped
+    except Exception:
+        return 0
+
+
+def _rotation_filters(angle: int) -> list[str]:
+    """ฟิลเตอร์ที่หมุนเฟรมตามเข็ม `angle` องศา (ใช้คู่กับ -noautorotate — เราจัดการเอง ไม่พึ่ง autorotate)"""
+    return {90: ["transpose=1"], 180: ["hflip", "vflip"], 270: ["transpose=2"]}.get(angle, [])
 
 
 def _has_audio(path: str) -> bool:
@@ -378,17 +407,22 @@ BLUR_PASSES = int(os.getenv("TIKTOK_BLUR_PASSES", "4"))
 TIKTOK_FIT_MODES = ("blur", "crop")
 
 
-def _tiktok_video_chain(fit_mode: str):
-    """คืน video_chain ให้ _build_trim_concat_graph — list (crop) หรือ str (blur)"""
+def _tiktok_video_chain(fit_mode: str, pre_filters=None):
+    """คืน video_chain ให้ _build_trim_concat_graph — list (crop) หรือ str (blur)
+
+    pre_filters = ฟิลเตอร์หมุนภาพให้ตั้งตรงก่อนจัดเฟรม (จาก _rotation_filters) ; ไม่ส่ง = ไม่หมุน
+    ต้องมาก่อนทุกอย่าง เพราะ scale/crop ด้านล่างคิดจากขนาดที่ "แสดงจริง" ไม่ใช่ขนาดพิกเซลที่เก็บ
+    """
+    pre = list(pre_filters or [])
     if fit_mode != "blur":
-        return [
+        return pre + [
             f"scale=w={TIKTOK_W}:h={TIKTOK_H}:force_original_aspect_ratio=increase:flags=lanczos",
             f"crop={TIKTOK_W}:{TIKTOK_H}",
             "setsar=1",
         ]
     # แตกสองสาย: พื้นหลังทำแบบ crop แล้วเบลอ / สายหน้าย่อให้พอดีทั้งเฟรมแล้ววางทับกลาง
     return (
-        "{IN}split=2[bgsrc][fgsrc];"
+        "{IN}" + "".join(f"{f}," for f in pre) + "split=2[bgsrc][fgsrc];"
         f"[bgsrc]scale=w={TIKTOK_W}:h={TIKTOK_H}:force_original_aspect_ratio=increase,"
         f"crop={TIKTOK_W}:{TIKTOK_H},boxblur={BLUR_RADIUS}:{BLUR_PASSES}[bg];"
         f"[fgsrc]scale=w={TIKTOK_W}:h={TIKTOK_H}:force_original_aspect_ratio=decrease:flags=lanczos[fg];"
@@ -451,7 +485,13 @@ def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_
     if burn_subtitle and (transcript or edited_phrases):
         subs_file = _write_subs(temp_dir, clean_segs, transcript, edited_phrases)
 
-    tiktok_chain = _tiktok_video_chain(fit_mode)
+    # -noautorotate ด้านล่างปิดการหมุนอัตโนมัติของ ffmpeg → ต้องหมุนเองตาม display matrix/rotate tag
+    # ไม่งั้นคลิปแนวตั้งจากมือถือ (เก็บพิกเซลแนวนอน + tag หมุน) จะออกมาเอียง เพราะเราลบ tag ทิ้งตอน output
+    rotation = _probe_rotation(video_path)
+    rot_filters = _rotation_filters(rotation)
+    if rotation:
+        print(f"🔄 [rotation] ต้นฉบับมี metadata หมุน {rotation}° ตามเข็ม → หมุนภาพให้ตั้งตรงก่อนจัดเฟรม")
+    tiktok_chain = _tiktok_video_chain(fit_mode, rot_filters)
 
     if len(bounds) <= FILTERGRAPH_MAX_SEGMENTS:
         try:
@@ -472,7 +512,7 @@ def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_
             print(f"⚠️ filter_complex failed ({e}) — falling back to legacy per-part render")
 
     result = _legacy_render_tiktok(video_path, bounds, output_path, temp_dir, subs_file,
-                                   denoise=denoise)
+                                   denoise=denoise, source_rotated=bool(rotation))
     _verify_tiktok(output_path)
     _cleanup_dir(temp_dir)
     return result
@@ -486,16 +526,22 @@ def _verify_tiktok(output_path):
 
 
 def _legacy_render_tiktok(video_path, bounds, output_path, temp_dir, subs_file,
-                          denoise=False):
+                          denoise=False, source_rotated=False):
     """วิธีเดิม (fallback): ตัด+scale ทีละ part → concat copy → burn subtitle แยก pass"""
     af = _output_audio_chain(denoise)
     af_opts = ["-af", af[0]] if af else []
+    # ต้นฉบับหมุน (มือถือแนวตั้ง): ใช้ autorotate ของ ffmpeg เอง ไม่ใส่ -noautorotate
+    #   เหตุผล: ffmpeg 4.4 พอปิด autorotate จะคัดลอก display matrix ของ input ไปติด output ด้วย
+    #   (-metadata rotate=0 ลบไม่ได้ — ทดสอบแล้ว) ภาพที่หมุนเองจึงถูกเพลเยอร์หมุนซ้ำ ; autorotate
+    #   หมุนพิกเซลและล้าง matrix ให้เอง (เส้นทาง standard ก็พึ่งตัวนี้และออกมาตั้งตรง)
+    #   ต้นฉบับไม่หมุน: คำสั่งเหมือนเดิมทุกประการ
+    rotate_opts = [] if source_rotated else ["-noautorotate"]
     part_files = []
     for i, (start, end) in enumerate(bounds):
         duration = end - start
         print(f"✂️ [TIKTOK legacy] Part {i}: {start}s → {end}s ({duration:.2f}s)")
         subprocess.run([
-            "ffmpeg", "-y", "-noautorotate",
+            "ffmpeg", "-y", *rotate_opts,
             "-ss", str(start), "-t", str(duration), "-i", video_path,
             "-vf", _TIKTOK_SCALE_PAD,
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
