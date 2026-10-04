@@ -1,0 +1,52 @@
+Total duration: 176.8s (2.9 min)
+[VAD Pre-filter] original segments = 12 | kept = 12 | removed = 0 | min speech overlap = 20%
+  segment 7 128.9-151.9 speech overlap = 81% KEEP
+[Transcript] 12 segments, 2,421 chars → Gemini
+🖼️ [Keyframe] ดึงภาพ 8/8 ภาพ (64 KB)
+⚡ [Pipeline] Running AI Correction + Deletion in parallel...
+🔧 [AI-Correct] mode=แก้+แปลเป็นไทย
+🔧 [AI-Correct Parallel] Split 12 segments → 2 chunks (1 per key)
+🚀 [key#1/3] gemini-2.5-flash att 1/2
+🚀 [key#2/3] gemini-2.5-flash att 1/2
+Sending filtered transcript to Gemini (Deletion mode) + 8 ภาพ...
+🔑 [key#1/3] Trying with API key …xBCWw
+🚀 [key#1/3] Trying gemini-2.5-flash (Attempt 1/2)...
+🚀 [key#2/3] gemini-3.6-flash att 1/2
+🚀 [key#1/3] gemini-3.6-flash att 1/2
+📉 gemini-2.5-flash quota exceeded on key#1/3.
+🔁 [key#1/3] exhausted, trying next key...
+🔑 [key#2/3] Trying with API key …jziEw
+🚀 [key#2/3] Trying gemini-2.5-flash (Attempt 1/2)...
+⚠️ gemini-2.5-flash not available (404) — switching model...
+🚀 [key#2/3] Trying gemini-3.6-flash (Attempt 1/2)...
+🚀 [key#2/3] gemini-3.6-flash att 2/2
+🚀 [key#1/3] gemini-3.6-flash att 2/2
+   ✅ chunk@key#2: 2/6 fixed
+⚠️ gemini-3.6-flash overloaded. Waiting 10s before retry...
+   ✅ chunk@key#1: 1/6 fixed
+✅ [AI-Correct Parallel] Merged 12 segments from 2 parallel workers
+🚀 [key#2/3] Trying gemini-3.6-flash (Attempt 2/2)...
+🔄 gemini-3.6-flash still busy. Switching model...
+🔁 [key#2/3] exhausted, trying next key...
+🔑 [key#3/3] Trying with API key …4v1Nw
+🚀 [key#3/3] Trying gemini-2.5-flash (Attempt 1/2)...
+✅ Corrected text applied to 12 segments
+
+📋 AI Suggested Cuts (3 segments to delete):
+  🔴 [high] 26.48s → 35.8s (9.3s) — เทคซ้ำ: ผู้พูดพูดประโยคเดิมซ้ำโดยไม่เพิ่มข้อมูลใหม่ เก็บเทคสุดท้าย
+  🔴 [high] 112.42s → 119.5s (7.1s) — พูดผิดและแก้ไขทันที: ตัดประโยคที่พูดผิดและคำแก้ไข 'อันนี้ไม่ถูกครับผมพูดผิด'
+  🔴 [high] 124.62s → 128.95s (4.3s) — ช่วงเงียบที่ตรวจพบ
+  Total to cut: 20.7s (0.3 min)
+  Will keep: 156.1s (2.6 min)
+
+✅ [Outro] คลิปจบถึงท้ายคำพูดแล้ว (176.8s / 176.8s)
+✂️ [Snap] ขยับขอบให้จบประโยคเต็ม 2 ช่วง (กันตัดกลางคำ)
+🔁 [Retake] คู่ที่ซ้ำ: 78.5s ~ 105.9s ตรงกัน 18 ตัว «มีอะไรได้เพิ่มขึ้น»
+🔁 [Retake] คู่ที่ซ้ำ: 105.9s ~ 116.3s ตรงกัน 24 ตัว «แปลว่ากำลายต้องเพิ่มขึ้น»
+🔁 [Retake] ตัดเทคซ้ำ 82.64s → 105.91s (23.3s)
+🔁 [Retake] ตัดเทคซ้ำ 111.23s → 116.28s (5.0s)
+✅ Final keep segments (4 total):
+  0.0s → 25.87s  (25.9s)  จบที่: …ี่เราถืออยู่ครับ หุ้นสามารถสร้าง
+  35.74s → 82.64s  (46.9s)  จบที่: …ันเป็นแมวเปรต มาข่วนแขนผมเป็นรอย
+  105.91s → 111.23s  (5.3s)  จบที่: …ีค่าใช้จ่ายเพิ่มขึ้นด้วย ดังนั้น
+  119.44s → 176.79s  (57.3s)  จบที่: …ห้ทุกคนโชคดี ลาไปก่อน ขอบคุณครับ

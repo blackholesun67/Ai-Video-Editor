@@ -1,0 +1,64 @@
+Total duration: 176.8s (2.9 min)
+[VAD Pre-filter] original segments = 12 | kept = 12 | removed = 0 | min speech overlap = 20%
+  segment 7 128.9-151.9 speech overlap = 81% KEEP
+[Transcript] 12 segments, 2,415 chars → Gemini
+🖼️ [Keyframe] ดึงภาพ 8/8 ภาพ (64 KB)
+⚡ [Pipeline] Running AI Correction + Deletion in parallel...
+⚡ [AI-Correct] Skipped — no Latin chars (ไม่มีอะไรต้องแก้/แปล)
+🔑 [key#1/3] Trying with API key …xBCWw
+🚀 [key#1/3] Trying gemini-2.5-flash (Attempt 1/2)...
+📉 gemini-2.5-flash quota exceeded on key#1/3.
+🔁 [key#1/3] exhausted, trying next key...
+🔑 [key#2/3] Trying with API key …jziEw
+🚀 [key#2/3] Trying gemini-2.5-flash (Attempt 1/2)...
+⚠️ gemini-2.5-flash not available (404) — switching model...
+🚀 [key#2/3] Trying gemini-3.6-flash (Attempt 1/2)...
+📉 gemini-3.6-flash quota exceeded on key#2/3.
+🔁 [key#2/3] exhausted, trying next key...
+🔑 [key#3/3] Trying with API key …4v1Nw
+🚀 [key#3/3] Trying gemini-2.5-flash (Attempt 1/2)...
+
+🧭 [Outline] ชนิดเนื้อหา: 📚 informational (อธิบาย/สอน — ตัดหนักได้)
+   8 ประเด็น (6 core):
+  🔵 [core   ] 0.0s → 25.87s — การแนะนำเรื่องการลงทุนหุ้นเบื้องต้นและความหมายของหุ้น
+  🔵 [core   ] 26.48s → 59.12s — ผลตอบแทนและความเสี่ยงจากการลงทุนในหุ้น
+  🔵 [core   ] 60.53s → 99.1s — ความสำคัญของการวางแผนการเงินและการเก็บออม
+  ⚪ [support] 99.1s → 101.52s — เรื่องเล่านอกเรื่องเกี่ยวกับแมว
+  ⚪ [support] 102.52s → 104.58s — กลับสู่ประเด็นหลักเรื่องหุ้น
+  🔵 [core   ] 105.91s → 124.62s — วิธีวิเคราะห์บริษัท: ธุรกิจ, รายได้ และกำไร (พร้อมแก้ไขความเข้าใจผิด)
+  🔵 [core   ] 128.95s → 153.96s — การพิจารณาความเสี่ยงและทำความเข้าใจธุรกิจ
+  🔵 [core   ] 155.02s → 176.79s — คำแนะนำสำหรับนักลงทุนมือใหม่และคำกล่าวปิดท้าย
+Sending filtered transcript to Gemini (Deletion mode) + 8 ภาพ...
+🔑 [key#1/3] Trying with API key …xBCWw
+🚀 [key#1/3] Trying gemini-2.5-flash (Attempt 1/2)...
+📉 gemini-2.5-flash quota exceeded on key#1/3.
+🔁 [key#1/3] exhausted, trying next key...
+🔑 [key#2/3] Trying with API key …jziEw
+🚀 [key#2/3] Trying gemini-2.5-flash (Attempt 1/2)...
+⚠️ gemini-2.5-flash not available (404) — switching model...
+🚀 [key#2/3] Trying gemini-3.6-flash (Attempt 1/2)...
+📉 gemini-3.6-flash quota exceeded on key#2/3.
+🔁 [key#2/3] exhausted, trying next key...
+🔑 [key#3/3] Trying with API key …4v1Nw
+🚀 [key#3/3] Trying gemini-2.5-flash (Attempt 1/2)...
+✅ Corrected text applied to 12 segments
+
+📋 AI Suggested Cuts (3 segments to delete):
+  🔴 [high] 37.8s → 46.88s (9.1s) — REPETITION: The explanation of how stocks generate returns (price increase or dividends) is repeated without adding new information.
+  🔴 [high] 89.0s → 101.52s (12.5s) — OFF_TOPIC_TANGENT: An irrelevant personal anecdote about a cat that does not contribute to the main topic of stock investment or financial planning.
+  🔴 [high] 124.62s → 128.95s (4.3s) — SILENCE_BREAK: Pre-identified silent segment, likely an unintended pause or break in speech flow.
+  Total to cut: 25.9s (0.4 min)
+  Will keep: 150.9s (2.5 min)
+
+✅ [Outline check] ประเด็น core ครบทุกข้อ
+✅ [Outro] คลิปจบถึงท้ายคำพูดแล้ว (176.8s / 176.8s)
+✂️ [Snap] ขยับขอบให้จบประโยคเต็ม 3 ช่วง (กันตัดกลางคำ)
+🔁 [Retake] คู่ที่ซ้ำ: 78.5s ~ 105.9s ตรงกัน 18 ตัว «มีอะไรได้เพิ่มขึ้น»
+🔁 [Retake] คู่ที่ซ้ำ: 105.9s ~ 116.3s ตรงกัน 24 ตัว «แปลว่ากำลายต้องเพิ่มขึ้น»
+🔁 [Retake] ตัดเทคซ้ำ 82.64s → 105.91s (23.3s)
+🔁 [Retake] ตัดเทคซ้ำ 111.23s → 116.28s (5.0s)
+✅ Final keep segments (4 total):
+  0.0s → 37.84s  (37.8s)  จบที่: …ะราคาหุ้นสามารถขึ้นหรือลงได้ครับ
+  46.51s → 82.64s  (36.1s)  จบที่: …มันเป็นแมวเปรตมาข่วนแขนผมเป็นรอย
+  105.91s → 111.23s  (5.3s)  จบที่: …ดมีค่าเชจ่ายเพิ่มขึ้นด้วยดังนั้น
+  116.28s → 176.79s  (60.5s)  จบที่: …้ทุกคน ชุดดี ลาไปก่อน ขอบคุณครับ
