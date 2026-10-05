@@ -45,9 +45,11 @@
 | ส่วน | สถานะ |
 |---|---|
 | A. Functional (endpoint/UI logic) | NOT READY (เล็กน้อย) — เตรียม integration test ผ่าน endpoint จริงได้เองโดยไม่ต้องรอคน |
-| B. Expert evaluation | NOT SET UP — ต้องออกแบบ rubric + หาผู้เชี่ยวชาญ ≥2 คน |
-| C. User evaluation | NOT SET UP — ต้องออกแบบ questionnaire (ยืนยัน SUS หรือแบบอื่นจาก Test Plan) + หาผู้ใช้จริง |
-| D. Manual vs AI-assisted | NOT SET UP — ต้องออกแบบ procedure + หาผู้เข้าร่วมทั้งสองฝั่ง |
+| B. Expert evaluation | NOT SET UP — ต้องออกแบบ rubric + หาผู้เชี่ยวชาญ **3 ท่าน** (แต่ละท่านรันระบบเองกับ **2 คลิป**) |
+| C. User evaluation | NOT SET UP — ต้องออกแบบ questionnaire (ยืนยัน SUS หรือแบบอื่นจาก Test Plan) + หาผู้ใช้ทั่วไป **10 คน** |
+| D. Manual vs AI-assisted | NOT SET UP — ต้องออกแบบ procedure + หาเพื่อน **4 คน** (design 2×2) |
+
+**จำนวนผู้เข้าร่วมตามแผนใหม่ 2026-10-06:** B 3 + C 10 + D 4 = 17 คน ไม่ซ้ำคนระหว่างกลุ่ม (ดู `objective4/PARTICIPANT-PLAN.md`)
 
 **ต้องทำก่อนเริ่มจริง:** A ทำได้ทันที ; B/C/D ต้องออกแบบ protocol โดยละเอียดกว่าที่มีใน `objective4/PROTOCOL.md` (rubric/questionnaire ฉบับเต็ม) และจัดหาผู้เข้าร่วมจริง — **ไม่ใช้ Claude แทนคนไม่ว่ากรณีใด**
 

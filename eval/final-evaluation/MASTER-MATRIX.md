@@ -44,7 +44,7 @@
 | 4 | **Objective 1** (9 case × n=2–3) | ✅ ใช้ | ต้องเสร็จก่อน Objective 2 เพราะเงื่อนไข B ของ Objective 2 ใช้ผลจาก Objective 1 ร่วมกันได้ |
 | 5 | **Objective 2** เงื่อนไข A เท่านั้น (9 case × n=2–3, `VISUAL_CONTEXT=0`) | ✅ ใช้ | เงื่อนไข B ใช้ผลจากลำดับ 4 อยู่แล้ว ไม่ต้องรันซ้ำ |
 | 6 | Objective 3 metric run (ถ้าเตรียมข้อมูลจากลำดับ 2 เสร็จแล้ว) | ⚠️ อาจใช้ (ถ้าต้องรัน AI-Correction เทียบ reference) | ทำหลัง Objective 1/2 เพราะไม่เร่งด่วนเท่าและ quota อาจเหลือน้อย |
-| 7 | Objective 4.B/C/D (human tests) | ❌ ไม่ใช้ Gemini โดยตรง (ใช้ผลจากลำดับ 4 เป็น stimulus) | รันได้อิสระจาก quota แต่ต้องรอผลจากลำดับ 4 ก่อน (ใช้เป็นคลิปตัวอย่างให้ผู้เชี่ยวชาญ/ผู้ใช้ดู) |
+| 7 | Objective 4.B/C/D (human tests) | ✅ **ใช้ Gemini ผ่านระบบจริง** (แก้ตามแผนใหม่ 2026-10-06 — เดิมระบุว่าไม่ใช้) | ผู้เชี่ยวชาญ/ผู้ใช้/เพื่อนรันระบบเอง ทุกงานวิเคราะห์เรียก Gemini → อย่างน้อยราว 20 งาน (B 3×2 = 6, C 10 โดยสมมติ 1 งาน/คน ยังไม่ยืนยัน, D 4) ไม่ได้ใช้ผลจากลำดับ 4 เป็น stimulus แล้วจึงไม่ต้องรอ แต่ใช้โควตาร่วมกับ Objective 1/2 — ควรเช็คโควตาก่อนวันทดสอบ |
 
 **หลักการ:** ห้ามเรียก Gemini ในขั้น preparation (ลำดับ 1–3) ทั้งหมด — สอดคล้องกับ "ห้ามเรียก Gemini จริง" ของรอบเตรียมความพร้อมนี้ด้วย (เอกสารทั้งหมดในรอบนี้จึงหยุดอยู่ที่ลำดับ 1–3 เท่านั้น ยังไม่แตะลำดับ 4 เป็นต้นไป)
 
@@ -60,9 +60,9 @@
 | 3 | Subtitle timing accuracy | เหมือนข้างบน | เหมือนข้างบน | ยังกำหนดไม่ได้ | offset เฉลี่ย/สูงสุดเทียบ reference timing | ยังไม่มี | **NOT READY** |
 | 3 | Editable subtitle flow | 1 คลิปตัวอย่าง | `SubtitleEditScreen.jsx` จริง | 1 รอบ (คนจริง) ขึ้นไป | task success | ยังไม่มี | **NOT READY** |
 | 4.A | Functional (endpoint/UI logic) | 1–2 คลิปตัวอย่าง | FastAPI endpoint จริง | 1–2 | pass/fail, response time | `eval/final-evaluation/objective4/` | **NOT READY (เล็กน้อย — เตรียมเองได้)** |
-| 4.B | Expert evaluation | ผลจาก Objective 1 | rubric (ยังไม่ออกแบบ) | ≥2 ผู้เชี่ยวชาญ | คะแนนตาม rubric | ยังไม่มี | **NOT SET UP** |
-| 4.C | User evaluation | ระบบจริง | questionnaire (ยังไม่ยืนยัน SUS) | ตามที่ออกแบบ | task success/time, satisfaction | ยังไม่มี | **NOT SET UP** |
-| 4.D | Manual vs AI-assisted | คลิปตัวอย่าง | คนตัดเอง vs ใช้ระบบช่วย | ตามที่ออกแบบ | task time, task success | ยังไม่มี | **NOT SET UP** |
+| 4.B | Expert evaluation | ระบบจริง — ผู้เชี่ยวชาญรันเอง (ไฟล์ B1 โหมด "เก็บเนื้อหาครบ", ไฟล์ C โหมด "สรุปให้เข้าใจครบ") | rubric (ยังไม่ออกแบบ) | 3 ผู้เชี่ยวชาญ × 2 คลิป | คะแนนตาม rubric (ค่าเฉลี่ย + ต่ำสุด–สูงสุด) | ยังไม่มี | **NOT SET UP** |
+| 4.C | User evaluation | ระบบจริง | questionnaire (ยังไม่ยืนยัน SUS) | 10 คน (ผู้ใช้ทั่วไป) | task success/time, satisfaction | ยังไม่มี | **NOT SET UP** |
+| 4.D | Manual vs AI-assisted | คลิปตัวอย่าง (A/B ยังไม่ระบุ) | คนตัดเอง vs ใช้ระบบช่วย | เพื่อน 4 คน (2×2) | task time, task success | ยังไม่มี | **NOT SET UP** |
 
 ## Objective Readiness Summary
 
@@ -71,7 +71,7 @@
 | 1 | **เกือบพร้อม (8/9 case)** | ยังไม่มี evidence จริง (เพิ่งเตรียม harness/scoring) ; V03_full มีข้อจำกัด GT โดยดีไซน์ | รัน harness จริงตาม run order ข้อ 9 (ลำดับ 4) |
 | 2 | **โครงสร้างพร้อม** | ยังไม่เคยรันเงื่อนไข A บนชุด V01–V07 เลย ; checklist เชิงคุณภาพต้องตกลงก่อนรัน (ทำแล้วในรอบนี้ — ดู `objective2/PROTOCOL.md`) | รันตาม run order ข้อ 9 (ลำดับ 5) |
 | 3 | **NOT READY** | reference transcript, reference timing, metric ที่ยืนยันจาก Test Plan, วิธีทดสอบ editable-subtitle | ทำ checklist ใน `objective3/PROTOCOL.md` ก่อน |
-| 4 | **A พร้อมเตรียมเอง / B-C-D NOT SET UP** | rubric, questionnaire, ผู้เข้าร่วมจริง | ออกแบบ + จัดหาคนสำหรับ B/C/D ; เตรียม endpoint test สำหรับ A ได้ทันที |
+| 4 | **A พร้อมเตรียมเอง / B-C-D NOT SET UP** | rubric, questionnaire, ผู้เข้าร่วมจริง (B 3 ท่าน · C 10 คน · D 4 คน ไม่ซ้ำคน) | ออกแบบ + จัดหาคนสำหรับ B/C/D ; เตรียม endpoint test สำหรับ A ได้ทันที |
 
 ---
 

@@ -16,7 +16,7 @@
 |---|---|
 | [`RESULTS-TEMPLATE.md`](RESULTS-TEMPLATE.md) | **เอกสารหลัก** — ผลลัพธ์จริงทุก Objective (1/2/3/4) + สรุปรวมสุดท้าย + caveat/limitation ทั้งหมด ใช้เขียนบทที่ 4 ได้ตรงนี้ |
 | [`EXECUTION-PLAN.md`](EXECUTION-PLAN.md) | แผนก่อนเริ่มรันจริง — นิยาม n ที่ต้องการ, กลยุทธ์ประหยัดโควตา, MINIMUM-SUFFICIENT-TESTS |
-| [`REMAINING-TESTS.md`](REMAINING-TESTS.md) | รายการ Objective 3 และ 4B/C/D ที่ยังไม่ได้ทำ — ต้องใช้อะไร/ใครกี่คน/ทำยังไง สำหรับรันตอน deploy จริง |
+| [`REMAINING-TESTS.md`](REMAINING-TESTS.md) | รายการ Objective 3 และ 4B/C/D ที่ยังไม่ได้ทำ — ต้องใช้อะไร/ใครกี่คน/ทำยังไง สำหรับรันตอน deploy จริง **(จำนวนคนของ 4B/C/D ในไฟล์นี้เป็นร่างเก่า ยังไม่ได้อัปเดต — ใช้ `objective4/PARTICIPANT-PLAN.md` แทน)** |
 | [`MASTER-MATRIX.md`](MASTER-MATRIX.md) | ตารางรวม Objective × Condition × สถานะ (ภาพรวมก่อนเริ่มรัน) |
 | [`READINESS.md`](READINESS.md) | เช็กลิสต์ความพร้อมก่อนเริ่ม Final Evaluation |
 
@@ -64,7 +64,7 @@
 |---|---|
 | [`objective4/PROTOCOL.md`](objective4/PROTOCOL.md) | โปรโตคอลรวม 4A/B/C/D |
 | [`objective4/FUNCTIONAL-TEST.md`](objective4/FUNCTIONAL-TEST.md) | เช็กลิสต์ 4A (upload → preview → edit → render → output) |
-| [`objective4/PARTICIPANT-PLAN.md`](objective4/PARTICIPANT-PLAN.md) | แผนจำนวนผู้เข้าร่วม 4B/C/D (ข้อเสนอ ยังไม่ได้จัดหาคนจริง) |
+| [`objective4/PARTICIPANT-PLAN.md`](objective4/PARTICIPANT-PLAN.md) | แผนจำนวนผู้เข้าร่วม 4B/C/D — แผนใหม่ 2026-10-06: ผู้เชี่ยวชาญ 3 ท่าน × 2 คลิป · ผู้ใช้ทั่วไป 10 คน · เพื่อน 4D 4 คน (2×2) · ไม่ซ้ำคนระหว่างกลุ่ม (รวม 17 คน) — รายละเอียดใน `objective4/PARTICIPANT-PLAN.md` (ยังไม่ได้จัดหาคนจริง) |
 | [`objective4/functional/job-5ab40c1a/INVESTIGATION-NOTES.md`](objective4/functional/job-5ab40c1a/INVESTIGATION-NOTES.md) | **การสืบสาเหตุ job ที่ล้มครั้งที่ 2** — ไฟล์เสียง/VAD ไม่ใช่ปัญหา ; ข้อสรุป "transcript-cache bug" เดิมถูกถอนแล้ว 2026-09-24 (ดูหัวข้อแก้ไขบนสุดของไฟล์) สาเหตุจริง: worker รัน image เก่าก่อนแก้ VAD-prefilter (ยืนยันแล้ว) |
 | [`objective4/functional/run2-post-rebuild/checklist_result.md`](objective4/functional/run2-post-rebuild/checklist_result.md) | **4A รอบใหม่หลัง rebuild (ใช้ผลนี้)** — checklist ตามข้อ + หลักฐาน (upload/preview/subtitle/render responses, process_log, ffprobe, `burn/frame_t3s.jpg`) ; ไม่มี token ในไฟล์ |
 | [`objective4/UI-MANUAL-CHECKLIST.md`](objective4/UI-MANUAL-CHECKLIST.md) | checklist 33 ข้อสำหรับทดสอบหน้าเว็บด้วยมือ (ส่วน UI ของ 4A ที่ API ยืนยันไม่ได้) — ผลอยู่ในแถวถัดไป |
