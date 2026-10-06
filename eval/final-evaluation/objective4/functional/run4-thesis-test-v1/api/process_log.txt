@@ -1,0 +1,92 @@
+worker-1  | [2026-10-06 12:09:15,240: INFO/MainProcess] Task tasks.process_video_task[22bc1a90-1798-4a9d-ab24-5fb972cd4ba9] received
+worker-1  | [2026-10-06 12:09:15,247: WARNING/MainProcess] 🎬 Extracting audio (with loudness norm): storage/22bc1a90-1798-4a9d-ab24-5fb972cd4ba9/V04___________________________________.mp4 -> storage/22bc1a90-1798-4a9d-ab24-5fb972cd4ba9/full_audio.wav
+worker-1  | ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021 the FFmpeg developers
+worker-1  |   built with gcc 11 (Ubuntu 11.2.0-19ubuntu1)
+worker-1  |   configuration: --prefix=/usr --extra-version=0ubuntu0.22.04.1 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --enable-gnutls --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libgsm --enable-libjack --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librabbitmq --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libsrt --enable-libssh --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-libzmq --enable-libzvbi --enable-lv2 --enable-omx --enable-openal --enable-opencl --enable-opengl --enable-sdl2 --enable-pocketsphinx --enable-librsvg --enable-libmfx --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-libx264 --enable-shared
+worker-1  |   libavutil      56. 70.100 / 56. 70.100
+worker-1  |   libavcodec     58.134.100 / 58.134.100
+worker-1  |   libavformat    58. 76.100 / 58. 76.100
+worker-1  |   libavdevice    58. 13.100 / 58. 13.100
+worker-1  |   libavfilter     7.110.100 /  7.110.100
+worker-1  |   libswscale      5.  9.100 /  5.  9.100
+worker-1  |   libswresample   3.  9.100 /  3.  9.100
+worker-1  |   libpostproc    55.  9.100 / 55.  9.100
+worker-1  | Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'storage/22bc1a90-1798-4a9d-ab24-5fb972cd4ba9/V04___________________________________.mp4':
+worker-1  |   Metadata:
+worker-1  |     minor_version   : 512
+worker-1  |     major_brand     : isom
+worker-1  |     compatible_brands: isomiso6iso2avc1mp41
+worker-1  |     Hw              : 1
+worker-1  |     LvMetaInfo      : {"data":{"appVersion":"15.4.0","ch1":"SEO","ch2":"google","editType":"edit","exportType":"export","original_edittype":"edit","os":"web","product":"vicutweb","videoId":"vspCQZIbJjtVmX24qm9dom4yszZ6eU1qk56pQlI"},"source_type":"vicutweb"}
+worker-1  |     bitrate         : 0
+worker-1  |     maxrate         : 0
+worker-1  |     te_is_reencode  : 1
+worker-1  |     encoder         : Lavf58.45.100
+worker-1  |   Duration: 00:02:24.41, start: 0.000000, bitrate: 3415 kb/s
+worker-1  |   Stream #0:0(und): Video: h264 (Main) (avc1 / 0x31637661), yuv420p(tv, bt709), 1280x720 [SAR 1:1 DAR 16:9], 3280 kb/s, 29.99 fps, 30 tbr, 1000k tbn, 60 tbc (default)
+worker-1  |     Metadata:
+worker-1  |       handler_name    : VideoHandler
+worker-1  |       vendor_id       : [0][0][0][0]
+worker-1  |   Stream #0:1(und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, stereo, fltp, 127 kb/s (default)
+worker-1  |     Metadata:
+worker-1  |       handler_name    : SoundHandler
+worker-1  |       vendor_id       : [0][0][0][0]
+worker-1  | Stream mapping:
+worker-1  |   Stream #0:1 -> #0:0 (aac (native) -> pcm_s16le (native))
+worker-1  | Press [q] to stop, [?] for help
+worker-1  | Output #0, wav, to 'storage/22bc1a90-1798-4a9d-ab24-5fb972cd4ba9/full_audio.wav':
+worker-1  |   Metadata:
+worker-1  |     minor_version   : 512
+worker-1  |     major_brand     : isom
+worker-1  |     compatible_brands: isomiso6iso2avc1mp41
+worker-1  |     Hw              : 1
+worker-1  |     LvMetaInfo      : {"data":{"appVersion":"15.4.0","ch1":"SEO","ch2":"google","editType":"edit","exportType":"export","original_edittype":"edit","os":"web","product":"vicutweb","videoId":"vspCQZIbJjtVmX24qm9dom4yszZ6eU1qk56pQlI"},"source_type":"vicutweb"}
+worker-1  |     bitrate         : 0
+worker-1  |     maxrate         : 0
+worker-1  |     te_is_reencode  : 1
+worker-1  |     ISFT            : Lavf58.76.100
+worker-1  |   Stream #0:0(und): Audio: pcm_s16le ([1][0][0][0] / 0x0001), 16000 Hz, mono, s16, 256 kb/s (default)
+worker-1  |     Metadata:
+worker-1  |       handler_name    : SoundHandler
+worker-1  |       vendor_id       : [0][0][0][0]
+worker-1  |       encoder         : Lavc58.134.100 pcm_s16le
+worker-1  | size=       0kB time=00:00:00.00 bitrate=N/A speed=   0x    size=     256kB time=00:00:11.69 bitrate= 179.3kbits/s speed=23.3x    size=     768kB time=00:00:27.29 bitrate= 230.5kbits/s speed=27.2x    size=    1280kB time=00:00:41.89 bitrate= 250.3kbits/s speed=27.9x    size=    1792kB time=00:00:57.49 bitrate= 255.3kbits/s speed=28.7x    size=    2304kB time=00:01:13.99 bitrate= 255.1kbits/s speed=29.5x    size=    2816kB time=00:01:30.39 bitrate= 255.2kbits/s speed=  30x    size=    3328kB time=00:01:46.59 bitrate= 255.8kbits/s speed=30.4x    size=    3584kB time=00:02:02.69 bitrate= 239.3kbits/s speed=30.6x    size=    4096kB time=00:02:18.09 bitrate= 243.0kbits/s speed=30.6x    size=    4511kB time=00:02:24.34 bitrate= 256.0kbits/s speed=30.9x    
+worker-1  | video:0kB audio:4511kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 0.001689%
+worker-1  | [2026-10-06 12:09:20,010: WARNING/MainProcess] [VAD] Audio loaded: storage/22bc1a90-1798-4a9d-ab24-5fb972cd4ba9/full_audio.wav
+worker-1  | [2026-10-06 12:09:20,010: WARNING/MainProcess] [VAD] Duration: 144.3s
+worker-1  | [2026-10-06 12:09:20,761: WARNING/MainProcess] [VAD] Found 27 raw → 4 merged voice segments
+worker-1  | [2026-10-06 12:09:20,761: WARNING/MainProcess] [VAD] Speech: 132.7s | Silence gaps to cut: 9.6s
+worker-1  | [2026-10-06 12:09:24,178: WARNING/MainProcess] 🎞️ [Visual] ฉากเปลี่ยน 0 จุด · เฟรมดำ 0 ช่วง · ภาพค้าง 0 ช่วง (3.4s)
+worker-1  | [2026-10-06 12:09:24,197: WARNING/MainProcess] ⚡ [Cache HIT] transcript loaded for hash=d51cb4d23c37d55e (9 segments)
+worker-1  | [2026-10-06 12:09:24,197: WARNING/MainProcess] Total duration: 143.2s (2.4 min)
+worker-1  | [2026-10-06 12:09:24,197: WARNING/MainProcess] [VAD Pre-filter] original segments = 9 | kept = 9 | removed = 0 | min speech overlap = 20%
+worker-1  | [2026-10-06 12:09:24,197: WARNING/MainProcess]   segment 2 61.9-91.0 speech overlap = 82% KEEP
+worker-1  | [2026-10-06 12:09:24,197: WARNING/MainProcess] [Transcript] 9 segments, 1,819 chars → Gemini
+worker-1  | [2026-10-06 12:09:24,198: WARNING/MainProcess] [Silence Gap] detected = 2 (between-segments 1, VAD 1) | usable = 2
+worker-1  | [2026-10-06 12:09:24,198: WARNING/MainProcess]   segment=between/edge gap 58.7-61.9 duration=3.2 action=KEEP_AS_HINT
+worker-1  | [2026-10-06 12:09:24,198: WARNING/MainProcess]   segment=2 (61.9-91.0) internal gap 71.1-75.7 duration=4.6 action=KEEP_AS_HINT
+worker-1  | [2026-10-06 12:09:24,778: WARNING/MainProcess] 🖼️ [Keyframe] ดึงภาพ 8/8 ภาพ (59 KB)
+worker-1  | [2026-10-06 12:09:24,778: WARNING/MainProcess] ⚡ [Pipeline] Running AI Correction + Deletion in parallel...
+worker-1  | [2026-10-06 12:09:24,779: WARNING/MainProcess] ⚡ [AI-Correct] Skipped — no Latin chars (ไม่มีอะไรต้องแก้/แปล)
+worker-1  | [2026-10-06 12:09:24,779: WARNING/MainProcess] Sending filtered transcript to Gemini (Deletion mode) + 8 ภาพ...
+worker-1  | [2026-10-06 12:09:24,780: WARNING/MainProcess] 🔑 [key#1/4] Trying with API key …SL8zw
+worker-1  | [2026-10-06 12:09:24,780: WARNING/MainProcess] 🚀 [key#1/4] Trying gemini-2.5-flash (Attempt 1/2)...
+worker-1  | [2026-10-06 12:09:24,780: INFO/MainProcess] AFC is enabled with max remote calls: 10.
+worker-1  | [2026-10-06 12:10:22,333: INFO/MainProcess] HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+worker-1  | [2026-10-06 12:10:22,334: WARNING/MainProcess] ✅ [key#1/4] Gemini ตอบสำเร็จด้วย gemini-2.5-flash
+worker-1  | [2026-10-06 12:10:22,335: WARNING/MainProcess] ✅ Corrected text applied to 9 segments
+worker-1  | [2026-10-06 12:10:22,336: WARNING/MainProcess] 
+worker-1  | 📋 AI Suggested Cuts (2 segments to delete):
+worker-1  | [2026-10-06 12:10:22,336: WARNING/MainProcess]   🔴 [high] 51.0s → 56.0s (5.0s) — Self-correction phrase 'เดี๋ยวก่อนนะครับผมขอแก้คำตอดนิดหนึ่งครับ' ที่ผู้พูดใช้เพื่อแก้ไขคำตอบ
+worker-1  | [2026-10-06 12:10:22,336: WARNING/MainProcess]   🔴 [high] 69.8s → 75.72s (5.9s) — เทคซ้ำ: ผู้พูดพูดประโยค 'ถ้าเราซื้อที่ 100 บาทและราคาเปลี่ยนเป็น 120 บาท' ซ้ำสองครั้งติดกัน และมีช่วงเงียบสลับอยู่ระหว่างสองเทค จึงตัดเทคแรกและช่วงเงียบออกเพื่อคงเทคที่สองที่สมบูรณ์กว่าไว้
+worker-1  | [2026-10-06 12:10:22,336: WARNING/MainProcess]   Total to cut: 10.9s (0.2 min)
+worker-1  | [2026-10-06 12:10:22,336: WARNING/MainProcess]   Will keep: 132.3s (2.2 min)
+worker-1  | [2026-10-06 12:10:22,336: WARNING/MainProcess] ✅ [Outro] คลิปจบถึงท้ายคำพูดแล้ว (143.2s / 143.2s)
+worker-1  | [2026-10-06 12:10:22,336: WARNING/MainProcess] ✂️ [Snap] ขยับขอบให้จบประโยคเต็ม 1 ช่วง (กันตัดกลางคำ)
+worker-1  | [2026-10-06 12:10:22,340: WARNING/MainProcess] ✅ Final keep segments (2 total):
+worker-1  | [2026-10-06 12:10:22,340: WARNING/MainProcess]   0.0s → 69.91s  (69.9s)  จบที่: …าคุณขึ้นแล้วลงละครับก็มีหลายปัดใ
+worker-1  | [2026-10-06 12:10:22,340: WARNING/MainProcess]   75.72s → 143.24s  (67.5s)  จบที่: … ขอจบการสัมพัติเถอะนี้ขอบคุณครับ
+worker-1  | [2026-10-06 12:10:22,340: WARNING/MainProcess] 
+worker-1  | 📊 Edit Summary (standard): 2 segments, 137.4s
+worker-1  | [2026-10-06 12:10:22,348: WARNING/MainProcess] 📝 Pre-generated 64 subtitle phrases
+worker-1  | [2026-10-06 12:10:22,364: INFO/MainProcess] Task tasks.process_video_task[22bc1a90-1798-4a9d-ab24-5fb972cd4ba9] succeeded in 67.30410004300029s: {'status': 'SUCCESS', 'progress': 100, 'mode': 'preview', 'message': 'วิเคราะห์เสร็จ — กรุณา review', 'segments': [{'start': 0.0, 'end': 69.91, 'text': 'V04 คิดวิโลทศอบ ผู้สำพาด ผู้สำหรับถ้าให้คุณอาทิบายคำว่า หุ่น แบบง่ายง่าย คุณอาทิบายว่ายังไงครับหุ่นก็คือ อ่า...เป็นส่วนหนึ่งของบริสัตว์ครับ หมายความว่ายังไงครับคือ ถ้าเราเข้าไปซื้อหุ่นของบริสัตว์เราก็...'}, {'start': 75.72, 'end': 143.24, 'text': 'ลือกำลายจากราคาที่เพิ่มขึ้นครับเพราะราคาสามารถเปลี่ยนแปลงได้ตลอดเวลาครับถ้าเราซื้อที่ 100 บาทและราคาเปลี่ยนเป็น 120 บาทถ้าเราซื้อคือ 100 บาทและราคาขึ้นไปเป็น 120 บาทจังนั้นเราขายที่ 120 บาทแบบนั้นถึงจ...'}], 'edit_summary': {'segments_kept': 2, 'duration_kept_seconds': 137.4}}

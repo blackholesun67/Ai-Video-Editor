@@ -1,0 +1,6 @@
+total 64856
+drwxr-xr-x 1 Chirat 197121        0 Oct  6 19:10 ./
+drwxr-xr-x 1 Chirat 197121        0 Oct  6 19:09 ../
+-rw-r--r-- 1 Chirat 197121 61647288 Oct  6 19:09 V04___________________________________.mp4
+-rw-r--r-- 1 Chirat 197121  4619182 Oct  6 19:09 full_audio.wav
+-rw-r--r-- 1 Chirat 197121   130054 Oct  6 19:10 preview.json

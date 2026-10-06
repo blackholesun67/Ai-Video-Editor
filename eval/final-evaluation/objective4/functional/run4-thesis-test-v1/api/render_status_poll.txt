@@ -1,0 +1,5 @@
+{"status":"กำลัง render วิดีโอ...","progress":50,"result":null}
+{"status":"กำลัง render วิดีโอ...","progress":50,"result":null}
+{"status":"กำลัง render วิดีโอ...","progress":50,"result":null}
+{"status":"กำลัง render วิดีโอ...","progress":50,"result":null}
+{"status":"SUCCESS","progress":100,"result":{"status":"SUCCESS","progress":100,"mode":"final","output_url":"22bc1a90-1798-4a9d-ab24-5fb972cd4ba9/final_summary.mp4","message":"ตัดต่อเสร็จเรียบร้อย!","edit_summary":{"segments_kept":2,"duration_kept_seconds":137.4,"burn_subtitle":true}}}

@@ -1,0 +1,6 @@
+edit_mode=full burn_subtitle=True
+AI เสนอเก็บ 2 ช่วง รวม 137.43 วิ:
+  0.00 – 69.91
+  75.72 – 143.24
+ช่วงทับกัน: ไม่มี
+transcript ท่อน: 9
