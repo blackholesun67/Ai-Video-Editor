@@ -233,6 +233,9 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
               {isDragOver ? 'ปล่อยไฟล์ที่นี่' : 'คลิกหรือลากไฟล์วิดีโอมาวาง'}
             </p>
             <p className="text-xs text-slate-400 mt-1">MP4, MOV, MKV, AVI, WebM · สูงสุด 2GB</p>
+            {/* ลิงก์เว็บสาธารณะผ่าน Cloudflare Tunnel (ดู frontend/nginx.conf) — Cloudflare จำกัดขนาด
+                request ที่ ~100MB ก่อนถึงเซิร์ฟเวอร์ของเรา (แก้ในโค้ดไม่ได้) จึงบอกผู้ใช้ไว้ล่วงหน้า */}
+            <p className="text-xs text-amber-700 mt-1">เมื่อใช้ผ่านลิงก์เว็บ ไฟล์ต้องไม่เกิน 100MB</p>
           </label>
         ) : (
           <div className="space-y-3">
@@ -251,6 +254,11 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
               <span className="font-medium truncate flex-1">{file.name}</span>
               <span className="text-slate-400 flex-shrink-0">{sizeMB} MB</span>
             </div>
+            {file.size > 100 * 1024 * 1024 && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                ไฟล์นี้เกิน 100MB — ถ้าใช้ผ่านลิงก์เว็บจะอัปโหลดไม่สำเร็จ กรุณาตัดคลิปให้สั้นลงหรือลดขนาดไฟล์ก่อน
+              </p>
+            )}
           </div>
         )}
       </div>
