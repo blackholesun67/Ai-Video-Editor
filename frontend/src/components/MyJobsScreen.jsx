@@ -10,7 +10,7 @@ const STATUS_META = {
   done:       { label: 'เสร็จแล้ว',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   failed:     { label: 'ล้มเหลว',        cls: 'bg-red-50 text-red-700 border-red-200' },
   cancelled:  { label: 'ยกเลิก',         cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-  // งานที่หมดอายุ (ครบ 7 วัน) ถูกลบทั้ง row ออกจาก DB แล้ว → ไม่มี status นี้อีก
+  // งานที่หมดอายุ (ครบ JOB_RETENTION_DAYS วัน — ตั้งไว้ 30 ใน backend/.env) ถูกลบทั้ง row ออกจาก DB แล้ว → ไม่มี status นี้อีก
 };
 
 function fmtDate(iso) {
@@ -83,7 +83,7 @@ export default function MyJobsScreen({ onClose, onOpen }) {
 
       <div>
         <h2 className="text-2xl font-semibold text-slate-900">งานของฉัน</h2>
-        <p className="text-sm text-slate-400 mt-0.5">ไฟล์ผลลัพธ์เก็บไว้ 7 วัน กรุณาดาวน์โหลดเก็บไว้</p>
+        <p className="text-sm text-slate-400 mt-0.5">ไฟล์ผลลัพธ์เก็บไว้ 30 วัน กรุณาดาวน์โหลดเก็บไว้</p>
       </div>
 
       {jobs === null && (
