@@ -37,11 +37,13 @@ celery_app.conf.update(
     result_serializer='json',
     accept_content=['json'],
     # ── Periodic cleanup (รันด้วย celery beat ที่ฝังใน worker ด้วย --beat) ──
-    # ลบ job เก่าทุกวันตี 3 — ไม่ให้ดิสก์เต็ม (เดิม cleanup รันแค่ตอน API startup)
+    # ลบ job เก่าทุกวันตี 3 เวลาไทย — ไม่ให้ดิสก์เต็ม (เดิม cleanup รันแค่ตอน API startup)
+    # Celery ไม่ได้ตั้ง timezone → crontab ใช้ UTC (ค่าเริ่มต้น) ; 20:00 UTC = 03:00 Asia/Bangkok
+    # (ไทยไม่มีเวลาออมแสง) — เดิมตั้ง hour=3 ทำให้รันจริงตอน 10:00 น. เวลาไทย
     beat_schedule={
         "cleanup-old-jobs-daily": {
             "task": "tasks.cleanup_task",
-            "schedule": crontab(hour=3, minute=0),
+            "schedule": crontab(hour=20, minute=0),
         },
     },
 )
