@@ -77,22 +77,39 @@ JOB_RETENTION_DAYS = int(os.getenv("JOB_RETENTION_DAYS", "7"))
 STALE_MARKER_SECONDS = 6 * 3600        # 6 ชม. (นานกว่างานที่ยาวที่สุดมาก)
 
 
+MSG_NO_KEEP = "AI ไม่สามารถระบุช่วงที่ควรเก็บได้ — กรุณาลองใหม่"
+MSG_AI_QUOTA = "ระบบ AI ไม่พร้อมให้บริการขณะนี้ (มีผู้ใช้งานมาก) กรุณาลองใหม่อีกครั้งในอีกสักครู่"
+MSG_AI_BUSY = "ระบบ AI ไม่ว่างชั่วคราว กรุณาลองใหม่อีกครั้ง"
+MSG_BAD_FILE = "ไฟล์วิดีโอเปิดไม่ได้หรือเสียหาย กรุณาตรวจไฟล์แล้วลองใหม่"
+MSG_GENERIC = "ประมวลผลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หากเกิดซ้ำ ติดต่อผู้ดูแลระบบ"
+_FRIENDLY_MESSAGES = {MSG_NO_KEEP, MSG_AI_QUOTA, MSG_AI_BUSY, MSG_BAD_FILE, MSG_GENERIC}
+
+
 def _friendly_error(detail: str) -> str:
     """แปล exception ดิบ (อาจมี API key/.env/JSON ดิบจาก Gemini) เป็นข้อความไทยทั่วไป
     ให้ผู้ใช้เห็น — รายละเอียดจริงถูก print() ไว้ก่อนเรียกฟังก์ชันนี้แล้ว (เก็บในล็อกฝั่ง
     server/Sentry เท่านั้น) ไม่ส่งต่อให้ frontend ไม่ว่ากรณีใด
+
+    เรียกซ้ำได้ (idempotent): ข้อความที่แปลแล้วคืนตามเดิม — /status ใน main.py แปลงซ้ำอีกชั้น
     """
+    detail = (detail or "").strip()
+    if detail in _FRIENDLY_MESSAGES:
+        return detail
     # ข้อความที่ tasks.py เขียนเองเป็นภาษาไทยที่ผู้ใช้เข้าใจอยู่แล้ว → ส่งต่อตามเดิม
     if "AI ไม่สามารถระบุช่วงที่ควรเก็บได้" in detail and "key" not in detail.lower():
-        return "AI ไม่สามารถระบุช่วงที่ควรเก็บได้ — กรุณาลองใหม่"
+        return MSG_NO_KEEP
     low = detail.lower()
     if "quota" in low or "resource_exhausted" in low or "429" in detail:
-        return "ระบบ AI ไม่พร้อมให้บริการขณะนี้ (มีผู้ใช้งานมาก) กรุณาลองใหม่อีกครั้งในอีกสักครู่"
+        return MSG_AI_QUOTA
     if "503" in detail or "unavailable" in low or "overloaded" in low:
-        return "ระบบ AI ไม่ว่างชั่วคราว กรุณาลองใหม่อีกครั้ง"
-    if "ffmpeg" in low or "moov atom" in low or "invalid data found" in low:
-        return "ไฟล์วิดีโอเปิดไม่ได้หรือเสียหาย กรุณาตรวจไฟล์แล้วลองใหม่"
-    return "ประมวลผลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หากเกิดซ้ำ ติดต่อผู้ดูแลระบบ"
+        return MSG_AI_BUSY
+    # ไฟล์ต้นฉบับเปิดไม่ได้ — ffmpeg ล้มตอนแยกเสียง (extract_clean_audio เขียน full_audio.wav)
+    # ข้อความดิบจริงเป็นแค่ CalledProcessError "Command '['ffmpeg', ... 'full_audio.wav']'
+    # returned non-zero exit status 1." (moov atom/Invalid data อยู่ใน stderr ของ ffmpeg ไม่อยู่ใน
+    # exception) — ffmpeg ที่ล้มตอน render ไม่เข้าข้อนี้ เพราะต้นฉบับเปิดได้แล้วในขั้นแยกเสียง
+    if ("ffmpeg" in low and "full_audio.wav" in low) or "moov atom" in low or "invalid data found" in low:
+        return MSG_BAD_FILE
+    return MSG_GENERIC
 
 
 def _mark_processing(job_dir: str) -> None:
@@ -455,9 +472,13 @@ def process_video_task(self, job_id, video_path, user_prompt,
 
         print(f"[FAILURE] {error_msg}")   # รายละเอียดจริงอยู่ในล็อกฝั่ง server เท่านั้น
         set_job_status(job_id, "failed")
+        # สถานะ FAILURE: Celery ไม่ส่ง meta นี้ให้ตรง ๆ แต่สร้าง exception ใหม่จาก exc_type +
+        # exc_message (backends/base.py exception_to_python) → ข้อความที่ผู้ใช้เห็นต้องอยู่ใน
+        # exc_message ด้วย ไม่งั้นได้ exception ข้อความว่าง ; ห้ามใส่ error_msg ดิบตรงนี้
+        user_msg = _friendly_error(error_msg)
         self.update_state(state='FAILURE', meta={
-            'status': _friendly_error(error_msg), 'progress': 0,
-            'exc_type': type(e).__name__,
+            'status': user_msg, 'progress': 0,
+            'exc_type': type(e).__name__, 'exc_message': user_msg,
         })
         raise Ignore()
 
@@ -566,9 +587,13 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
         error_msg = str(e)
         print(f"[RENDER FAILURE] {error_msg}")   # รายละเอียดจริงอยู่ในล็อกฝั่ง server เท่านั้น
         set_job_status(job_id, "failed")
+        # สถานะ FAILURE: Celery ไม่ส่ง meta นี้ให้ตรง ๆ แต่สร้าง exception ใหม่จาก exc_type +
+        # exc_message (backends/base.py exception_to_python) → ข้อความที่ผู้ใช้เห็นต้องอยู่ใน
+        # exc_message ด้วย ไม่งั้นได้ exception ข้อความว่าง ; ห้ามใส่ error_msg ดิบตรงนี้
+        user_msg = _friendly_error(error_msg)
         self.update_state(state='FAILURE', meta={
-            'status': _friendly_error(error_msg), 'progress': 0,
-            'exc_type': type(e).__name__,
+            'status': user_msg, 'progress': 0,
+            'exc_type': type(e).__name__, 'exc_message': user_msg,
         })
         raise Ignore()
 
