@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ArrowLeft, Download, Loader2, FileVideo, RefreshCw, Play } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, FileVideo, RefreshCw, Play, ExternalLink } from 'lucide-react';
 import { API_URL, fetchMediaToken } from '../config';
 
 // ป้ายสถานะ (ตรงกับค่าที่ worker เขียนลง DB) → ข้อความไทย + สี
@@ -26,9 +26,12 @@ function fmtDate(iso) {
 /**
  * หน้า "งานของฉัน" — gallery การ์ดวิดีโอ (GET /jobs)
  * งาน done → มีภาพปก (thumbnail.jpg ผ่าน media token) + ดาวน์โหลดได้
+ * งาน ready (รอเลือกช่วง — ยังไม่เคย render) → เปิดต่อได้ (onOpen) กลับไปหน้าเลือกช่วง
+ * งาน failed/cancelled/processing → ไม่มีปุ่มเปิดต่อ (processing ยังไม่มี task_id ของ Celery เก็บไว้ที่นี่
+ *   ให้ติดตามผ่านหน้า Processing ของเซสชันที่อัปโหลดเองเท่านั้น)
  * งานอื่น/หมดอายุ → placeholder + ปิดปุ่มดาวน์โหลด
  */
-export default function MyJobsScreen({ onClose }) {
+export default function MyJobsScreen({ onClose, onOpen }) {
   const [jobs, setJobs] = useState(null);   // null = ยังไม่โหลด
   const [error, setError] = useState('');
   const [tokens, setTokens] = useState({}); // jobId → media token (สำหรับ thumbnail/download)
@@ -105,6 +108,7 @@ export default function MyJobsScreen({ onClose }) {
           {jobs.map((job) => {
             const meta = STATUS_META[job.status] || { label: job.status, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
             const isDone = job.status === 'done';
+            const isReady = job.status === 'ready';
             const thumbUrl = isDone && tokens[job.id]
               ? `${API_URL}/media/${job.id}/thumbnail.jpg?token=${tokens[job.id]}`
               : null;
@@ -138,18 +142,29 @@ export default function MyJobsScreen({ onClose }) {
                   </p>
                   <div className="flex items-center justify-between mt-1.5">
                     <span className="text-xs text-slate-400">{fmtDate(job.created_at)}</span>
-                    {isDone && (
-                      <button
-                        onClick={() => download(job.id)}
-                        disabled={downloading === job.id}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg disabled:opacity-50"
-                      >
-                        {downloading === job.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <Download className="h-3.5 w-3.5" />}
-                        ดาวน์โหลด
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {isReady && onOpen && (
+                        <button
+                          onClick={() => onOpen(job.id)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          เปิดต่อ
+                        </button>
+                      )}
+                      {isDone && (
+                        <button
+                          onClick={() => download(job.id)}
+                          disabled={downloading === job.id}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg disabled:opacity-50"
+                        >
+                          {downloading === job.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Download className="h-3.5 w-3.5" />}
+                          ดาวน์โหลด
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

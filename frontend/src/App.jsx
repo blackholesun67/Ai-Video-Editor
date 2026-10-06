@@ -173,6 +173,20 @@ function App() {
     if (loginResolveRef.current) { loginResolveRef.current(false); loginResolveRef.current = null; }
   };
 
+  // จากหน้า "งานของฉัน" — เปิดงานสถานะ "ready" (รอเลือกช่วง ยังไม่เคย render) ต่อ
+  // ล้าง state ของงานก่อนหน้าทั้งหมดก่อนสวม jobId ใหม่ กัน state ปนกันข้ามงาน
+  // (ปลอดภัยเพราะ GET /preview อ่านจาก preview.json ตรง ๆ ไม่เช็กสถานะงาน — main.py)
+  const handleOpenJob = (id) => {
+    setRenderTaskId(null);
+    setSelectedSegs(null);
+    setEditSummary(null);
+    setReediting(false);
+    setVideoUrl(null);
+    setJobId(id);
+    setPhase('preview');
+    setShowJobs(false);
+  };
+
   // กด "งานของฉัน" — ต้อง login ก่อน ไม่งั้นเปิด modal
   const openMyJobs = async () => {
     if (!token) {
@@ -292,7 +306,7 @@ function App() {
       {/* ── Main ───────────────────────────────────────── */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 sm:py-12">
         {showJobs && token ? (
-          <MyJobsScreen onClose={() => setShowJobs(false)} />
+          <MyJobsScreen onClose={() => setShowJobs(false)} onOpen={handleOpenJob} />
         ) : (
          <>
         {/* landing (upload) — เห็นได้แม้ยังไม่ login · component เดียวคงอยู่ตลอดตอน gate login
