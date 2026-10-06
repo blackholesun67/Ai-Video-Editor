@@ -95,7 +95,8 @@ final = _finish_last_sentence(...)      # ประโยคสุดท้า�
 - `MIN_CUT_GAP` ต้องเท่ากับ `MIN_ROW_LEN` ไม่งั้น `buildRows` สร้างแถวที่สั้นกว่าที่ `nudge` ยอมให้มี
 - `nudge` ต้อง **snap ก่อน clamp** ไม่ใช่ clamp แล้วค่อย snap (ไม่งั้นค่าหลุดเข้าเขตต้องห้าม ~0.03s)
 - `splitAt` ห้ามเปลี่ยนผลลัพธ์ที่ render — ครึ่งซ้าย/ขวาสืบ `on` จากพ่อ แล้ว `toRenderSegments`
-  merge กลับเป็น payload เดิมเป๊ะ **มีเทสต์ข้อนี้อยู่ ห้ามให้ตก**
+  merge กลับเป็น payload เดิมเป๊ะ — **ยังไม่มีไฟล์เทสต์อัตโนมัติคุมข้อนี้ใน repo** (ตรวจ 2026-10-06:
+  ไม่พบ `*.test.*`/`__tests__` และไม่เคยมีในประวัติ git) ต้องตรวจด้วยการอ่านโค้ด/ลองในเบราว์เซอร์ทุกครั้งที่แตะ
 - `applyMerge` เป็นตัวกลับของ `applySplit` — รวมได้เฉพาะแถว `kind` เดียวกัน เพราะ `kind`
   คุมทั้งตัวกรองและการคิด `dirty` ; `on = a.on || b.on` โดยตั้งใจ (ถ้าครึ่งหนึ่งถูกเก็บไว้
   การรวมต้องไม่ทำให้เนื้อหานั้นหายเงียบ ๆ) และตั้ง `split=true` เสมอเพื่อให้ `dirty` มองเห็น
@@ -403,8 +404,10 @@ log `🔁 [Retake] คู่ที่ซ้ำ ... «ข้อความที
 # ใช้ Gemini API จริงและ render จริง ช้าและเปลืองโควตา ไม่เหมาะกับการรันบ่อย
 docker compose exec worker python test_core.py
 
-# frontend — ตรรกะไทม์ไลน์เป็น pure function ทั้งหมด เทสต์ด้วย node ตรง ๆ ได้
-npx esbuild src/components/<file>.jsx --loader:.jsx=jsx --bundle --outfile=/dev/null
+# frontend — ยังไม่มีชุดเทสต์อัตโนมัติ (ไม่มี *.test.* ใน repo) ; ตรรกะไทม์ไลน์เป็น pure function
+# จึง "เขียนเทสต์ด้วย node ได้" แต่ยังไม่มีใครเขียน — ที่ทำได้ตอนนี้คือตรวจ syntax/JSX อย่างเดียว:
+npx esbuild src/components/<file>.jsx --loader:.jsx=jsx --jsx=automatic --outfile=/tmp/x.js
+#   (ไม่ใส่ --bundle เพราะไม่มี node_modules บนเครื่อง — frontend build ใน Docker)
 
 # ตั้ง threshold ใหม่ → วัดกับข้อมูลจริงก่อนเสมอ
 #   backend/storage/*/preview.json มี transcript จริงหลายพัน segment
@@ -421,5 +424,6 @@ npx esbuild src/components/<file>.jsx --loader:.jsx=jsx --bundle --outfile=/dev/
 
 - อัปเดตไฟล์นี้ถ้าเพิ่ม invariant ใหม่ หรือเจอกับดักใหม่
 - แตะ `backend/core/ai_logic.py` แล้วเช็กว่า guard ทั้ง 4 ชั้นยังเรียงถูก
-- แตะ `useTimelineRows.js` แล้วเช็กว่ากฎการปูเต็มไทม์ไลน์ยังจริง และเทสต์ split ยังผ่าน
+- แตะ `useTimelineRows.js` แล้วเช็กว่ากฎการปูเต็มไทม์ไลน์ยังจริง และ split/merge ยังไม่เปลี่ยนผล render
+  (ตรวจด้วยมือ — ยังไม่มีเทสต์อัตโนมัติ ดูหัวข้อ 2.4)
 - แตะอะไรก็ตามที่กระทบ transcript → bump cache key
