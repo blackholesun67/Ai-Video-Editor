@@ -71,3 +71,6 @@ backend/transcript_cache/
 
 # ─── Debug / Dev-only scripts ───────────────────────────────────────────────
 backend/check_models.py
+
+# ─── Saved worker logs (contain API key suffixes) ───────────────────────────
+eval/worker_logs/
