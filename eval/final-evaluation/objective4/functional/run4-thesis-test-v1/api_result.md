@@ -1,6 +1,10 @@
 # 4A API — ผลรอบ thesis-test-v1
 
-- โค้ด: `4774fde` (tag `thesis-test-v1`) · image rebuild เมื่อ: ___ (ผู้ทดสอบยังไม่ได้จด)
+- โค้ด: `4774fde` (tag `thesis-test-v1`) · เวลา commit `2026-10-06 16:30:54 +0700` (`git log -1 --format=%ci 4774fde`)
+- เวลา rebuild image: frontend `2026-10-06 16:32:58 +0700` · backend และ worker `2026-10-06 16:32:57 +0700`
+  (ผู้ทดสอบจด จาก `docker ps --format "{{.Names}}  {{.CreatedAt}}"`) → **หลังเวลา commit 2 นาที 3–4 วินาที**
+  ข้อจำกัด: `CreatedAt` ของ `docker ps` คือเวลาสร้าง container ไม่ใช่หลักฐานโดยตรงว่า image build จาก 4774fde
+  แต่ 4774fde เป็น commit สุดท้ายก่อนเวลานั้น และหลังจากนั้นไม่มี commit แก้โค้ดระบบ
 - รันโดยผู้ทดสอบเองตาม `API-COMMANDS.md` ; Claude อ่านไฟล์ใน `api/` แล้วกรอกตารางนี้ (2026-10-06)
 - อัปโหลด 2026-10-06 19:09:14 +0700 (`api/upload_time.txt`) · job `22bc1a90-1798-4a9d-ab24-5fb972cd4ba9` (`api/job.txt`)
 - คลิป V04 · โหมด full · preview_mode=true · burn_subtitle=true · ไม่ได้ส่ง X-API-Key (`API_KEYS` ว่าง ดู README)
