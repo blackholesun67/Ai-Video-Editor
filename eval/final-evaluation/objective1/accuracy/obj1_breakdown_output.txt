@@ -1,0 +1,73 @@
+GT intervals per case:
+  V02_full       46.0-  51.0 SILENCE  len  5.00 allowed=True
+  V02_full       84.0-  90.0 SILENCE  len  6.00 allowed=True
+  V03_full       43.0-  86.0 TANGENT  len 43.00 allowed=False
+  V03_summary    43.0-  86.0 TANGENT  len 43.00 allowed=True
+  V04_full       47.0-  55.0 RETAKE   len  8.00 allowed=True
+  V04_full       67.0-  75.0 RETAKE   len  8.00 allowed=True
+  V04_full      104.0- 109.0 RETAKE   len  5.00 allowed=True
+  V06_full       25.0-  40.0 RETAKE   len 15.00 allowed=True
+  V06_full       52.0- 105.0 TANGENT  len 53.00 allowed=False
+  V06_summary    25.0-  40.0 RETAKE   len 15.00 allowed=True
+  V06_summary    52.0- 105.0 TANGENT  len 53.00 allowed=True
+  V07_full       17.0-  31.0 SILENCE  len 14.00 allowed=True
+  V07_full       38.0-  48.0 SILENCE  len 10.00 allowed=True
+  V07_full       63.0-  82.0 SILENCE  len 19.00 allowed=True
+
+===== ALLOWED (นิยาม recall เดิม) =====
+-- by case
+V02_full                           | instances   8 | GT s   44.00 | hit   22.28 | recall  50.64% | >=half   4/8   | miss total   21.72 = notcut   20.00 + partial   1.72 | of which GT<5s  0.00
+V03_full                           | instances   0 | GT s    0.00 | hit    0.00 | recall    nan% | >=half   0/0   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+V03_summary                        | instances   4 | GT s  172.00 | hit  109.46 | recall  63.64% | >=half   3/4   | miss total   62.54 = notcut   43.00 + partial  19.54 | of which GT<5s  0.00
+V04_full                           | instances  12 | GT s   84.00 | hit   23.06 | recall  27.45% | >=half   4/12  | miss total   60.94 = notcut   52.00 + partial   8.94 | of which GT<5s  0.00
+V06_full                           | instances   4 | GT s   60.00 | hit   39.90 | recall  66.50% | >=half   4/4   | miss total   20.10 = notcut    0.00 + partial  20.10 | of which GT<5s  0.00
+V06_summary                        | instances   8 | GT s  272.00 | hit  167.76 | recall  61.68% | >=half   5/8   | miss total  104.24 = notcut   15.00 + partial  89.24 | of which GT<5s  0.00
+V07_full                           | instances   9 | GT s  129.00 | hit  129.00 | recall 100.00% | >=half   9/9   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+-- by type (6 main cases + V03_full)
+SILENCE                            | instances  17 | GT s  173.00 | hit  151.28 | recall  87.45% | >=half  13/17  | miss total   21.72 = notcut   20.00 + partial   1.72 | of which GT<5s  0.00
+RETAKE                             | instances  20 | GT s  204.00 | hit   94.24 | recall  46.20% | >=half  11/20  | miss total  109.76 = notcut   67.00 + partial  42.76 | of which GT<5s  0.00
+FILLER                             | instances   0 | GT s    0.00 | hit    0.00 | recall    nan% | >=half   0/0   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+TECH                               | instances   0 | GT s    0.00 | hit    0.00 | recall    nan% | >=half   0/0   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+TANGENT                            | instances   8 | GT s  384.00 | hit  245.94 | recall  64.05% | >=half   5/8   | miss total  138.06 = notcut   43.00 + partial  95.06 | of which GT<5s  0.00
+-- by length
+<5s                                | instances   0 | GT s    0.00 | hit    0.00 | recall    nan% | >=half   0/0   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+>=5s                               | instances  45 | GT s  761.00 | hit  491.46 | recall  64.58% | >=half  29/45  | miss total  269.54 = notcut  130.00 + partial 139.54 | of which GT<5s  0.00
+-- total
+ALL rows                           | instances  45 | GT s  761.00 | hit  491.46 | recall  64.58% | >=half  29/45  | miss total  269.54 = notcut  130.00 + partial 139.54 | of which GT<5s  0.00
+
+===== ALL (นับทุกประเภท) =====
+-- by case
+V02_full                           | instances   8 | GT s   44.00 | hit   22.28 | recall  50.64% | >=half   4/8   | miss total   21.72 = notcut   20.00 + partial   1.72 | of which GT<5s  0.00
+V03_full                           | instances   2 | GT s   86.00 | hit    0.00 | recall   0.00% | >=half   0/2   | miss total   86.00 = notcut   86.00 + partial   0.00 | of which GT<5s  0.00
+V03_summary                        | instances   4 | GT s  172.00 | hit  109.46 | recall  63.64% | >=half   3/4   | miss total   62.54 = notcut   43.00 + partial  19.54 | of which GT<5s  0.00
+V04_full                           | instances  12 | GT s   84.00 | hit   23.06 | recall  27.45% | >=half   4/12  | miss total   60.94 = notcut   52.00 + partial   8.94 | of which GT<5s  0.00
+V06_full                           | instances   8 | GT s  272.00 | hit  129.34 | recall  47.55% | >=half   4/8   | miss total  142.66 = notcut    0.00 + partial 142.66 | of which GT<5s  0.00
+V06_summary                        | instances   8 | GT s  272.00 | hit  167.76 | recall  61.68% | >=half   5/8   | miss total  104.24 = notcut   15.00 + partial  89.24 | of which GT<5s  0.00
+V07_full                           | instances   9 | GT s  129.00 | hit  129.00 | recall 100.00% | >=half   9/9   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+-- by type (6 main cases + V03_full)
+SILENCE                            | instances  17 | GT s  173.00 | hit  151.28 | recall  87.45% | >=half  13/17  | miss total   21.72 = notcut   20.00 + partial   1.72 | of which GT<5s  0.00
+RETAKE                             | instances  20 | GT s  204.00 | hit   94.24 | recall  46.20% | >=half  11/20  | miss total  109.76 = notcut   67.00 + partial  42.76 | of which GT<5s  0.00
+FILLER                             | instances   0 | GT s    0.00 | hit    0.00 | recall    nan% | >=half   0/0   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+TECH                               | instances   0 | GT s    0.00 | hit    0.00 | recall    nan% | >=half   0/0   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+TANGENT                            | instances  14 | GT s  682.00 | hit  335.38 | recall  49.18% | >=half   5/14  | miss total  346.62 = notcut  129.00 + partial 217.62 | of which GT<5s  0.00
+-- by length
+<5s                                | instances   0 | GT s    0.00 | hit    0.00 | recall    nan% | >=half   0/0   | miss total    0.00 = notcut    0.00 + partial   0.00 | of which GT<5s  0.00
+>=5s                               | instances  51 | GT s 1059.00 | hit  580.90 | recall  54.85% | >=half  29/51  | miss total  478.10 = notcut  216.00 + partial 262.10 | of which GT<5s  0.00
+-- total
+ALL rows                           | instances  51 | GT s 1059.00 | hit  580.90 | recall  54.85% | >=half  29/51  | miss total  478.10 = notcut  216.00 + partial 262.10 | of which GT<5s  0.00
+
+-- per-interval detail (hit seconds per run)
+  V02_full       46.0-  51.0 SILENCE  L= 5.00 hits= [0.0, 0.0, 0.0, 0.0]
+  V02_full       84.0-  90.0 SILENCE  L= 6.00 hits= [5.57, 5.57, 5.57, 5.57]
+  V03_full       43.0-  86.0 TANGENT  L=43.00 hits= [0, 0]
+  V03_summary    43.0-  86.0 TANGENT  L=43.00 hits= [43.0, 41.56, 24.9, 0]
+  V04_full       47.0-  55.0 RETAKE   L= 8.00 hits= [4.79, 6.21, 0, 0.0]
+  V04_full       67.0-  75.0 RETAKE   L= 8.00 hits= [0.0, 4.79, 0, 7.27]
+  V04_full      104.0- 109.0 RETAKE   L= 5.00 hits= [0.0, 0.0, 0, 0.0]
+  V06_full       25.0-  40.0 RETAKE   L=15.00 hits= [12.35, 8.91, 8.11, 10.53]
+  V06_full       52.0- 105.0 TANGENT  L=53.00 hits= [22.36, 22.36, 22.36, 22.36]
+  V06_summary    25.0-  40.0 RETAKE   L=15.00 hits= [0.0, 8.91, 14.13, 8.24]
+  V06_summary    52.0- 105.0 TANGENT  L=53.00 hits= [22.36, 45.88, 45.88, 22.36]
+  V07_full       17.0-  31.0 SILENCE  L=14.00 hits= [14.0, 14.0, 14.0]
+  V07_full       38.0-  48.0 SILENCE  L=10.00 hits= [10.0, 10.0, 10.0]
+  V07_full       63.0-  82.0 SILENCE  L=19.00 hits= [19.0, 19.0, 19.0]
