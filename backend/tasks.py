@@ -75,6 +75,24 @@ JOB_RETENTION_DAYS = int(os.getenv("JOB_RETENTION_DAYS", "7"))
 STALE_MARKER_SECONDS = 6 * 3600        # 6 ชม. (นานกว่างานที่ยาวที่สุดมาก)
 
 
+def _friendly_error(detail: str) -> str:
+    """แปล exception ดิบ (อาจมี API key/.env/JSON ดิบจาก Gemini) เป็นข้อความไทยทั่วไป
+    ให้ผู้ใช้เห็น — รายละเอียดจริงถูก print() ไว้ก่อนเรียกฟังก์ชันนี้แล้ว (เก็บในล็อกฝั่ง
+    server/Sentry เท่านั้น) ไม่ส่งต่อให้ frontend ไม่ว่ากรณีใด
+    """
+    # ข้อความที่ tasks.py เขียนเองเป็นภาษาไทยที่ผู้ใช้เข้าใจอยู่แล้ว → ส่งต่อตามเดิม
+    if "AI ไม่สามารถระบุช่วงที่ควรเก็บได้" in detail and "key" not in detail.lower():
+        return "AI ไม่สามารถระบุช่วงที่ควรเก็บได้ — กรุณาลองใหม่"
+    low = detail.lower()
+    if "quota" in low or "resource_exhausted" in low or "429" in detail:
+        return "ระบบ AI ไม่พร้อมให้บริการขณะนี้ (มีผู้ใช้งานมาก) กรุณาลองใหม่อีกครั้งในอีกสักครู่"
+    if "503" in detail or "unavailable" in low or "overloaded" in low:
+        return "ระบบ AI ไม่ว่างชั่วคราว กรุณาลองใหม่อีกครั้ง"
+    if "ffmpeg" in low or "moov atom" in low or "invalid data found" in low:
+        return "ไฟล์วิดีโอเปิดไม่ได้หรือเสียหาย กรุณาตรวจไฟล์แล้วลองใหม่"
+    return "ประมวลผลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หากเกิดซ้ำ ติดต่อผู้ดูแลระบบ"
+
+
 def _mark_processing(job_dir: str) -> None:
     """เขียน marker .processing (best-effort) ตอนเริ่ม task"""
     try:
@@ -433,11 +451,11 @@ def process_video_task(self, job_id, video_path, user_prompt,
             print(f"[RETRY {self.request.retries + 1}] Gemini 503 — wait {wait_seconds}s")
             raise self.retry(exc=e, countdown=wait_seconds)   # ยัง retry อยู่ ยังไม่ mark failed
 
-        print(f"[FAILURE] {error_msg}")
+        print(f"[FAILURE] {error_msg}")   # รายละเอียดจริงอยู่ในล็อกฝั่ง server เท่านั้น
         set_job_status(job_id, "failed")
         self.update_state(state='FAILURE', meta={
-            'status': f'Error: {error_msg}', 'progress': 0,
-            'exc_type': type(e).__name__, 'exc_message': error_msg,
+            'status': _friendly_error(error_msg), 'progress': 0,
+            'exc_type': type(e).__name__,
         })
         raise Ignore()
 
@@ -544,11 +562,11 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
 
     except Exception as e:
         error_msg = str(e)
-        print(f"[RENDER FAILURE] {error_msg}")
+        print(f"[RENDER FAILURE] {error_msg}")   # รายละเอียดจริงอยู่ในล็อกฝั่ง server เท่านั้น
         set_job_status(job_id, "failed")
         self.update_state(state='FAILURE', meta={
-            'status': f'Error: {error_msg}', 'progress': 0,
-            'exc_type': type(e).__name__, 'exc_message': error_msg,
+            'status': _friendly_error(error_msg), 'progress': 0,
+            'exc_type': type(e).__name__,
         })
         raise Ignore()
 

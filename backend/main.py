@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from core.srt_utils import generate_phrases_from_transcript, apply_saved_edits
 from tasks import (
     process_video_task, render_only_task, cleanup_old_jobs,
-    celery_app, set_cancel_flag,
+    celery_app, set_cancel_flag, _friendly_error,
 )
 from observability import init_sentry
 
@@ -288,15 +288,18 @@ async def get_status(
             response["progress"] = 0
             try:
                 error_info = result.info
+                # ปกติจะเข้า branch dict เสมอ (tasks.py ใส่ข้อความไทยทั่วไปไว้ใน meta['status']
+                # ให้แล้วผ่าน _friendly_error — branch Exception ด้านล่างเป็นทางสำรองที่ไม่ควร
+                # เกิดขึ้นจริง (เช่น task ตายก่อนเข้า try/except ของมันเอง) จึงกรองซ้ำอีกชั้น
+                # กันไม่ให้ raw exception message (API key/.env/JSON ดิบ) หลุดไปหา frontend
                 if isinstance(error_info, Exception):
-                    msg = str(error_info)
+                    msg = _friendly_error(str(error_info))
                 elif isinstance(error_info, dict):
                     msg = error_info.get("status", "เกิดข้อผิดพลาด")
                 else:
                     msg = "เกิดข้อผิดพลาด กรุณาลองใหม่"
             except Exception:
                 msg = "เกิดข้อผิดพลาด กรุณาลองใหม่"
-            # ตัด stack/Gemini detail ที่อาจมี API key หลุดได้
             if len(msg) > 300:
                 msg = msg[:300] + "..."
             response["result"] = msg
@@ -314,7 +317,8 @@ async def get_status(
     except HTTPException:
         raise
     except Exception as e:
-        return {"status": "FAILURE", "progress": 0, "result": f"เกิดข้อผิดพลาด: {str(e)[:200]}"}
+        print(f"⚠️ /status error: {e}")   # รายละเอียดจริงอยู่ในล็อกฝั่ง server เท่านั้น
+        return {"status": "FAILURE", "progress": 0, "result": _friendly_error(str(e))}
 
 
 @app.get("/download/{job_id}")
