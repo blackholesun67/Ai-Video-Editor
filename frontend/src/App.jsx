@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Sparkles, Download, RotateCcw, Type, LogOut, FolderOpen } from 'lucide-react';
+import { Sparkles, Download, RotateCcw, Type, LogOut, FolderOpen, Scissors } from 'lucide-react';
 import UploadScreen from './components/UploadScreen';
 import Processing from './components/Processing';
 import PreviewScreen from './components/PreviewScreen';
@@ -131,6 +131,15 @@ function App() {
     setReediting(true);
     setVideoUrl(null);
     setPhase('editing');
+  };
+
+  // จากหน้า "เสร็จแล้ว" — กด "แก้ช่วงตัด" ย้อนกลับไปหน้าเลือกช่วง (preview) แล้วเรนเดอร์ใหม่ได้
+  // backend รองรับอยู่แล้ว — POST /render/{job_id} อ่านแค่ preview.json ไม่เช็กสถานะงานเลย
+  // (ต่างจาก handleReedit: อันนี้กลับไปแก้ "ช่วงที่จะเก็บ" ไม่ใช่แค่ข้อความซับ)
+  const handleEditCuts = () => {
+    setReediting(false);
+    setVideoUrl(null);
+    setPhase('preview');
   };
 
   const handleReset = () => {
@@ -346,7 +355,14 @@ function App() {
             </div>
 
             {/* Actions — ปุ่มเริ่มใหม่อยู่มุมขวาบน (header) ที่เดียว */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${editSummary?.burn_subtitle ? 'lg:grid-cols-3' : ''} gap-3 pt-2`}>
+              <button
+                onClick={handleEditCuts}
+                className="flex items-center justify-center gap-2 bg-white text-slate-700 px-6 py-3.5 rounded-xl font-semibold border border-slate-200 hover:bg-slate-50 transition-colors active:scale-[0.98]"
+              >
+                <Scissors className="h-5 w-5" />
+                แก้ช่วงตัด
+              </button>
               {editSummary?.burn_subtitle && (
                 <button
                   onClick={handleReedit}
@@ -360,8 +376,8 @@ function App() {
                 href={mediaToken ? `${API_URL}/download/${jobIdShort}?token=${mediaToken}` : undefined}
                 download="ai_edited_video.mp4"
                 className={`flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors active:scale-[0.98] ${
-                  editSummary?.burn_subtitle ? '' : 'sm:col-span-2'
-                } ${mediaToken ? '' : 'pointer-events-none opacity-60'}`}
+                  mediaToken ? '' : 'pointer-events-none opacity-60'
+                }`}
               >
                 <Download className="h-5 w-5" />
                 ดาวน์โหลดวิดีโอ
