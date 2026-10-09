@@ -6,6 +6,7 @@
 4. รับประกัน phrase ไม่ซ้อนกัน + มี gap เล็กน้อยให้แต่ละ phrase หายไปก่อนตัวถัดไป
 """
 
+import difflib
 import os
 import unicodedata
 from collections import Counter
@@ -408,40 +409,63 @@ def _thai_words_with_times(seg_text: str, whisper_words: list[dict]) -> list[dic
     แบ่ง seg_text เป็น "คำไทยจริง" (PyThaiNLP) แล้วให้เวลาแต่ละคำจาก Whisper word
     ที่ประกอบเป็นคำนั้น — ไม่เฉลี่ยเวลาทั้ง segment
 
-    วิธี: Whisper คืน word เป็นเศษพยางค์พร้อม timestamp จริง — จับคู่ช่วงตัวอักษร
-    ของแต่ละคำ PyThaiNLP กับ fragment ที่ครอบตำแหน่งนั้น แล้วอ่านเวลาจาก fragment
+    วิธี: Whisper คืน word เป็นเศษพยางค์พร้อม timestamp จริง — จับคู่ "ตัวอักษร" ของ
+    seg_text กับตัวอักษรของ fragment ด้วย difflib แล้วอ่านเวลาจาก fragment ที่จับคู่ได้
     (interpolate ภายใน fragment; ช่วง pause ระหว่าง fragment ไม่มีตัวอักษร จึงไม่ถูกกิน)
+
+    ห้ามกลับไปเทียบตำแหน่งตาม "สัดส่วน" ความยาว: text ที่ผ่าน AI-Correction อาจตัดเทคที่พูดผิด
+    ทิ้งแต่ words ยังมีอยู่ (B1: text 217 ตัว / words 262 ตัว) → ซับขึ้นก่อนเสียงจริงถึง 10 วิ
+    ตัวอักษรที่จับคู่ไม่ได้ (คำที่ถูกแก้) ได้เวลาเฉลี่ยระหว่างจุดที่จับคู่ได้ซ้าย-ขวา
 
     คืน [{"start", "end", "text"}] — text = คำไทยจริง, เวลา = เวลาพูดจริง
     """
-    frags = [
-        (float(w["start"]), float(w["end"]), len((w.get("text") or "").strip()))
-        for w in whisper_words
-        if (w.get("text") or "").strip()
-        and w.get("start") is not None and w.get("end") is not None
-    ]
-    if not frags:
+    w_chars: list[str] = []
+    w_times: list[tuple[float, float]] = []   # (start, end) ของตัวอักษรแต่ละตัวใน words
+    for w in whisper_words:
+        t = "".join((w.get("text") or "").split())
+        if not t or w.get("start") is None or w.get("end") is None:
+            continue
+        fs, fe = float(w["start"]), float(w["end"])
+        L = len(t)
+        for k, ch in enumerate(t):
+            w_chars.append(ch)
+            w_times.append((fs + (fe - fs) * k / L, fs + (fe - fs) * (k + 1) / L))
+    if not w_chars:
         return []
 
-    total_w = float(sum(L for _, _, L in frags)) or 1.0
     seg_norm = "".join(seg_text.split())
-    total_s = float(len(seg_norm)) or 1.0
-    scale = total_w / total_s   # เผื่อ text ถูกแก้จนยาวไม่เท่ากันเป๊ะ
+    n_s = len(seg_norm)
+    c_start: list[float | None] = [None] * n_s
+    c_end: list[float | None] = [None] * n_s
+    sm = difflib.SequenceMatcher(None, seg_norm.lower(), "".join(w_chars).lower(), autojunk=False)
+    for a, b, size in sm.get_matching_blocks():
+        for k in range(size):
+            c_start[a + k], c_end[a + k] = w_times[b + k]
 
-    def time_at(seg_char: float, is_end: bool) -> float:
-        x = max(0.0, min(seg_char * scale, total_w))
-        cum = 0.0
-        for fs, fe, L in frags:
-            if L <= 0:
-                continue
-            lo, hi = cum, cum + L
-            inside = (x <= hi) if is_end else (x < hi)
-            if inside:
-                if x <= lo:
-                    return fs
-                return fs + (fe - fs) * (x - lo) / L
-            cum = hi
-        return frags[-1][1]
+    # ตัวอักษรที่ไม่ได้จับคู่ → กระจายเวลาเท่า ๆ กันระหว่างจุดที่จับคู่ได้ซ้าย-ขวา
+    i = 0
+    while i < n_s:
+        if c_start[i] is not None:
+            i += 1
+            continue
+        j = i
+        while j < n_s and c_start[j] is None:
+            j += 1
+        left = c_end[i - 1] if i > 0 else w_times[0][0]
+        right = c_start[j] if j < n_s else w_times[-1][1]
+        right = max(right, left)
+        run = j - i
+        for k in range(run):
+            c_start[i + k] = left + (right - left) * k / run
+            c_end[i + k] = left + (right - left) * (k + 1) / run
+        i = j
+
+    def time_at(seg_char: int, is_end: bool) -> float:
+        if n_s == 0:
+            return w_times[-1][1] if is_end else w_times[0][0]
+        if is_end:
+            return c_end[max(0, min(seg_char - 1, n_s - 1))]
+        return c_start[max(0, min(seg_char, n_s - 1))]
 
     tokens = _tokenize_thai_aware(seg_text)
     out: list[dict] = []
