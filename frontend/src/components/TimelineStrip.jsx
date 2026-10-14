@@ -141,16 +141,6 @@ export default function TimelineStrip({
         )}
       </div>
 
-      {/* คำอธิบายสีของแถบ */}
-      <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-sm text-muted">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-3.5 w-5 rounded-sm bg-primary" /> เก็บไว้
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-3.5 w-5 rounded-sm cut-stripes border border-line-strong" /> AI เสนอให้ตัดออก
-        </span>
-      </div>
-
       <div className="flex items-center gap-2 text-sm text-muted flex-wrap">
         <span className="font-mono">0:00.0</span>
         <span className="font-mono font-semibold text-ink">▸ {formatClock(now)}</span>
