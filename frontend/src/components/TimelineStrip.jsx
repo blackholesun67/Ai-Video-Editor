@@ -3,8 +3,7 @@ import { Scissors, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatClock, formatLength } from './time';
 import { describeSplit, SPLIT_REASON, snap } from './useTimelineRows';
 
-// ลายทแยงสำหรับช่วงที่ไม่ได้เก็บ — บอกว่า "ตัดออก" โดยไม่ต้องใช้สีที่สอง
-const CUT_FILL = 'repeating-linear-gradient(45deg, #e2e8f0 0 4px, #f1f5f9 4px 8px)';
+// ลายทแยงสำหรับช่วงที่ไม่ได้เก็บ (คลาส .cut-stripes ใน index.css) — บอกว่า "ตัดออก" โดยไม่ต้องใช้สีที่สอง
 
 // ขีดที่ชิดหัว/ท้ายคลิปไม่มีประโยชน์ (ffmpeg มักรายงานเฟรมสุดท้ายเป็นฉากเปลี่ยน)
 const EDGE_IGNORE = 0.5;
@@ -109,24 +108,20 @@ export default function TimelineStrip({
         ref={barRef}
         onClick={seekTo}
         title="คลิกเพื่อเลื่อนวิดีโอไปตรงนั้น"
-        className="relative h-9 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 cursor-pointer"
+        className="relative h-10 rounded-lg overflow-hidden bg-white border border-line-strong cursor-pointer"
       >
         {total > 0 && rows.map((r) => (
           <div
             key={r.id}
-            className={r.on ? 'absolute inset-y-0 bg-indigo-500' : 'absolute inset-y-0'}
-            style={{
-              left: pct(r.start),
-              width: pct(r.end - r.start),
-              ...(r.on ? {} : { background: CUT_FILL }),
-            }}
+            className={`absolute inset-y-0 ${r.on ? 'bg-primary' : 'cut-stripes'}`}
+            style={{ left: pct(r.start), width: pct(r.end - r.start) }}
           />
         ))}
         {/* ขีดฉากเปลี่ยน — บาง จาง ไม่แย่งความสนใจจากสีเก็บ/ตัด ; กระโดดไปด้วยปุ่ม ‹ ฉาก › */}
         {cuts.map((t) => (
           <div
             key={`sc-${t}`}
-            className="absolute inset-y-0 w-px bg-slate-500/45 pointer-events-none"
+            className="absolute inset-y-0 w-px bg-slate-400/70 pointer-events-none"
             style={{ left: pct(t) }}
           />
         ))}
@@ -140,36 +135,48 @@ export default function TimelineStrip({
         ))}
         {total > 0 && (
           <div
-            className="absolute inset-y-0 w-0.5 bg-slate-900 pointer-events-none"
+            className="absolute inset-y-0 w-0.5 bg-accent pointer-events-none"
             style={{ left: pct(now) }}
           />
         )}
       </div>
 
-      <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap">
+      {/* คำอธิบายสีของแถบ */}
+      <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-sm text-muted">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-3.5 w-5 rounded-sm bg-primary" /> เก็บไว้
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-3.5 w-5 rounded-sm cut-stripes border border-line-strong" /> AI เสนอให้ตัดออก
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 text-sm text-muted flex-wrap">
         <span className="font-mono">0:00.0</span>
-        <span className="font-mono font-semibold text-slate-700">▸ {formatClock(now)}</span>
+        <span className="font-mono font-semibold text-ink">▸ {formatClock(now)}</span>
         <span className="font-mono">{formatLength(total)}</span>
         {cuts.length > 0 && (
           <span className="inline-flex items-center gap-1 ml-1">
             <button
               type="button" onClick={() => stepScene(-1)} disabled={!hasPrev}
               title="ไปจุดฉากเปลี่ยนก่อนหน้า"
-              className={`h-6 w-6 inline-flex items-center justify-center rounded border text-[11px] ${
-                hasPrev ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'}`}
+              aria-label="ไปจุดฉากเปลี่ยนก่อนหน้า"
+              className={`h-11 w-11 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-lg border ${
+                hasPrev ? 'border-line-strong bg-white text-ink hover:bg-page'
+                        : 'border-line bg-page text-slate-400 cursor-not-allowed'}`}
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-[10px] text-slate-400">ฉาก</span>
+            <span className="text-sm text-muted">ฉาก</span>
             <button
               type="button" onClick={() => stepScene(1)} disabled={!hasNext}
               title="ไปจุดฉากเปลี่ยนถัดไป"
-              className={`h-6 w-6 inline-flex items-center justify-center rounded border text-[11px] ${
-                hasNext ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'}`}
+              aria-label="ไปจุดฉากเปลี่ยนถัดไป"
+              className={`h-11 w-11 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-lg border ${
+                hasNext ? 'border-line-strong bg-white text-ink hover:bg-page'
+                        : 'border-line bg-page text-slate-400 cursor-not-allowed'}`}
             >
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </span>
         )}
@@ -178,18 +185,18 @@ export default function TimelineStrip({
           onClick={() => onSplit(now)}
           disabled={!canSplit}
           title={why || 'แยกช่วงนี้ออกเป็นสองช่วง ตรงตำแหน่งที่เล่นอยู่'}
-          className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`ml-auto min-h-11 sm:min-h-9 inline-flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold transition-colors ${
             canSplit
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              ? 'bg-primary text-white hover:bg-primary-dark'
+              : 'bg-slate-100 text-muted cursor-not-allowed'
           }`}
         >
-          <Scissors className="h-3.5 w-3.5" /> แยกตรงนี้
+          <Scissors className="h-4 w-4" /> แยกตรงนี้
         </button>
       </div>
-      {!chk.ok && why && <p className="text-[11px] text-slate-400 text-right">{why}</p>}
+      {!chk.ok && why && <p className="text-sm text-muted text-right">{why}</p>}
       {cuts.length > 0 && (
-        <p className="text-[11px] text-slate-400">
+        <p className="text-sm text-muted">
           เส้นจาง {cuts.length} เส้นคือจุดที่ภาพเปลี่ยนฉาก — กดปุ่ม ‹ ฉาก › เพื่อกระโดดไปให้ตรงจุด
           {blacks.length > 0 && ` · แถบดำล่าง ${blacks.length} ช่วงคือจอดำ`}
         </p>

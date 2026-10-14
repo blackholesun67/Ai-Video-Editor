@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Sparkles, Loader2, X, Scissors, ShieldCheck, Zap } from 'lucide-react';
+import { Loader2, X, Scissors, ShieldCheck, Zap } from 'lucide-react';
+import Logo from './Logo';
 import { API_URL, setAuthToken } from '../config';
 
 /**
@@ -83,21 +84,19 @@ export default function LoginScreen({ onLogin, onClose }) {
       className={
         isModal
           ? 'fixed inset-0 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200'
-          : 'min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-8'
+          : 'min-h-screen bg-page flex flex-col items-center justify-center px-4 py-8'
       }
       onClick={isModal ? onClose : undefined}
     >
       {!isModal && (
         <div className="flex items-center gap-2.5 mb-8">
-          <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center">
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
-          <h1 className="text-lg font-semibold text-slate-900">AI Video Smart Editor</h1>
+          <Logo size={40} />
+          <h1 className="text-lg font-semibold text-ink">AI Video Smart Editor</h1>
         </div>
       )}
 
       <div
-        className="relative w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-900/5 overflow-hidden"
+        className="relative w-full max-w-sm bg-white rounded-2xl border border-line shadow-xl shadow-slate-900/5 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {isModal && (
@@ -107,13 +106,11 @@ export default function LoginScreen({ onLogin, onClose }) {
           </button>
         )}
 
-        {/* หัวการ์ด — แถบ gradient indigo + โลโก้ */}
-        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 px-6 pt-7 pb-6 text-center">
-          <div className="h-12 w-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center mx-auto ring-1 ring-white/25">
-            <Sparkles className="h-6 w-6 text-white" />
-          </div>
+        {/* หัวการ์ด — แถบกรมท่า + โลโก้ */}
+        <div className="bg-primary px-6 pt-7 pb-6 text-center">
+          <Logo size={48} className="mx-auto rounded-xl ring-1 ring-white/25" />
           <h2 className="text-lg font-semibold text-white mt-3">ยินดีต้อนรับ</h2>
-          <p className="text-sm text-indigo-100 mt-0.5">เข้าสู่ระบบเพื่อเริ่มตัดวิดีโอด้วย AI</p>
+          <p className="text-sm text-white/85 mt-0.5">เข้าสู่ระบบเพื่อเริ่มตัดวิดีโอด้วย AI</p>
         </div>
 
         {/* เนื้อการ์ด */}
@@ -126,7 +123,7 @@ export default function LoginScreen({ onLogin, onClose }) {
               { icon: Zap, text: 'ไม่ต้องจำรหัสผ่าน เข้าใช้ได้ทันที' },
             ].map(({ icon: Icon, text }) => (
               <li key={text} className="flex items-center gap-3 text-sm text-slate-600">
-                <span className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                <span className="h-7 w-7 rounded-lg bg-primary-soft text-primary-dark flex items-center justify-center flex-shrink-0">
                   <Icon className="h-4 w-4" />
                 </span>
                 {text}
@@ -137,9 +134,9 @@ export default function LoginScreen({ onLogin, onClose }) {
           <div className="flex flex-col items-center gap-3 min-h-[46px]">
             {/* GIS จะ render ปุ่ม Sign in with Google ในกล่องนี้ */}
             <div ref={btnRef} />
-            {!ready && !error && <Loader2 className="h-5 w-5 animate-spin text-slate-400" />}
+            {!ready && !error && <Loader2 className="h-5 w-5 animate-spin text-muted" />}
             {loading && (
-              <p className="text-sm text-slate-500 flex items-center gap-2">
+              <p className="text-sm text-muted flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> กำลังเข้าสู่ระบบ...
               </p>
             )}
@@ -151,7 +148,7 @@ export default function LoginScreen({ onLogin, onClose }) {
             </div>
           )}
 
-          <p className="text-xs text-slate-400 text-center mt-6">
+          <p className="text-sm text-muted text-center mt-6">
             การเข้าสู่ระบบถือว่ายอมรับเงื่อนไขการใช้งาน
           </p>
         </div>

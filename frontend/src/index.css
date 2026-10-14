@@ -1,11 +1,36 @@
 @import "tailwindcss";
 
-:root {
-  font-family: "Noto Sans Thai", ui-sans-serif, system-ui, -apple-system,
+/* ธีม UI v2.1 — ใช้เป็นคลาส Tailwind ได้ เช่น bg-primary, text-ink, text-accent-strong */
+@theme {
+  --font-sans: "Noto Sans Thai", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
+
+  /* สีหลัก — ปุ่มหลัก ตัวเลือกที่ถูกเลือก แถบ "เก็บไว้" คำไฮไลต์ แถบความคืบหน้า ปุ่มดาวน์โหลด */
+  --color-primary: #2563EB;
+  --color-primary-dark: #1D4ED8;  /* hover และตัวอักษรบนพื้นอ่อน */
+  --color-primary-soft: #EFF6FF;  /* พื้นของสถานะที่ถูกเลือก */
+  --color-ink: #0F172A;           /* ตัวอักษรหลัก / หัวข้อ */
+
+  /* ส้มเข้ม — ใช้แค่หัวเล่นบนไทม์ไลน์ และวงกลมขั้นที่กำลังทำในหน้าประมวลผล */
+  --color-accent: #F97316;
+  /* ส้มอ่อน — ป้าย "AI เสนอตัด" ปุ่ม/กล่องวิธีใช้ */
+  --color-accent-soft: #FFF7ED;
+  --color-accent-strong: #9A3412;
+  --color-accent-border: #FED7AA;
+
+  /* เขียว — ใช้แค่วงกลม ✓ ขั้นที่เสร็จ และป้าย "เสร็จแล้ว" (ข้อความในป้ายใช้ ink เพราะเขียวบนพื้นอ่อนคอนทราสต์ไม่พอ) */
+  --color-ok: #16A34A;
+
+  --color-page: #F8FAFC;
+  --color-line: #E2E8F0;
+  --color-line-strong: #CBD5E1;
+  --color-muted: #475569;         /* ข้อความรอง — ห้ามใช้เทาอ่อนกว่านี้กับตัวหนังสือ */
 }
 
 body {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -19,4 +44,9 @@ button,
 textarea,
 input {
   line-height: 1.65;
+}
+
+/* ลายขีดเฉียง = ช่วงที่ AI เสนอให้ตัดออก (ใช้ทั้งแถบเวลาและตัวอย่างในกล่องวิธีใช้) */
+.cut-stripes {
+  background: repeating-linear-gradient(45deg, #CBD5E1 0 6px, #FFFFFF 6px 12px);
 }

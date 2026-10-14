@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import {
-  X, Eye, Play, Loader2, AlertTriangle, RotateCcw,
+  X, Eye, Play, Loader2, AlertTriangle, RotateCcw, HelpCircle,
 } from 'lucide-react';
 import { API_URL, PREVIEW_ROWS_KEY, fetchMediaToken } from '../config';
 import useTimelineRows, { toRenderSegments, describeMerge } from './useTimelineRows';
@@ -9,11 +9,35 @@ import SegmentRow from './SegmentRow';
 import TimelineStrip from './TimelineStrip';
 import { formatLength } from './time';
 
+// ปุ่มในแถบเครื่องมือเหนือรายการ — สูง 44px บนมือถือ
+const TOOL_BTN = 'min-h-11 sm:min-h-9 px-3 rounded-lg border text-sm font-medium transition-colors';
+
 const FILTERS = [
   { id: 'all', label: 'ทั้งหมด' },
-  { id: 'ai', label: 'AI เลือก' },
-  { id: 'cut', label: 'AI ตัดออก' },
+  { id: 'ai', label: '✓ AI ให้เก็บ' },
+  { id: 'cut', label: '✕ AI เสนอตัด' },
 ];
+
+// จำว่าผู้ใช้เปิด/ซ่อนกล่องวิธีใช้ไว้ (ค่าเริ่มต้น = เปิด) — เป็นแค่ความสะดวก อ่าน/เขียนไม่ได้ก็ไม่เป็นไร
+const HELP_KEY = 'aive_preview_help';
+const readHelpOpen = () => {
+  try { return localStorage.getItem(HELP_KEY) !== '0'; } catch { return true; }
+};
+
+/** ข้อหนึ่งในกล่องวิธีใช้ — วงกลมเลข + หัวข้อ + 2 บรรทัด */
+function HelpItem({ n, title, children }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="h-7 w-7 flex-shrink-0 rounded-full bg-primary text-white text-sm font-semibold flex items-center justify-center">
+        {n}
+      </span>
+      <div className="min-w-0">
+        <p className="text-base font-semibold text-ink">{title}</p>
+        <div className="text-sm text-muted leading-relaxed mt-0.5 space-y-0.5">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   const [preview, setPreview] = useState(null);
@@ -26,6 +50,20 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
   const [step, setStep] = useState(1);              // ขนาดก้าวของปุ่มขยับขอบ
   const [flashIds, setFlashIds] = useState([]);     // แถวที่เพิ่งถูกแยก (ไฮไลต์ชั่วคราว)
   const [confirmReset, setConfirmReset] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(readHelpOpen);
+
+  const toggleHelp = () => {
+    const next = !helpOpen;
+    setHelpOpen(next);
+    try { localStorage.setItem(HELP_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+  };
+
+  // ยกเลิก = ล้างงานทั้งหมดกลับหน้าอัปโหลด (onCancel) — ถามยืนยันแบบเดียวกับปุ่มใน header กันกดพลาด
+  const handleCancelConfirm = () => {
+    if (window.confirm('ยกเลิกงานนี้? งานปัจจุบันและวิดีโอที่ตัดไว้จะถูกล้างทั้งหมด')) {
+      onCancel();
+    }
+  };
 
   const videoRef = useRef(null);
   const playEndRef = useRef(null);
@@ -203,9 +241,9 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-        <Loader2 className="h-12 w-12 text-indigo-500 animate-spin mx-auto mb-3" />
-        <p className="text-sm text-slate-500">กำลังโหลดตัวอย่าง...</p>
+      <div className="bg-white rounded-2xl shadow-sm border border-line p-12 text-center">
+        <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-3" />
+        <p className="text-base text-muted">กำลังโหลดตัวอย่าง...</p>
       </div>
     );
   }
@@ -217,7 +255,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         <p className="text-sm text-red-700 mb-4">{error}</p>
         <button
           onClick={onCancel}
-          className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200"
+          className="min-h-11 px-5 py-2.5 bg-white border border-line-strong text-ink rounded-xl font-semibold hover:bg-page"
         >
           กลับ
         </button>
@@ -227,23 +265,65 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Hero */}
+      {/* Hero — ป้าย + หัวข้อ + บรรทัดรอง + ปุ่มวิธีใช้ อยู่กึ่งกลางทั้งหมด */}
       <div className="text-center">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium mb-2">
-          <Eye className="h-3.5 w-3.5" />
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary-soft text-primary-dark rounded-full text-sm font-medium mb-2">
+          <Eye className="h-4 w-4" />
           ดูตัวอย่าง
         </div>
-        <h2 className="text-2xl font-semibold text-slate-900">
-          เลือกช่วงที่จะ<span className="text-indigo-600">เก็บไว้</span>
+        <h2 className="text-2xl sm:text-[26px] font-semibold text-ink leading-snug">
+          เลือกช่วงที่จะ<span className="text-primary">เก็บไว้</span>
         </h2>
-        <p className="text-sm text-slate-500 mt-1">
-          แถบสีคือช่วงที่จะเก็บ · ลายทแยงคือช่วงที่ AI ตัดออก — กดที่แถวเพื่อสลับ
+        <p className="text-base text-muted mt-1">
+          AI เลือกให้แล้ว ตรวจดู แล้วแก้เฉพาะจุดที่ไม่ตรงใจ
         </p>
+        <button
+          type="button"
+          onClick={toggleHelp}
+          aria-expanded={helpOpen}
+          aria-controls="preview-help"
+          className="mt-3 min-h-11 sm:min-h-9 inline-flex items-center gap-1.5 px-3.5 rounded-full bg-accent-soft border border-accent-border text-accent-strong text-sm font-medium hover:bg-orange-100 transition-colors"
+        >
+          <HelpCircle className="h-4 w-4" />
+          {helpOpen ? 'ซ่อนวิธีใช้' : 'วิธีใช้หน้านี้'}
+        </button>
       </div>
+
+      {/* วิธีใช้หน้านี้ — 2×2 บนคอม คอลัมน์เดียวบนมือถือ */}
+      {helpOpen && (
+        <section id="preview-help" className="bg-white border border-accent-border rounded-2xl p-4 sm:p-5">
+          <h3 className="text-base font-semibold text-ink mb-3">วิธีใช้หน้านี้</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <HelpItem n={1} title="อ่านแถบเวลา">
+              <p className="flex items-center gap-2">
+                <span className="inline-block h-3.5 w-5 rounded-sm bg-primary flex-shrink-0" /> สีเข้ม = เก็บไว้
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="inline-block h-3.5 w-5 rounded-sm cut-stripes border border-line-strong flex-shrink-0" /> ขีดเฉียงสีเทา = AI เสนอให้ตัดออก
+              </p>
+            </HelpItem>
+            <HelpItem n={2} title="เลือกเก็บหรือตัด">
+              <p>กดช่องหน้าแต่ละช่วง ✓ = เก็บ ✕ = ตัดออก</p>
+              <p>ปุ่มกรองเหนือรายการช่วยดูทีละแบบ</p>
+            </HelpItem>
+            <HelpItem n={3} title="ฟังและปรับเวลา">
+              <p>กด "ฟัง" เพื่อฟังช่วงนั้นก่อน</p>
+              <p>กด "ปรับ" เพื่อเลื่อนเวลาเริ่มหรือจบ</p>
+            </HelpItem>
+            <HelpItem n={4} title="ตัดบางส่วนในช่วงยาว">
+              <p>หยุดวิดีโอตรงจุดที่จะตัด แล้วกด "แยกตรงนี้"</p>
+              <p>จากนั้นกด ✕ ที่ส่วนที่ไม่เอา</p>
+            </HelpItem>
+          </div>
+          <p className="text-sm text-muted mt-4 pt-3 border-t border-line">
+            ไม่แน่ใจ กด "คืนค่า AI" เพื่อกลับไปใช้ช่วงที่ AI เลือกไว้
+          </p>
+        </section>
+      )}
 
       {/* Video player (ต้นฉบับ) — seek ดูแต่ละช่วงได้ */}
       {videoSrc && (
-        <div className="rounded-2xl overflow-hidden bg-slate-900 border border-slate-200">
+        <div className="rounded-2xl overflow-hidden bg-slate-900 border border-line">
           <video
             ref={videoRef}
             src={videoSrc}
@@ -264,59 +344,60 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         visual={preview?.visual}
       />
 
-      {/* แถบเดียว: สรุป + ตัวกรอง + ปุ่มจัดการ (เดิมเป็น 3 กล่องซ้อนกัน) */}
-      <div className="flex items-center gap-2 flex-wrap border-y border-slate-200 py-2.5">
-        <span className="text-sm font-semibold text-slate-800">
-          {stats.count} ช่วง · {formatLength(stats.dur)}
-        </span>
-
-        <span className="inline-flex items-center gap-1 ml-1">
+      {/* แถบเครื่องมือ 2 แถว: (1) สรุป ซ้าย + ปุ่มจัดการ ขวา  (2) ปุ่มกรอง */}
+      <div className="space-y-2 border-y border-line py-2.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-base font-semibold text-ink">
+            {stats.count} ช่วง · {formatLength(stats.dur)}
+          </span>
+          <span className="inline-flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setAll(true)}
+              className={`${TOOL_BTN} bg-white border-line-strong text-slate-700 hover:bg-page`}
+            >
+              เลือกทั้งหมด
+            </button>
+            <button
+              onClick={() => setAll(false)}
+              className={`${TOOL_BTN} bg-white border-line-strong text-slate-700 hover:bg-page`}
+            >
+              ล้าง
+            </button>
+            <button
+              onClick={handleReset}
+              onBlur={() => setConfirmReset(false)}
+              disabled={!dirty}
+              title="กลับไปใช้ช่วงที่ AI เลือกให้ — การติ๊ก ขยับขอบ และแยกช่วงจะหายทั้งหมด"
+              className={`${TOOL_BTN} inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${
+                confirmReset
+                  ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                  : 'border-line-strong bg-white text-slate-700 hover:bg-page'
+              }`}
+            >
+              <RotateCcw className="h-4 w-4" /> {confirmReset ? 'ยืนยัน?' : 'คืนค่า AI'}
+            </button>
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
           {FILTERS.filter((f) => counts[f.id] > 0 || f.id === filter).map((f) => (
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className={`text-[11px] px-2 py-1 rounded-md border font-medium transition-colors ${
+              aria-pressed={filter === f.id}
+              className={`${TOOL_BTN} ${
                 filter === f.id
-                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-line-strong bg-white text-slate-700 hover:bg-page'
               }`}
             >
-              {f.label} <span className="opacity-60">({counts[f.id]})</span>
+              {f.label} ({counts[f.id]})
             </button>
           ))}
-        </span>
-
-        <span className="ml-auto inline-flex items-center gap-1.5">
-          <button
-            onClick={() => setAll(true)}
-            className="text-[11px] px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 font-medium"
-          >
-            เลือกทั้งหมด
-          </button>
-          <button
-            onClick={() => setAll(false)}
-            className="text-[11px] px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 font-medium"
-          >
-            ล้าง
-          </button>
-          <button
-            onClick={handleReset}
-            onBlur={() => setConfirmReset(false)}
-            disabled={!dirty}
-            title="กลับไปใช้ช่วงที่ AI เลือกให้ — การติ๊ก ขยับขอบ และแยกช่วงจะหายทั้งหมด"
-            className={`text-[11px] px-2.5 py-1 rounded-md font-medium inline-flex items-center gap-1 border disabled:opacity-40 disabled:cursor-not-allowed ${
-              confirmReset
-                ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <RotateCcw className="h-3 w-3" /> {confirmReset ? 'ยืนยัน?' : 'คืนค่า AI'}
-          </button>
-        </span>
+        </div>
       </div>
 
       {/* คำแนะนำตามสถานการณ์ — แทนคำอธิบาย 4 ขั้นตอนที่ยัดอยู่มุมขวา */}
-      {hint && <p className="text-[11px] text-slate-400 -mt-1">💡 {hint}</p>}
+      {hint && <p className="text-sm text-muted -mt-1">💡 {hint}</p>}
 
       {/* Segments list */}
       <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
@@ -337,7 +418,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
           />
         ))}
         {visibleRows.length === 0 && (
-          <p className="text-center text-sm text-slate-400 py-8">ไม่มีช่วงในหมวดนี้</p>
+          <p className="text-center text-sm text-muted py-8">ไม่มีช่วงในหมวดนี้</p>
         )}
       </div>
 
@@ -346,7 +427,7 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           <span>⚠️</span>
           <span className="flex-1">{submitError}</span>
-          <button onClick={() => setSubmitError('')} className="text-red-400 hover:text-red-600" aria-label="ปิด">
+          <button onClick={() => setSubmitError('')} className="text-red-600 hover:text-red-800" aria-label="ปิด">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -357,10 +438,10 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
         <button
           onClick={handleConfirm}
           disabled={submitting || stats.count === 0}
-          className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-semibold text-white shadow-lg transition-all ${
+          className={`w-full min-h-11 flex items-center justify-center gap-2 px-4 py-4 rounded-2xl text-base font-semibold text-white shadow-sm transition-all ${
             submitting || stats.count === 0
               ? 'bg-slate-400 cursor-not-allowed'
-              : 'bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98]'
+              : 'bg-primary hover:bg-primary-dark active:scale-[0.98]'
           }`}
         >
           {submitting ? (
@@ -369,20 +450,20 @@ const PreviewScreen = ({ jobId, onRendering, onCancel, onEditSubtitle }) => {
             </>
           ) : preview?.burn_subtitle ? (
             <>
-              <Play className="h-5 w-5" />
-              ถัดไป — แก้ subtitle ({stats.count} ช่วง · {formatLength(stats.dur)})
+              <Play className="h-5 w-5 flex-shrink-0" />
+              ถัดไป: ตรวจคำบรรยาย ({stats.count} ช่วง · {formatLength(stats.dur)})
             </>
           ) : (
             <>
-              <Play className="h-5 w-5" />
+              <Play className="h-5 w-5 flex-shrink-0" />
               ตัดต่อตามที่เลือก ({stats.count} ช่วง · {formatLength(stats.dur)})
             </>
           )}
         </button>
         <button
-          onClick={onCancel}
+          onClick={handleCancelConfirm}
           disabled={submitting}
-          className="w-full py-3 rounded-xl font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50"
+          className="w-full min-h-11 py-3 rounded-xl text-base font-semibold text-ink bg-white border border-line-strong hover:bg-page"
         >
           ← ยกเลิก
         </button>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Sparkles, Download, RotateCcw, Type, LogOut, FolderOpen, Scissors } from 'lucide-react';
+import { Download, RotateCcw, Type, LogOut, FolderOpen, Scissors, Menu, X, Check } from 'lucide-react';
+import Logo from './components/Logo';
 import UploadScreen from './components/UploadScreen';
 import Processing from './components/Processing';
 import PreviewScreen from './components/PreviewScreen';
@@ -45,6 +46,8 @@ function App() {
   const [mediaToken, setMediaToken] = useState(null);
   // true = กำลังดูหน้า "งานของฉัน"
   const [showJobs, setShowJobs] = useState(false);
+  // เมนู ☰ บนจอแคบ (≤640px) — ปุ่มใน header ย่อเข้าไปอยู่ในนี้
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (jobId) localStorage.setItem(STORAGE_KEYS.JOB, jobId);
@@ -242,59 +245,82 @@ function App() {
 
   const jobIdShort = videoUrl ? videoUrl.split('/')[0] : '';
 
+  // ปุ่มใน header — ชุดเดียวใช้ทั้งแถวปุ่ม (จอกว้าง) และเมนู ☰ (จอแคบ)
+  const headerActions = [
+    (jobId || videoUrl) && !showJobs && {
+      id: 'reset', label: 'เริ่มทำวิดีโอใหม่', icon: RotateCcw, danger: true,
+      title: 'เริ่มทำวิดีโอใหม่ — ล้างงานทั้งหมด กลับหน้าอัปโหลด', onClick: handleResetConfirm,
+    },
+    !showJobs && { id: 'jobs', label: 'งานของฉัน', icon: FolderOpen, title: 'งานของฉัน', onClick: openMyJobs },
+    { id: 'logout', label: 'ออกจากระบบ', icon: LogOut, title: 'ออกจากระบบ', onClick: handleLogout },
+  ].filter(Boolean);
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-page flex flex-col">
       {/* ── Header ─────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/70">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-line">
+        <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-9 w-9 flex-shrink-0 rounded-xl bg-indigo-600 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-base font-semibold text-slate-900 leading-tight truncate">AI Video Smart Editor</h1>
-            </div>
+            <Logo size={32} className="flex-shrink-0" />
+            <h1 className="text-base font-semibold text-ink leading-tight truncate">AI Video Smart Editor</h1>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {token ? (
               <>
-                {(jobId || videoUrl) && !showJobs && (
+                {/* จอกว้าง — ปุ่มเรียงตามเดิม */}
+                <div className="hidden sm:flex items-center gap-2">
+                  {headerActions.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={a.onClick}
+                      title={a.title}
+                      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium bg-white border px-3.5 py-1.5 rounded-lg transition-colors ${
+                        a.danger
+                          ? 'text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300'
+                          : 'text-slate-700 border-line-strong hover:bg-page hover:border-primary/40'
+                      }`}
+                    >
+                      <a.icon className="h-4 w-4" />
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+                {/* จอแคบ — ย่อเป็นเมนู ☰ */}
+                <div className="relative sm:hidden">
                   <button
-                    onClick={handleResetConfirm}
-                    title="เริ่มทำวิดีโอใหม่ — ล้างงานทั้งหมด กลับหน้าอัปโหลด"
-                    aria-label="เริ่มทำวิดีโอใหม่"
-                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 bg-white border border-red-200 px-2.5 sm:px-3.5 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
+                    onClick={() => setMenuOpen((o) => !o)}
+                    aria-label={menuOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
+                    aria-expanded={menuOpen}
+                    className="h-11 w-11 inline-flex items-center justify-center rounded-lg border border-line-strong bg-white text-ink hover:bg-page"
                   >
-                    <RotateCcw className="h-4 w-4" />
-                    <span className="hidden sm:inline">เริ่มทำวิดีโอใหม่</span>
+                    {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                   </button>
-                )}
-                {!showJobs && (
-                  <button
-                    onClick={openMyJobs}
-                    title="งานของฉัน"
-                    aria-label="งานของฉัน"
-                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-2.5 sm:px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    <span className="hidden sm:inline">งานของฉัน</span>
-                  </button>
-                )}
-                <button
-                  onClick={handleLogout}
-                  title="ออกจากระบบ"
-                  aria-label="ออกจากระบบ"
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-slate-600 bg-white border border-slate-200 px-2.5 sm:px-3.5 py-1.5 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">ออกจากระบบ</span>
-                </button>
+                  {menuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+                      <div className="absolute right-0 mt-2 z-20 w-60 bg-white border border-line rounded-xl shadow-lg py-1.5">
+                        {headerActions.map((a) => (
+                          <button
+                            key={a.id}
+                            onClick={() => { setMenuOpen(false); a.onClick(); }}
+                            className={`w-full min-h-11 flex items-center gap-2.5 px-4 text-base text-left hover:bg-page ${
+                              a.danger ? 'text-red-600' : 'text-slate-800'
+                            }`}
+                          >
+                            <a.icon className="h-5 w-5" />
+                            {a.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </>
             ) : (
               <button
                 onClick={requestLogin}
                 title="เข้าสู่ระบบ"
-                className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-white bg-indigo-600 px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap min-h-11 sm:min-h-0 text-sm font-medium text-white bg-primary px-3.5 py-1.5 rounded-lg hover:bg-primary-dark transition-colors"
               >
                 เข้าสู่ระบบ
               </button>
@@ -323,7 +349,7 @@ function App() {
         )}
 
         {token && jobId && !videoUrl && (phase === 'processing' || phase === 'rendering') && (
-          <Processing jobId={activeTaskId} onComplete={handleComplete} onCancel={handleReset} />
+          <Processing jobId={activeTaskId} onComplete={handleComplete} onCancel={handleReset} isRender={phase === 'rendering'} />
         )}
 
         {token && jobId && !videoUrl && phase === 'preview' && (
@@ -349,15 +375,15 @@ function App() {
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Success badge */}
             <div className="text-center">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-xs font-medium">
-                <Sparkles className="h-3.5 w-3.5" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-ink border border-ok rounded-full text-sm font-medium">
+                <span className="h-4 w-4 rounded-full bg-ok text-white flex items-center justify-center" aria-hidden="true"><Check className="h-3 w-3" strokeWidth={3} /></span>
                 ตัดต่อเสร็จแล้ว
               </div>
-              <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 mt-3">วิดีโอของคุณพร้อมแล้ว</h2>
+              <h2 className="text-2xl sm:text-[26px] font-semibold text-ink mt-3">วิดีโอของคุณพร้อมแล้ว</h2>
             </div>
 
             {/* Video Player */}
-            <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-200">
+            <div className="bg-slate-900 rounded-2xl overflow-hidden border border-line">
               <div className="flex justify-center max-h-[70vh]">
                 <video
                   src={mediaToken ? `${API_URL}/media/${jobIdShort}/final_summary.mp4?token=${mediaToken}` : undefined}
@@ -368,11 +394,14 @@ function App() {
               </div>
             </div>
 
-            {/* Actions — ปุ่มเริ่มใหม่อยู่มุมขวาบน (header) ที่เดียว */}
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${editSummary?.burn_subtitle ? 'lg:grid-cols-3' : ''} gap-3 pt-2`}>
+            {/* Actions — ปุ่มเริ่มใหม่อยู่มุมขวาบน (header) ที่เดียว
+                มือถือ: ดาวน์โหลดเต็มความกว้างบนสุด · ปุ่มแก้สองปุ่มอยู่แถวเดียวกันด้านล่าง */}
+            <div className={`grid grid-cols-2 ${editSummary?.burn_subtitle ? 'sm:grid-cols-3' : ''} gap-3 pt-2`}>
               <button
                 onClick={handleEditCuts}
-                className="flex items-center justify-center gap-2 bg-white text-slate-700 px-6 py-3.5 rounded-xl font-semibold border border-slate-200 hover:bg-slate-50 transition-colors active:scale-[0.98]"
+                className={`min-h-11 flex items-center justify-center gap-2 bg-white text-ink px-4 py-3.5 rounded-xl font-semibold border border-line-strong hover:bg-page hover:border-primary/40 transition-colors active:scale-[0.98] ${
+                  editSummary?.burn_subtitle ? '' : 'col-span-2 sm:col-span-1'
+                }`}
               >
                 <Scissors className="h-5 w-5" />
                 แก้ช่วงตัด
@@ -380,7 +409,7 @@ function App() {
               {editSummary?.burn_subtitle && (
                 <button
                   onClick={handleReedit}
-                  className="flex items-center justify-center gap-2 bg-white text-indigo-700 px-6 py-3.5 rounded-xl font-semibold border border-indigo-200 hover:bg-indigo-50 transition-colors active:scale-[0.98]"
+                  className="min-h-11 flex items-center justify-center gap-2 bg-white text-primary-dark px-4 py-3.5 rounded-xl font-semibold border border-line-strong hover:bg-page hover:border-primary/40 transition-colors active:scale-[0.98]"
                 >
                   <Type className="h-5 w-5" />
                   แก้คำบรรยาย
@@ -389,7 +418,7 @@ function App() {
               <a
                 href={mediaToken ? `${API_URL}/download/${jobIdShort}?token=${mediaToken}` : undefined}
                 download="ai_edited_video.mp4"
-                className={`flex items-center justify-center gap-2 bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors active:scale-[0.98] ${
+                className={`col-span-2 sm:col-span-1 order-first sm:order-none min-h-11 flex items-center justify-center gap-2 bg-primary text-white px-4 py-3.5 rounded-xl font-semibold hover:bg-primary-dark transition-colors active:scale-[0.98] ${
                   mediaToken ? '' : 'pointer-events-none opacity-60'
                 }`}
               >
@@ -398,7 +427,7 @@ function App() {
               </a>
             </div>
             {editSummary?.burn_subtitle && (
-              <p className="text-center text-xs text-slate-400">
+              <p className="text-center text-sm text-muted">
                 แก้คำบรรยายแล้วสร้างใหม่ได้เลย — ไม่ต้องตัดต่อใหม่ทั้งหมด
               </p>
             )}
@@ -420,27 +449,27 @@ function App() {
           onClick={() => setConfirmLogoutOpen(false)}
         >
           <div
-            className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-xl p-6 text-center"
+            className="w-full max-w-sm bg-white rounded-2xl border border-line shadow-xl p-6 text-center"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="h-11 w-11 rounded-full bg-red-50 flex items-center justify-center mx-auto">
               <LogOut className="h-5 w-5 text-red-600" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mt-3">ออกจากระบบ?</h3>
-            <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+            <h3 className="text-lg font-semibold text-ink mt-3">ออกจากระบบ?</h3>
+            <p className="text-sm text-muted mt-1.5 leading-relaxed">
               งานที่กำลังแก้ไขอยู่ (ยังไม่ได้เรนเดอร์) จะหาย —
               งานที่เสร็จแล้วยังอยู่ใน "งานของฉัน"
             </p>
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setConfirmLogoutOpen(false)}
-                className="flex-1 py-2.5 rounded-lg font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors"
+                className="flex-1 min-h-11 py-2.5 rounded-lg font-medium text-slate-700 bg-white border border-line-strong hover:bg-page transition-colors"
               >
                 ยกเลิก
               </button>
               <button
                 onClick={doLogout}
-                className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
+                className="flex-1 min-h-11 py-2.5 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
               >
                 ออกจากระบบ
               </button>

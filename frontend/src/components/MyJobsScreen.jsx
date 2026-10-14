@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ArrowLeft, Download, Loader2, FileVideo, RefreshCw, Play, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, FileVideo, RefreshCw, Play, ExternalLink, Check } from 'lucide-react';
 import { API_URL, fetchMediaToken } from '../config';
 
 // ป้ายสถานะ (ตรงกับค่าที่ worker เขียนลง DB) → ข้อความไทย + สี
 const STATUS_META = {
   processing: { label: 'กำลังประมวลผล', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   ready:      { label: 'พร้อมเลือกช่วง', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
-  done:       { label: 'เสร็จแล้ว',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  done:       { label: 'เสร็จแล้ว',      cls: 'bg-green-50 text-ink border-ok', dot: true },
   failed:     { label: 'ล้มเหลว',        cls: 'bg-red-50 text-red-700 border-red-200' },
-  cancelled:  { label: 'ยกเลิก',         cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  cancelled:  { label: 'ยกเลิก',         cls: 'bg-slate-100 text-muted border-line' },
   // งานที่หมดอายุ (ครบ JOB_RETENTION_DAYS วัน — ตั้งไว้ 30 ใน backend/.env) ถูกลบทั้ง row ออกจาก DB แล้ว → ไม่มี status นี้อีก
 };
 
@@ -73,21 +73,21 @@ export default function MyJobsScreen({ onClose, onOpen }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <button onClick={onClose} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900">
+        <button onClick={onClose} className="min-h-11 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-ink">
           <ArrowLeft className="h-4 w-4" /> กลับ
         </button>
-        <button onClick={load} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
+        <button onClick={load} className="min-h-11 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink">
           <RefreshCw className="h-4 w-4" /> รีเฟรช
         </button>
       </div>
 
       <div>
         <h2 className="text-2xl font-semibold text-slate-900">งานของฉัน</h2>
-        <p className="text-sm text-slate-400 mt-0.5">ไฟล์ผลลัพธ์เก็บไว้ 30 วัน กรุณาดาวน์โหลดเก็บไว้</p>
+        <p className="text-sm text-muted mt-0.5">ไฟล์ผลลัพธ์เก็บไว้ 30 วัน กรุณาดาวน์โหลดเก็บไว้</p>
       </div>
 
       {jobs === null && (
-        <div className="flex items-center justify-center py-16 text-slate-400">
+        <div className="flex items-center justify-center py-16 text-muted">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       )}
@@ -97,7 +97,7 @@ export default function MyJobsScreen({ onClose, onOpen }) {
       )}
 
       {jobs !== null && jobs.length === 0 && !error && (
-        <div className="text-center py-16 text-slate-400">
+        <div className="text-center py-16 text-muted">
           <FileVideo className="h-10 w-10 mx-auto mb-3 opacity-50" />
           <p>ยังไม่มีงาน — อัปโหลดวิดีโอเพื่อเริ่มต้น</p>
         </div>
@@ -106,14 +106,14 @@ export default function MyJobsScreen({ onClose, onOpen }) {
       {jobs !== null && jobs.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {jobs.map((job) => {
-            const meta = STATUS_META[job.status] || { label: job.status, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
+            const meta = STATUS_META[job.status] || { label: job.status, cls: 'bg-slate-100 text-muted border-line' };
             const isDone = job.status === 'done';
             const isReady = job.status === 'ready';
             const thumbUrl = isDone && tokens[job.id]
               ? `${API_URL}/media/${job.id}/thumbnail.jpg?token=${tokens[job.id]}`
               : null;
             return (
-              <div key={job.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md hover:border-slate-300 transition">
+              <div key={job.id} className="bg-white border border-line rounded-xl overflow-hidden hover:shadow-md hover:border-line-strong transition">
                 {/* ภาพปก / placeholder */}
                 <div className="relative aspect-video bg-gradient-to-br from-slate-100 to-slate-200">
                   {thumbUrl ? (
@@ -130,7 +130,12 @@ export default function MyJobsScreen({ onClose, onOpen }) {
                         : <FileVideo className="h-8 w-8 text-slate-300" />}
                     </div>
                   )}
-                  <span className={`absolute top-2 right-2 text-xs font-medium px-2 py-0.5 rounded-full border ${meta.cls} whitespace-nowrap`}>
+                  <span className={`absolute top-2 right-2 inline-flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded-full border ${meta.cls} whitespace-nowrap`}>
+                    {meta.dot && (
+                      <span className="h-4 w-4 rounded-full bg-ok text-white flex items-center justify-center" aria-hidden="true">
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                      </span>
+                    )}
                     {meta.label}
                   </span>
                 </div>
@@ -141,12 +146,12 @@ export default function MyJobsScreen({ onClose, onOpen }) {
                     {job.original_filename || 'ไม่มีชื่อไฟล์'}
                   </p>
                   <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-xs text-slate-400">{fmtDate(job.created_at)}</span>
+                    <span className="text-sm text-muted">{fmtDate(job.created_at)}</span>
                     <div className="flex items-center gap-1.5">
                       {isReady && onOpen && (
                         <button
                           onClick={() => onOpen(job.id)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg"
+                          className="inline-flex items-center gap-1 text-sm font-medium text-primary-dark bg-primary-soft hover:bg-primary-soft min-h-11 sm:min-h-9 px-3 py-1 rounded-lg"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                           เปิดต่อ
@@ -156,7 +161,7 @@ export default function MyJobsScreen({ onClose, onOpen }) {
                         <button
                           onClick={() => download(job.id)}
                           disabled={downloading === job.id}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg disabled:opacity-50"
+                          className="inline-flex items-center gap-1 text-sm font-medium text-white bg-primary hover:bg-primary-dark min-h-11 sm:min-h-9 px-3 py-1 rounded-lg disabled:opacity-50"
                         >
                           {downloading === job.id
                             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
