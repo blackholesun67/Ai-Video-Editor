@@ -162,6 +162,7 @@ async def upload_video(
     preset_id: str = Form(""),
     denoise: bool = Form(False),
     tiktok_fit: str = Form("blur"),
+    jl_cut: bool = Form(False),      # J/L-cut: ขยับจุดสลับภาพ เสียงไม่แตะ (ดู ffmpeg_utils._jl_video_bounds)
     current_user: User = Depends(get_current_user),   # ไม่มี token = 401 (บังคับ login)
     db: Session = Depends(get_db),
 ):
@@ -195,7 +196,7 @@ async def upload_video(
         tiktok_fit = "blur"
 
     print(f"DEBUG: Upload received: file={fname}, edit_mode={edit_mode}, aspect={output_mode}, "
-          f"target_length={target_length}s, burn_subtitle={burn_subtitle}, denoise={denoise}")
+          f"target_length={target_length}s, burn_subtitle={burn_subtitle}, denoise={denoise}, jl_cut={jl_cut}")
 
     try:
         job_id = str(uuid.uuid4())
@@ -243,7 +244,7 @@ async def upload_video(
 
         process_video_task.apply_async(
             args=[job_id, video_path, prompt, output_mode, target_length, burn_subtitle,
-                  preview_mode, preset_id, edit_mode, denoise, tiktok_fit],
+                  preview_mode, preset_id, edit_mode, denoise, tiktok_fit, jl_cut],
             task_id=job_id,
         )
 

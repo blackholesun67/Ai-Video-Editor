@@ -311,7 +311,7 @@ def _load_preview(job_dir: str) -> dict:
 def process_video_task(self, job_id, video_path, user_prompt,
                        output_mode="standard", target_length=60, burn_subtitle=False,
                        preview_mode=False, preset_id="", edit_mode=None, denoise=False,
-                       tiktok_fit="blur"):
+                       tiktok_fit="blur", jl_cut=False):
     job_dir = os.path.dirname(video_path)
     audio_path = os.path.join(job_dir, "full_audio.wav")
     final_output = os.path.join(job_dir, FINAL_VIDEO_NAME)
@@ -409,6 +409,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
             "burn_subtitle": burn_subtitle,
             "denoise": denoise,
             "tiktok_fit": tiktok_fit,           # ← โหมดจัดเฟรม 9:16 (blur = เห็นครบ / crop = เต็มจอ)
+            "jl_cut": bool(jl_cut),             # ← J/L-cut ตอน render (ปิด = ตัดตรงแบบเดิม)
             "segments": ai_result,
             "transcript": transcript,           # ← reuse ตอน render / re-edit (ไม่ถอดเสียงซ้ำ)
             "subtitle_phrases": phrases,        # ← phrases ที่ user แก้ได้
@@ -437,9 +438,9 @@ def process_video_task(self, job_id, video_path, user_prompt,
         self.update_state(state='PROGRESS', meta={
             'status': f'Step 4/4: Rendering ({output_mode})...', 'progress': 80
         })
-        _render(video_path, ai_result, transcript, final_output, job_dir,
-                output_mode, target_length, burn_subtitle, denoise=denoise,
-                tiktok_fit=tiktok_fit)
+        render_info = _render(video_path, ai_result, transcript, final_output, job_dir,
+                              output_mode, target_length, burn_subtitle, denoise=denoise,
+                              tiktok_fit=tiktok_fit, jl_cut=jl_cut)
 
         _make_thumbnail(final_output, job_dir)   # ภาพปกสำหรับหน้า "งานของฉัน"
         set_job_status(job_id, "done", result_path=f"{job_id}/{FINAL_VIDEO_NAME}")
@@ -453,6 +454,7 @@ def process_video_task(self, job_id, video_path, user_prompt,
                 "segments_kept": len(ai_result),
                 "duration_kept_seconds": round(total_keep, 1),
                 "burn_subtitle": bool(burn_subtitle),
+                "jl_cut_applied": render_info.get("jl_cut_applied", False),
             }
         }
 
@@ -556,10 +558,11 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
 
         # ขอบชุดนี้ผู้ใช้เห็นตัวเลขและกดยืนยันมาแล้วจากหน้า preview → ห้ามบวกเผื่อปลาย
         # ไม่งั้นไฟล์ที่ได้จะยาวกว่าที่หน้าจอบอก 0.2 วิ ต่อหนึ่งช่วง
-        _render(video_path, clean_segs, transcript or [], final_output, job_dir,
-                output_mode, target_length, burn_subtitle, edited_phrases=final_phrases,
-                denoise=denoise, tail_pad=0.0,
-                tiktok_fit=preview.get("tiktok_fit") or "blur")
+        render_info = _render(video_path, clean_segs, transcript or [], final_output, job_dir,
+                              output_mode, target_length, burn_subtitle, edited_phrases=final_phrases,
+                              denoise=denoise, tail_pad=0.0,
+                              tiktok_fit=preview.get("tiktok_fit") or "blur",
+                              jl_cut=bool(preview.get("jl_cut", False)))
 
         total_keep = sum(s["end"] - s["start"] for s in clean_segs)
         _make_thumbnail(final_output, job_dir)   # ภาพปกสำหรับหน้า "งานของฉัน"
@@ -574,6 +577,7 @@ def render_only_task(self, job_id, selected_segments, edited_phrases=None):
                 "segments_kept": len(clean_segs),
                 "duration_kept_seconds": round(total_keep, 1),
                 "burn_subtitle": bool(burn_subtitle),
+                "jl_cut_applied": render_info.get("jl_cut_applied", False),
             }
         }
 
@@ -642,21 +646,26 @@ def _fill_missing_phrases(edited_phrases: list[dict], transcript: list[dict],
 
 def _render(video_path, segments, transcript, final_output, job_dir,
             output_mode, target_length, burn_subtitle, edited_phrases=None,
-            denoise=False, tail_pad: float = 0.2, tiktok_fit: str = "blur"):
+            denoise=False, tail_pad: float = 0.2, tiktok_fit: str = "blur",
+            jl_cut: bool = False) -> dict:
     """
     tail_pad: เผื่อปลายช่วงกันเสียงขาด (Whisper มักให้ end เร็วกว่าเสียงจริง)
     ต้องเป็น 0 เมื่อขอบมาจากผู้ใช้ผ่านหน้า preview — ดู _seg_bounds
+    jl_cut: ขยับจุดสลับภาพแบบ J/L — เสียงและซับไม่เปลี่ยน ; คืน info {"jl_cut_applied": bool}
     """
+    info: dict = {}
     if output_mode == "tiktok":
         render_tiktok_video(
             video_path, segments, transcript, final_output, job_dir,
             target_length=target_length, burn_subtitle=burn_subtitle,
             edited_phrases=edited_phrases, denoise=denoise, tail_pad=tail_pad,
-            fit_mode=tiktok_fit,
+            fit_mode=tiktok_fit, jl_cut=jl_cut, info=info,
         )
     else:
         edit_and_merge_video(
             video_path, segments, final_output, job_dir,
             transcript=transcript, burn_subtitle=burn_subtitle,
             edited_phrases=edited_phrases, denoise=denoise, tail_pad=tail_pad,
+            jl_cut=jl_cut, info=info,
         )
+    return info

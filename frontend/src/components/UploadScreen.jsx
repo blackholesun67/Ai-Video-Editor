@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Upload, X, FileVideo, Scissors, ListChecks, Monitor, Smartphone, Loader2,
-  GraduationCap, Mic, Star, Video, Captions, Eye, AudioLines,
+  GraduationCap, Mic, Star, Video, Captions, Eye, AudioLines, Film,
 } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
@@ -53,6 +53,8 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
   const [denoise, setDenoise] = useState(false);
   // วิธีจัดเฟรมตอนแปลงเป็น 9:16 — ตั้งต้น blur เพราะ crop กินความกว้างไปมากในคลิปไวด์
   const [tiktokFit, setTiktokFit] = useState('blur');
+  // J/L-cut ปิดเป็นค่าเริ่มต้น — ปิด = render เหมือนเดิมทุกประการ (backend ไม่ขยับขอบภาพ)
+  const [jlCut, setJlCut] = useState(false);
   // ค่าเริ่มต้นเปิด — หน้ารีวิวช่วงตัดเป็นหัวใจของ Objective 4 (ผู้ใช้ติ๊กออกเองได้)
   const [previewMode, setPreviewMode] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -155,6 +157,7 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
     if (isPortrait) formData.append('tiktok_fit', tiktokFit);                // blur = เห็นครบ | crop = เต็มจอ
     formData.append('burn_subtitle', String(burnSubtitle));
     formData.append('denoise', String(denoise));
+    formData.append('jl_cut', String(jlCut));
     formData.append('preview_mode', String(previewMode));
     formData.append('preset_id', topicId || cutMode);
 
@@ -428,6 +431,16 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
                 <Eye className="h-4 w-4 text-primary" /> ขอตรวจช่วงตัดก่อน
               </p>
               <p className="text-sm text-muted mt-0.5">ดูว่า AI จะเก็บหรือตัดช่วงไหน แล้วแก้เองได้ก่อนสร้างวิดีโอ</p>
+            </div>
+          </label>
+
+          <label className={toggleCardCls(jlCut)}>
+            <input type="checkbox" checked={jlCut} onChange={(e) => setJlCut(e.target.checked)} className="mt-1 h-4 w-4 rounded accent-primary" />
+            <div className="flex-1">
+              <p className="text-base font-medium text-ink flex items-center gap-1.5">
+                <Film className="h-4 w-4 text-primary" /> รอยต่อแบบ J-Cut / L-Cut
+              </p>
+              <p className="text-sm text-muted mt-0.5">ให้ภาพเปลี่ยนก่อนหรือหลังเสียงเล็กน้อย (≤ 0.4 วิ) ที่รอยตัด — เหมาะกับคลิปที่ภาพเปลี่ยนชัดตรงรอยตัด; คลิปพูดหน้ากล้องที่เห็นปากชัด ปากอาจไม่ตรงเสียงชั่วครู่</p>
             </div>
           </label>
         </div>

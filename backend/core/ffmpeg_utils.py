@@ -1,4 +1,5 @@
 import json
+import math
 import subprocess
 import os
 import shutil
@@ -177,21 +178,126 @@ def _seg_bounds(segments, max_duration: float = 0.0,
     return out
 
 
+# ── J-Cut / L-Cut (ตัวเลือก jl_cut — ปิดเป็นค่าตั้งต้น) ──
+# ขยับเฉพาะ "จุดที่ภาพสลับ" เสียงคงเดิมทุกไบต์ → ซับ (ตามเสียง) ไม่เลื่อน ความยาวรวมไม่เปลี่ยน
+#   J = ภาพช่วงก่อนค้างต่ออีก d วิ ขณะเสียงช่วงถัดไปเริ่มแล้ว
+#   L = ภาพช่วงถัดไปขึ้นก่อน d วิ ขณะเสียงช่วงก่อนยังพูดอยู่
+# ทิศตายตัว: รอยตัดที่ 1,3,5… = J · 2,4,6… = L
+# ภาพส่วนที่ยืดออกมาคือฟุตเทจใน "ช่องว่างที่ถูกตัดทิ้ง" → d ต้องไม่เกินช่องว่าง ไม่งั้นเห็นเนื้อหาช่วงถัดไปซ้ำ
+try:                     # ค่า env ผิดรูปแบบห้ามทำ worker ล้มตอน import
+    JL_OFFSET = max(0.0, float(os.getenv("JL_OFFSET", "0.4")))
+except ValueError:
+    JL_OFFSET = 0.4
+JL_SEG_FRACTION = 0.4    # d ≤ 40% ของช่วงสองข้าง → ภาพที่โดนหดทั้งหัวทั้งท้ายเหลือ ≥ 20%
+JL_MIN_SHIFT = 0.1       # เลื่อนน้อยกว่านี้ (~3 เฟรม) ไม่คุ้ม → ตัดตรงแบบเดิม
+
+
+def _fps_value(fps_expr: str) -> float:
+    try:
+        num, _, den = str(fps_expr).partition("/")
+        return float(num) / float(den or 1)
+    except Exception:
+        return 0.0
+
+
+def _half_up(x: float) -> int:
+    """ปัดครึ่งขึ้นเสมอ (round() ของ Python ปัดครึ่งไปหาเลขคู่ — ผลขึ้นกับว่าเลขเฟรมคู่หรือคี่)"""
+    return math.floor(x + 0.5)
+
+
+def _jl_video_bounds(bounds, offset: float = JL_OFFSET, fps: float = 0.0):
+    """คืน ([(sel_start, sel_end, src_origin, out_origin)] ของ "ภาพ" แต่ละช่วง, [s ของแต่ละรอยตัด])
+    เสียงยังใช้ bounds เดิม ; ภาพชิ้น i = เฟรมต้นฉบับที่ t ∈ [sel_start, sel_end) วางบน output ที่
+    out_origin + (t − src_origin) — แมปเวลาแบบเดียวกับเสียงทุกประการ (ดู _build_trim_concat_graph)
+
+    ภาพช่วง i = [st_i + s_(i-1), en_i + s_i] โดย s = +d (J) / −d (L) / 0 (ตัดตรง)
+    รอยแรก/รอยท้ายไม่ขยับ → ผลรวมความยาวภาพเท่ากับเสียงพอดี
+
+    fps > 0 → ล็อกเข้ากริดเฟรม: d ปัดลงเป็นจำนวนเฟรมเต็ม และขอบของแต่ละชิ้นคิดจาก
+    "เวลาสะสมบน output" ไม่ใช่จากความยาวชิ้นเดี่ยว ๆ — ถ้าปัดทีละชิ้น เศษจะสะสมตามจำนวนรอยตัด
+    (วัดจริง: 9 ช่วง ภาพสั้นกว่าตัดตรง 1 เฟรม) ; ขอบ select วางกึ่งกลางระหว่างเฟรม จึงไม่หลุดเพราะปัดทศนิยม
+    """
+    n = len(bounds)
+    shifts = []
+    for b in range(n - 1):
+        (st_a, en_a), (st_b, en_b) = bounds[b], bounds[b + 1]
+        gap = max(0.0, st_b - en_a)
+        d = min(offset, gap, JL_SEG_FRACTION * (en_a - st_a), JL_SEG_FRACTION * (en_b - st_b))
+        if fps > 0:
+            d = int(d * fps + 1e-6) / fps
+        if d < JL_MIN_SHIFT:
+            d = 0.0
+        shifts.append(d if b % 2 == 0 else -d)
+    out = []
+    cum = 0.0                                   # เวลาสะสมของเสียงบน output ก่อนชิ้น i
+    for i, (st, en) in enumerate(bounds):
+        head = shifts[i - 1] if i > 0 else 0.0
+        tail = shifts[i] if i < n - 1 else 0.0
+        if fps > 0:
+            f0 = _half_up((cum + head) * fps)            # เฟรม output ที่ภาพชิ้นนี้เริ่ม/จบ
+            f1 = _half_up((cum + (en - st) + tail) * fps)
+            if i == n - 1:
+                # ชิ้นสุดท้ายปัดขึ้น → ภาพไม่สั้นกว่าเสียง (ปัดลงแล้ววัดได้ภาพสั้นกว่าเสียง 0.067 วิ)
+                f1 = math.ceil((cum + (en - st)) * fps - 1e-6)
+            src0 = _half_up((st + head + f0 / fps - (cum + head)) * fps)   # เฟรมต้นฉบับที่ตรงกับ f0 ตามการแมปของเสียง
+            out.append((max(0.0, round((src0 - 0.5) / fps, 4)),
+                        round((src0 + f1 - f0 - 0.5) / fps, 4),
+                        round(src0 / fps, 6), round(f0 / fps, 6), round((f1 - 0.5) / fps, 6)))
+        else:
+            out.append((round(st + head, 3), round(en + tail, 3), round(st + head, 6), round(cum + head, 6),
+                        round(cum + en - st + tail, 6)))
+        cum += en - st
+    return out, shifts
+
+
+def _jl_video_graph(video_bounds, fps_expr) -> str:
+    """ภาพแบบ J/L เป็นสายเดียว: select เฟรมทุกชิ้น → setpts แมปเวลาต้นฉบับ → output ทีละชิ้น → fps เติมช่อง
+
+    ทำไมไม่ trim ทีละชิ้นแล้ว concat: ขอบภาพ ≠ เสียง จึงต้อง concat ภาพแยกจากเสียง ซึ่งไม่ซิงก์ภาพกับเสียง
+    ที่ต้นชิ้นให้เหมือน concat=v=1:a=1 → ชิ้นที่เฟรมขาด (ต้นฉบับไม่มีเฟรมที่ t=0 แบบ A1, คลิป VFR) ทำให้ภาพ
+    ทุกชิ้นหลังจากนั้นมาก่อนเสียง (วัดจริงกับคลิปที่ลบเฟรม: 80 เฟรมคลาด > 1 เฟรม) ; ล็อกความยาวด้วย tpad
+    ได้ผลบน ffmpeg ใหม่ แต่ **4.4.2 ใน container ไม่ซ้ำเฟรมท้ายเมื่อกราฟมีสายเสียงด้วย** → ใช้ timestamp แทน
+    เฟรมวางตามเวลาที่แมปไว้ เฟรมที่ขาด fps เติมด้วยเฟรมก่อนหน้า ภาพจึงตรงเสียงไม่ว่าชิ้นจะมีกี่เฟรม
+    ชิ้นเรียงตามเวลาต้นฉบับและไม่ทับกัน (d ≤ ช่องว่าง) → if ซ้อนตามขอบท้ายของแต่ละชิ้นพอ
+    ชิ้นสุดท้ายต้อง min(…, out_end): เวลา EOF ของ "ต้นฉบับ" ผ่าน setpts ด้วยนิพจน์ของชิ้นสุดท้าย แล้ว fps
+    (ทั้งตัวนี้และตัวใน video_chain) เติมเฟรมสุดท้ายซ้ำไปถึงเวลานั้น — trim ไม่ช่วย เพราะ 4.4.2 ส่งเวลา EOF
+    จากต้นทางต่อไปตรง ๆ (วัดจริงบน 4.4.2: ภาพยาวเกิน 5 วิ เท่ากับหางต้นฉบับหลังชิ้นสุดท้าย)
+    """
+    sel = "+".join(f"gte(t,{a})*lt(t,{b})" for a, b, _, _, _ in video_bounds)
+    _, _, src, out, out_end = video_bounds[-1]
+    expr = f"min(T-{src}+{out},{out_end})"
+    for _, b, src, out, _ in reversed(video_bounds[:-1]):
+        expr = f"if(lt(T,{b}),T-{src}+{out},{expr})"
+    return (f"[0:v]select='{sel}',setpts='({expr})/TB',fps=fps={fps_expr}:start_time=0,"
+            f"trim=end={out_end}[vcat]")
+
+
 def _build_trim_concat_graph(bounds, has_audio, video_chain=None,
-                             subs_file=None, subs_style="", audio_chain=None):
+                             subs_file=None, subs_style="", audio_chain=None,
+                             video_bounds=None, jl_fps="30"):
     """
     สร้างสตริง filter_complex:
       trim ทุกช่วง → concat เป็นสตรีมเดียว → (option) video_chain + burn subtitle
       + (option) audio_chain (เช่น ลด noise) กับเสียงที่ concat แล้ว
+    video_bounds: ขอบของภาพที่ต่างจากเสียง (J/L-cut, ดู _jl_video_graph) ;
+                  None = ใช้ bounds เดียวกัน (กราฟเดิมทุกตัวอักษร)
     คืน (graph, video_map_label, audio_map_label|None)
     """
     parts = []
+    if video_bounds:
+        parts.append(_jl_video_graph(video_bounds, jl_fps))
     for i, (st, en) in enumerate(bounds):
-        parts.append(f"[0:v]trim=start={st}:end={en},setpts=PTS-STARTPTS[v{i}]")
+        if not video_bounds:
+            parts.append(f"[0:v]trim=start={st}:end={en},setpts=PTS-STARTPTS[v{i}]")
         if has_audio:
             parts.append(f"[0:a]atrim=start={st}:end={en},asetpts=PTS-STARTPTS[a{i}]")
     n = len(bounds)
-    if has_audio:
+    if has_audio and video_bounds:
+        # ภาพกับเสียงยาวไม่เท่ากันในแต่ละชิ้น (นั่นคือ J/L) → ภาพมาจาก _jl_video_graph เสียง concat แยก
+        # concat แบบ v=1:a=1 รอให้ทุกสตรีมของชิ้นจบก่อนเริ่มชิ้นถัดไป → ภาพที่สั้นกว่าถูกเติมเฟรมค้าง
+        # และภาพรวมยาวกว่าเสียง (วัดจริง: 899 vs 872 เฟรม + เฟรมค้างหลังทุกรอย L)
+        parts.append("".join(f"[a{i}]" for i in range(n)) + f"concat=n={n}:v=0:a=1[acat]")
+    elif has_audio:
         cat_in = "".join(f"[v{i}][a{i}]" for i in range(n))
         parts.append(f"{cat_in}concat=n={n}:v=1:a=1[vcat][acat]")
     else:
@@ -226,12 +332,27 @@ def _build_trim_concat_graph(bounds, has_audio, video_chain=None,
 
 def _run_filtergraph_render(video_path, bounds, output_path, temp_dir,
                             video_chain=None, subs_file=None, subs_style="",
-                            input_opts=None, out_opts=None, fps=None, audio_chain=None):
-    """ตัด + รวม + (option) subtitle/denoise ใน ffmpeg pass เดียว — frame/sample-accurate"""
+                            input_opts=None, out_opts=None, fps=None, audio_chain=None,
+                            jl_cut=False):
+    """ตัด + รวม + (option) subtitle/denoise ใน ffmpeg pass เดียว — frame/sample-accurate
+
+    jl_cut=True → ขอบภาพขยับแบบ J/L (เสียงไม่แตะ) ; ไม่มีแทร็กเสียง = ไม่มีความหมาย → ข้าม
+    คืน True ถ้าขอบภาพถูกขยับจริงอย่างน้อยหนึ่งรอย
+    """
     has_audio = _has_audio(video_path)
+    video_bounds = None
+    jl_fps = "30"
+    if jl_cut and has_audio and len(bounds) > 1:
+        jl_fps = _probe_fps_expr(video_path)
+        vb, shifts = _jl_video_bounds(bounds, fps=_fps_value(jl_fps))
+        moved = sum(1 for s in shifts if s)
+        print(f"🎞️ [J/L-cut] offset={JL_OFFSET}s | ขยับ {moved}/{len(shifts)} รอยตัด "
+              f"({', '.join(f'{s:+.3f}' for s in shifts)})")
+        video_bounds = vb if moved else None    # ไม่มีรอยไหนขยับได้ = ตัดตรงแบบเดิมทุกตัวอักษร
     graph, vmap, amap = _build_trim_concat_graph(
         bounds, has_audio, video_chain=video_chain,
         subs_file=subs_file, subs_style=subs_style, audio_chain=audio_chain,
+        video_bounds=video_bounds, jl_fps=jl_fps,
     )
     cmd = ["ffmpeg", "-y", *(input_opts or []), "-i", os.path.abspath(video_path),
            "-filter_complex", graph, "-map", vmap]
@@ -245,6 +366,19 @@ def _run_filtergraph_render(video_path, bounds, output_path, temp_dir,
     cmd += ["-movflags", "+faststart", *(out_opts or []), os.path.abspath(output_path)]
     print(f"🎬 [filter_complex] {len(bounds)} segment(s), audio={has_audio} → {os.path.basename(output_path)}")
     subprocess.run(cmd, check=True, cwd=temp_dir)
+    return video_bounds is not None
+
+
+def _run_filtergraph_with_jl(video_path, bounds, output_path, temp_dir, jl_cut=False, **kw):
+    """กราฟ J/L ล้ม → ลองกราฟแบบเดิม (ตัดตรง) ก่อน แล้วค่อยปล่อยให้ผู้เรียกตกไป legacy
+    (legacy ตัดภาพ+เสียงรวมเป็น part เดียว แยกขอบภาพไม่ได้ → ไม่รองรับ J/L)"""
+    if jl_cut:
+        try:
+            return _run_filtergraph_render(video_path, bounds, output_path, temp_dir,
+                                           jl_cut=True, **kw)
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️ [J/L-cut] filter_complex failed ({e}) — retry แบบตัดตรง")
+    return _run_filtergraph_render(video_path, bounds, output_path, temp_dir, **kw)
 
 
 def _write_subs(temp_dir, highlights, transcript, edited_phrases):
@@ -263,12 +397,15 @@ def _write_subs(temp_dir, highlights, transcript, edited_phrases):
 
 def edit_and_merge_video(video_path, highlights_json, output_path, job_dir,
                           transcript=None, burn_subtitle=False, edited_phrases=None,
-                          denoise=False, tail_pad: float = 0.2):
+                          denoise=False, tail_pad: float = 0.2, jl_cut=False, info=None):
     """
     หัวใจหลัก: ตัดวิดีโอตามช่วงที่เลือก + รวมเป็นไฟล์เดียว (มาตรฐาน 16:9)
     burn_subtitle=True → เผา subtitle ลงไปด้วย
     edited_phrases → ถ้าให้มา ใช้แทน transcript (user แก้แล้ว)
+    jl_cut → ขยับจุดสลับภาพแบบ J/L (ดู _jl_video_bounds) ; info (dict) ← "jl_cut_applied"
     """
+    info = info if info is not None else {}
+    info["jl_cut_applied"] = False
     print("\n" + "=" * 50)
     print(f"🎬 STANDARD EDIT (burn_subtitle={burn_subtitle})")
     print("=" * 50 + "\n")
@@ -293,18 +430,20 @@ def edit_and_merge_video(video_path, highlights_json, output_path, job_dir,
 
     if len(bounds) <= FILTERGRAPH_MAX_SEGMENTS:
         try:
-            _run_filtergraph_render(
-                video_path, bounds, output_path, temp_dir,
+            info["jl_cut_applied"] = bool(_run_filtergraph_with_jl(
+                video_path, bounds, output_path, temp_dir, jl_cut=jl_cut,
                 video_chain=[f"fps={_probe_fps_expr(video_path)}"],
                 subs_file=subs_file, subs_style=_STD_SUB_STYLE,
                 audio_chain=_output_audio_chain(denoise),
-            )
+            ))
             print(f"🎉 STANDARD EDIT SUCCESS → {output_path}")
             _cleanup_dir(temp_dir)
             return output_path
         except subprocess.CalledProcessError as e:
             print(f"⚠️ filter_complex failed ({e}) — falling back to legacy per-part render")
 
+    if jl_cut:
+        print("⚠️ [J/L-cut] เส้นทาง legacy ไม่รองรับ J/L — render แบบตัดตรง")
     result = _legacy_edit_and_merge(video_path, bounds, output_path, temp_dir,
                                     subs_file, _STD_SUB_STYLE, denoise=denoise)
     _cleanup_dir(temp_dir)
@@ -452,10 +591,12 @@ def verify_output_dimensions(video_path: str) -> tuple[int, int, str]:
 
 def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_dir,
                         target_length=60, burn_subtitle=True, edited_phrases=None,
-                        denoise=False, tail_pad: float = 0.2, fit_mode: str = "blur"):
+                        denoise=False, tail_pad: float = 0.2, fit_mode: str = "blur",
+                        jl_cut=False, info=None):
     """
     fit_mode = "blur" (ตั้งต้น) เห็นครบทั้งเฟรม เติมขอบด้วยภาพเดิมที่เบลอ
              = "crop" เต็มจอแบบเดิม ตัดส่วนที่ล้นทิ้ง
+    jl_cut → ขยับจุดสลับภาพแบบ J/L (ดู _jl_video_bounds) ; info (dict) ← "jl_cut_applied"
 
     TikTok render: ตัดช่วงที่เลือก → center-crop 9:16 (1080x1920) → burn subtitle
     ทำใน filter_complex pass เดียว (frame/sample-accurate, subtitle ตรง timeline output)
@@ -470,6 +611,8 @@ def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_
 
     if fit_mode not in TIKTOK_FIT_MODES:
         fit_mode = "blur"
+    info = info if info is not None else {}
+    info["jl_cut_applied"] = False
 
     temp_dir = os.path.abspath(os.path.join(job_dir, "tiktok_temp"))
     os.makedirs(temp_dir, exist_ok=True)
@@ -495,15 +638,15 @@ def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_
 
     if len(bounds) <= FILTERGRAPH_MAX_SEGMENTS:
         try:
-            _run_filtergraph_render(
-                video_path, bounds, output_path, temp_dir,
+            info["jl_cut_applied"] = bool(_run_filtergraph_with_jl(
+                video_path, bounds, output_path, temp_dir, jl_cut=jl_cut,
                 video_chain=tiktok_chain,
                 subs_file=subs_file, subs_style=_TIKTOK_SUB_STYLE,
                 input_opts=["-noautorotate"],
                 out_opts=["-metadata:s:v:0", "rotate=0"],
                 fps=30,
                 audio_chain=_output_audio_chain(denoise),
-            )
+            ))
             _verify_tiktok(output_path)
             print(f"🎉 TIKTOK RENDER SUCCESS → {output_path}")
             _cleanup_dir(temp_dir)
@@ -511,6 +654,8 @@ def render_tiktok_video(video_path, keep_segments, transcript, output_path, job_
         except subprocess.CalledProcessError as e:
             print(f"⚠️ filter_complex failed ({e}) — falling back to legacy per-part render")
 
+    if jl_cut:
+        print("⚠️ [J/L-cut] เส้นทาง legacy ไม่รองรับ J/L — render แบบตัดตรง")
     result = _legacy_render_tiktok(video_path, bounds, output_path, temp_dir, subs_file,
                                    denoise=denoise, source_rotated=bool(rotation))
     _verify_tiktok(output_path)
