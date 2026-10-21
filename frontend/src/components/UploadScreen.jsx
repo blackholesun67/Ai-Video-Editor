@@ -434,13 +434,14 @@ const UploadScreen = ({ onUploadSuccess, isAuthed = true, requestLogin }) => {
             </div>
           </label>
 
-          <label className={toggleCardCls(jlCut)}>
-            <input type="checkbox" checked={jlCut} onChange={(e) => setJlCut(e.target.checked)} className="mt-1 h-4 w-4 rounded accent-primary" />
+          {/* ตัวเลือกรอง — การ์ดเตี้ยกว่าสองช่องบน (p-4 → py-2.5) ตัวอักษรเล็กลงหนึ่งระดับ */}
+          <label className={toggleCardCls(jlCut).replace('p-4', 'px-4 py-2.5')}>
+            <input type="checkbox" checked={jlCut} onChange={(e) => setJlCut(e.target.checked)} className="mt-0.5 h-4 w-4 rounded accent-primary" />
             <div className="flex-1">
-              <p className="text-base font-medium text-ink flex items-center gap-1.5">
+              <p className="text-sm font-medium text-ink flex items-center gap-1.5">
                 <Film className="h-4 w-4 text-primary" /> รอยต่อแบบ J-Cut / L-Cut
               </p>
-              <p className="text-sm text-muted mt-0.5">ให้ภาพเปลี่ยนก่อนหรือหลังเสียงเล็กน้อย (≤ 0.4 วิ) ที่รอยตัด — เหมาะกับคลิปที่ภาพเปลี่ยนชัดตรงรอยตัด; คลิปพูดหน้ากล้องที่เห็นปากชัด ปากอาจไม่ตรงเสียงชั่วครู่</p>
+              <p className="text-xs text-muted mt-0.5">ภาพเปลี่ยนก่อน/หลังเสียงเล็กน้อยที่รอยตัด</p>
             </div>
           </label>
         </div>
