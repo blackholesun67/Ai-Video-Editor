@@ -10,8 +10,11 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.4-76B900.svg)](https://developer.nvidia.com/cuda-zone)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1.svg)](https://www.postgresql.org/)
+[![JWT](https://img.shields.io/badge/Auth-Google%20OAuth%20%2B%20JWT-FBBC05.svg)](https://jwt.io/)
 
 อัปโหลดวิดีโอ → AI **ฟังเสียงและดูภาพ** → ตัดเฉพาะส่วนสำคัญ → ตรวจ/แก้เองได้ก่อนตัดจริง → ได้วิดีโอที่กระชับขึ้น พร้อม subtitle อัตโนมัติ
+**ล็อกอินด้วย Google · งานตัดต่อแยกตามผู้ใช้**
 
 </div>
 
@@ -27,10 +30,13 @@
 - 🇹🇭 **Bilingual support** — Thai-native + English embedded → auto-translate
 - ⚡ **GPU Acceleration** — CUDA + Whisper float16 + BatchedInferencePipeline
 - 🛡️ **Multi API Key fallback** — auto-switch เมื่อ quota หมด
+- 🔐 **ระบบล็อกอิน (Login ด้วย Google)** — Google OAuth → JWT · **งานตัดต่อแยกตามผู้ใช้** เห็นเฉพาะของตัวเอง
 
 ### Advanced
 - 🎛️ **Preview แบบแก้ได้จริง** — เห็นช่วงที่ AI ตัดออกและกดเอากลับได้ · ขยับขอบทีละ 1 วิ–1 นาที ·
   **แยก/รวมช่วง** เองเพื่อทำไฮไลต์ · แถบไทม์ไลน์พร้อมขีดจุดฉากเปลี่ยน
+- 🎞️ **J-Cut / L-Cut** — เลื่อน**เฉพาะจุดภาพสลับ** ให้ภาพนำ/ตามเสียง → รอยตัดลื่นขึ้นแบบมืออาชีพ
+  (เลือกเปิดเอง · เสียงและ subtitle ไม่ขยับ · ความยาวรวมเท่าเดิม)
 - ✏️ **Subtitle Editor** — แก้ subtitle ทีละบรรทัด **เฉพาะช่วงที่เลือกไว้จริง** ก่อน burn-in
 - 🩹 **ซ่อมท่อนที่ Whisper หลอน** — Pass 3 ตรวจ repetition loop แล้วถอดเสียงใหม่ กู้เนื้อหาที่หายกลับมา
 - 🤖 **AI Post-correction** — Gemini แก้ชื่อเฉพาะ + แปลประโยค English ↔ Thai
@@ -63,12 +69,15 @@
 ```
 ┌─────────────────┐
 │   Frontend      │   React 19 + Vite + Tailwind
-│   (port 80)     │   Browser → Preview / Edit subtitle
+│   (port 80)     │   Login (Google) → Preview / Edit subtitle / My Jobs
 └────────┬────────┘
-         │ HTTP/JSON
-┌────────▼────────┐
-│   Backend API   │   FastAPI + Pydantic validation
-│   (port 8000)   │   Upload / Status / Render / Subtitle CRUD
+         │ HTTP/JSON  (Authorization: Bearer <JWT>)
+┌────────▼────────┐        ┌──────────────┐
+│   Backend API   │◄──────►│  PostgreSQL  │  users + jobs
+│   (port 8000)   │        │  (dev:SQLite)│  งานแยกตามผู้ใช้
+│  Auth /auth/*   │        └──────────────┘  (Adminer :8080)
+│  JWT · OAuth    │
+│  Upload/Render  │
 └────────┬────────┘
          │
 ┌────────▼────────────────────────────────────────────┐
@@ -85,6 +94,7 @@
 │  │ 6. Guard 4 ชั้น (outline/outro/snap/จบประโยค) │  │
 │  │ 7. Phrase generation (sentence-aware)         │  │
 │  │ 8. FFmpeg render (cut + concat + burn-in SRT) │  │
+│  │    + J/L-cut (ออปชัน: ภาพนำ/ตามเสียงที่รอยตัด) │  │
 │  └───────────────────────────────────────────────┘  │
 └─────┬───────────────────────────────┬───────────────┘
       │                               │
@@ -100,6 +110,8 @@
 |---|---|
 | **Frontend** | React 19 · Vite · Tailwind CSS · Axios |
 | **Backend** | FastAPI · Pydantic · Python 3.11 |
+| **Auth** | PyJWT (HS256) + Google OAuth (`google-auth`) · token revocation |
+| **Database** | PostgreSQL 16 (prod) / SQLite (dev) · SQLAlchemy 2.0 |
 | **Queue** | Celery + Redis |
 | **Transcription** | faster-whisper 1.2 (BatchedInference) |
 | **AI Analysis** | Google Gemini 2.5/2.0/3-flash |
@@ -108,7 +120,7 @@
 | **Video** | FFmpeg libx264 + ASS subtitle burn-in |
 | **Thai NLP** | PyThaiNLP newmm tokenizer |
 | **GPU** | NVIDIA CUDA 12.4 + PyTorch + float16 |
-| **Container** | Docker Compose (4 services) |
+| **Container** | Docker Compose (6 services) + Adminer (DB UI) |
 
 ---
 
@@ -123,6 +135,7 @@
 | **Disk** | 30 GB | 100 GB SSD |
 | **Docker** | Docker Compose v2 + NVIDIA Container Toolkit | |
 | **Gemini API Key** | 1 key (free tier) | 2+ keys (parallel calls) |
+| **Google OAuth Client ID** | optional (ปิดล็อกอินได้ตอน dev) | required ตอน deploy จริง |
 
 ---
 
@@ -151,9 +164,17 @@ GEMINI_API_KEYS=AIzaSy...your_key...
 GEMINI_API_KEYS=AIzaSy...key1...,AIzaSy...key2...
 
 REDIS_URL=redis://redis:6379/0
+
+# ─── Auth + Database ───
+# JWT_SECRET: คีย์เซ็น token — production สร้างด้วย `openssl rand -hex 32`
+JWT_SECRET=change-me-dev-secret
+DB_PASSWORD=aivepass                 # รหัสผ่าน postgres
+DATABASE_URL=                        # ว่าง = SQLite (dev) · postgres ใช้ค่าใน .env.example
+GOOGLE_CLIENT_ID=                    # ว่าง = ปิดปุ่ม Login ด้วย Google (dev ใช้ได้)
 ```
 
 > 💡 ขอ Gemini API key ฟรีจาก [Google AI Studio](https://aistudio.google.com/app/apikey)
+> 🔐 ขอ Google Client ID จาก [Google Cloud Console](https://console.cloud.google.com/) → APIs &amp; Services → Credentials → OAuth client ID (Web)
 
 ### 3. Build + Start
 
@@ -170,11 +191,13 @@ docker compose up -d --build
 | 🌐 **Web UI** | http://127.0.0.1 |
 | 🔌 API docs | http://127.0.0.1:8000/docs |
 | ❤️ Health | http://127.0.0.1:8000/health |
+| 🗄️ Adminer (DB UI) | http://127.0.0.1:8080 |
 
 ---
 
 ## 📖 Usage
 
+0. **Login ด้วย Google** (ถ้าตั้ง `GOOGLE_CLIENT_ID`) — งานทุกชิ้นผูกกับบัญชี ดูย้อนหลังได้ที่ **My Jobs**
 1. **Upload** วิดีโอ (.mp4, .mov, .mkv) ขนาด ≤ 2GB
 2. **เลือกโหมดตัด** — `เก็บเนื้อหาครบ` (คลีนนิ่ง) หรือ `สรุปให้เข้าใจครบ`
 3. **เลือกสัดส่วน** — แนวนอน 16:9 หรือ แนวตั้ง 9:16
@@ -271,6 +294,26 @@ Whisper ติด repetition loop ได้เมื่อเสียงฟั�
 | `TIKTOK_BLUR_RADIUS` | `40` | ความแรงการเบลอพื้นหลังในโหมด "เห็นครบ" |
 | `TIKTOK_BLUR_PASSES` | `4` | จำนวนรอบการเบลอ |
 
+#### Auth + Database
+
+| Variable | Default | Description |
+|---|---|---|
+| `JWT_SECRET` | `dev-secret-change-me-in-production` | คีย์เซ็น session token (HS256) — **production ต้องตั้งค่าสุ่มยาว ๆ** (`openssl rand -hex 32`) |
+| `JWT_TTL_HOURS` | `24` | อายุ token (ชั่วโมง) — logout เพิกถอนทุก token ทันทีผ่าน `users.token_version` |
+| `DATABASE_URL` | ว่าง → SQLite | prod: `postgresql+psycopg2://aive:<DB_PASSWORD>@postgres:5432/aivideo` |
+| `DB_PASSWORD` | `aivepass` | รหัสผ่าน postgres (docker-compose ใช้ตั้งค่า container + ประกอบ `DATABASE_URL`) |
+| `GOOGLE_CLIENT_ID` | ว่าง | Google OAuth Client ID (`...apps.googleusercontent.com`) — ว่าง = ปิดปุ่ม Login |
+| `JOB_RETENTION_DAYS` | `7` | ลบงานอัตโนมัติหลังกี่วัน (deploy จริงตั้ง `30`) — cleanup รันทุกวันตี 3 เวลาไทย |
+| `CORS_ORIGINS` | localhost | โดเมนที่อนุญาต (คั่นด้วย `,`) — deploy จริงใส่ `https://yourdomain.com` |
+
+#### J-Cut / L-Cut
+
+| Variable | Default | Description |
+|---|---|---|
+| `JL_OFFSET` | `0.4` | ระยะที่ภาพนำ/ตามเสียงที่รอยตัด (วินาที) — จริง = `min(0.4, ช่องว่างระหว่างช่วง, 40% ของช่วงข้างเคียง)` |
+
+> เปิด/ปิดได้ที่หน้าอัปโหลด (ช่องติ๊กเดียว ปิดเป็นค่าตั้งต้น) — **ปิด = กราฟ render เดิมทุกไบต์**
+
 ### Tuning Performance
 
 ใน `docker-compose.yml` ปรับ `WHISPER_BATCH_SIZE` ตาม VRAM:
@@ -320,6 +363,20 @@ client เก่าที่ส่ง `edit_mode=short` หรือ `hook` → 
 
 > env `HOOK_*` / `SENTENCE_*` ด้านบนมีผลเฉพาะเมื่อเปิดโหมดนี้กลับมา
 
+### J-Cut / L-Cut (`jl_cut`)
+
+ช่องติ๊กที่หน้าอัปโหลด (ปิดเป็นค่าตั้งต้น) — ขยับ**เฉพาะจุดที่ภาพสลับ** โดย**ไม่แตะเสียง**
+ทำให้รอยตัดลื่นขึ้นแบบงานตัดต่อมืออาชีพ โดยเสียงและ subtitle ยังอยู่ที่เดิม ความยาวรวมเท่าเดิม
+
+| แบบ | ภาพ | ใช้ที่รอยตัดลำดับ |
+|---|---|---|
+| **J-cut** | ภาพช่วงก่อน**ค้างต่อ** ขณะเสียงช่วงถัดไปเริ่มแล้ว | 1, 3, 5… |
+| **L-cut** | ภาพช่วงถัดไป**ขึ้นก่อน** ที่เสียงจะเปลี่ยน | 2, 4, 6… |
+
+- ระยะเลื่อน `d = min(JL_OFFSET 0.4, ช่องว่างระหว่างช่วง, 40% ของช่วงข้างเคียง)` ปัดลงเป็นเฟรมเต็ม
+- ปิดอยู่ = กราฟ `filter_complex` เดิมทุกไบต์ · เปิดแล้ว concat ภาพ/เสียงแยกสายเพราะขอบไม่เท่ากัน
+- ผลลัพธ์ว่าใช้ J/L จริงหรือไม่ดูได้ที่ `edit_summary.jl_cut_applied`
+
 ### Subtitle Sync
 
 - Subtitle timing ใช้ **word-level timestamps** จาก Whisper โดยตรง (ตัดวรรคที่จังหวะหยุดพูดจริง)
@@ -340,17 +397,25 @@ ai-video-editor/
 │   │   ├── ffmpeg_utils.py    # Audio extract + cut + concat + burn subtitle
 │   │   ├── srt_utils.py       # SRT generation + phrase splitting + lead time
 │   │   ├── vad_logic.py       # Silero VAD wrapper
-│   │   └── visual_logic.py    # สัญญาณจากภาพ + ดึงคีย์เฟรมให้ Gemini
-│   ├── main.py                # FastAPI app (endpoints)
-│   ├── tasks.py               # Celery tasks (process_video + render_only)
+│   │   ├── visual_logic.py    # สัญญาณจากภาพ + ดึงคีย์เฟรมให้ Gemini
+│   │   ├── auth.py            # JWT (HS256) + media token + get_current_user
+│   │   ├── database.py        # SQLAlchemy engine/session (Postgres | SQLite)
+│   │   ├── models.py          # ORM: User / Job (งานผูกกับเจ้าของ)
+│   │   └── schemas.py         # Pydantic DTO (auth + job)
+│   ├── routes/
+│   │   └── auth.py            # /auth/google · /auth/me · /auth/logout · /auth/config
+│   ├── main.py                # FastAPI app (endpoints + include_router(auth))
+│   ├── tasks.py               # Celery tasks (process_video + render_only + cleanup)
 │   ├── requirements.txt
 │   ├── Dockerfile             # CUDA base + Python deps
 │   └── .env.example
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx            # State machine: processing/preview/editing/done
+│   │   ├── App.jsx            # State machine: login/processing/preview/editing/done
 │   │   ├── components/
-│   │   │   ├── UploadScreen.jsx
+│   │   │   ├── LoginScreen.jsx        # Sign in with Google
+│   │   │   ├── MyJobsScreen.jsx       # งานของผู้ใช้ (retention 30 วัน)
+│   │   │   ├── UploadScreen.jsx       # เลือกโหมด/สัดส่วน/subtitle/J-L cut
 │   │   │   ├── Processing.jsx
 │   │   │   ├── PreviewScreen.jsx
 │   │   │   ├── SegmentRow.jsx        # แถวช่วง (ติ๊ก/ขยับขอบ/แยก/รวม)
@@ -361,7 +426,7 @@ ai-video-editor/
 │   │   └── config.js
 │   ├── package.json
 │   └── Dockerfile
-├── docker-compose.yml          # 4 services (frontend / backend / worker / redis)
+├── docker-compose.yml          # 6 services (frontend/backend/worker/redis/postgres/adminer)
 └── CLAUDE.md                   # กฎที่ห้ามพัง + กับดักที่เคยเจอ (อ่านก่อนแก้โค้ด)
 ```
 
@@ -475,17 +540,24 @@ cd frontend && npx esbuild src/components/<file>.jsx --loader:.jsx=jsx --bundle 
 - [x] Preview mode — เอาช่วงที่ AI ตัดกลับมา / ขยับขอบ / **แยก-รวมช่วง**
 - [x] **วิเคราะห์ภาพ** — ฉากเปลี่ยน/จอดำ/ภาพค้าง + ส่งคีย์เฟรมให้ Gemini
 - [x] **9:16 เลือกได้** — เห็นครบ (เบลอขอบ) / เต็มจอ (crop)
+- [x] 🔐 **ระบบล็อกอิน** — Google OAuth + JWT + งานแยกตามผู้ใช้ (PostgreSQL / SQLAlchemy)
+- [x] 🎞️ **J-Cut / L-Cut** — ภาพนำ/ตามเสียงที่รอยตัด (ออปชัน)
+- [x] **UI v2.1** — ธีมน้ำเงิน · help box หน้าเลือกช่วง · สถานะประมวลผลภาษาไทย
+- [x] **Chapter 4 Evaluation** — วัด Accuracy / Recall / Precision / Specificity (ตาราง TP/FP/FN/TN)
 
 ---
 
 ## 🔐 Security
 
+- ✅ **Authentication** — Google OAuth → JWT (HS256) · token หมดอายุ 24 ชม.
+- ✅ **Token revocation** — logout เพิกถอนทุกอุปกรณ์ทันทีผ่าน `users.token_version`
+- ✅ **Per-user isolation** — เห็นเฉพาะงานของตัวเอง · `owned_job_or_404` คืน **404 ไม่ใช่ 403** กัน job-id enumeration
+- ✅ **Media token** — ลิงก์ดาวน์โหลด/สตรีมใช้ token อายุสั้นแยกจาก session
 - ✅ Path traversal protection (filename sanitization)
-- ✅ File size limit (2GB upload max)
-- ✅ Extension whitelist (only video formats)
-- ✅ CORS lockdown (localhost only by default)
-- ✅ API keys via env (never committed)
-- ✅ Storage cleanup (auto-delete jobs > 7 days)
+- ✅ File size limit + extension whitelist (video only)
+- ✅ CORS lockdown (localhost by default · `CORS_ORIGINS` ตอน deploy)
+- ✅ Secrets via env (`.env` gitignored — API keys / `JWT_SECRET` / Client ID ไม่เคย commit)
+- ✅ Storage cleanup (auto-delete ตาม `JOB_RETENTION_DAYS` — deploy จริง 30 วัน, รันตี 3 เวลาไทย)
 
 ---
 
